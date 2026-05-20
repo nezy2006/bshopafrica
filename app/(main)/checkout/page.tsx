@@ -4,7 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { getCart, clearCart, type Cart } from "@/lib/cart";
+import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting } from "@/lib/cart";
+
+// Legacy shape for checkout summary compat
+interface Cart { domain?: CartDomain; hosting?: CartHosting; }
+function itemsToCart(items: CartItem[]): Cart {
+  return {
+    domain:  items.find(i => i.type === "domain")  as CartDomain  | undefined,
+    hosting: items.find(i => i.type === "hosting") as CartHosting | undefined,
+  };
+}
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
@@ -489,7 +498,8 @@ export default function CheckoutPage() {
   const [orderNum, setOrderNum] = useState("");
 
   useEffect(() => {
-    const c = getCart();
+    const items = getCart();
+    const c = itemsToCart(items);
     if (!c.domain && !c.hosting) { router.replace("/cart"); return; }
     setCart(c);
     setReady(true);

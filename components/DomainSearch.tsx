@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DomainCheckResult } from "@/lib/whmcs";
-import { getCart, saveCart } from "@/lib/cart";
+import { addToCart } from "@/lib/cart";
 
 const TLDS = [".com", ".net", ".org", ".biz", ".xyz"];
 
@@ -62,7 +62,7 @@ function AvailableCard({
 
   const handleAddToCart = () => {
     const name = result.domain.slice(0, result.domain.length - tld.length);
-    saveCart({ ...getCart(), domain: { type: "domain", name, tld, domain: result.domain, price: result.price ?? 12 } });
+    addToCart({ id: result.domain, type: "domain", name, tld, domain: result.domain, price: result.price ?? 12 });
     router.push("/cart");
   };
 

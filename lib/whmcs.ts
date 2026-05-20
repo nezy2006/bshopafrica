@@ -223,3 +223,85 @@ export async function getAdminTickets(status = "", limitstart = 0, limitnum = 20
     tickets: raw.map(t => ({ tid: String(t.tid ?? ""), id: Number(t.id ?? 0), title: String(t.title ?? ""), firstname: String(t.firstname ?? ""), lastname: String(t.lastname ?? ""), email: String(t.email ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), date: String(t.date ?? ""), department: String(t.deptname ?? "") })),
   };
 }
+
+export async function acceptOrder(orderId: number): Promise<void> {
+  await callWhmcs("AcceptOrder", { orderid: orderId });
+}
+
+export async function cancelOrder(orderId: number): Promise<void> {
+  await callWhmcs("CancelOrder", { orderid: orderId });
+}
+
+/* ─── Extended client types ──────────────────────────────────────────────── */
+export interface ClientOrder {
+  id: number; date: string; total: string; status: string; currencycode: string;
+}
+
+export interface TicketReply {
+  id: number; userid: number; name: string; email: string;
+  date: string; message: string; type: "client" | "staff";
+}
+
+export interface SupportTicket {
+  id: number; tid: string; title: string; status: string;
+  priority: string; deptname: string; date: string; lastreply: string;
+  replies?: TicketReply[];
+}
+
+/* ─── Extended client API ────────────────────────────────────────────────── */
+export async function getClientOrders(clientId: number): Promise<ClientOrder[]> {
+  try {
+    const data = await callWhmcs("GetOrders", { userid: clientId, limitnum: 50 });
+    const raw = (data.orders as { order: WhmcsRaw[] } | undefined)?.order ?? [];
+    return raw.map(o => ({ id: Number(o.id ?? 0), date: String(o.date ?? ""), total: String(o.amount ?? "0.00"), status: String(o.status ?? ""), currencycode: String(o.currencycode ?? "USD") }));
+  } catch { return []; }
+}
+
+export async function getTickets(clientId: number): Promise<SupportTicket[]> {
+  try {
+    const data = await callWhmcs("GetSupportTickets", { clientid: clientId, limitnum: 50 });
+    const raw = (data.tickets as { ticket: WhmcsRaw[] } | undefined)?.ticket ?? [];
+    return raw.map(t => ({ id: Number(t.id ?? 0), tid: String(t.tid ?? ""), title: String(t.title ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), deptname: String(t.deptname ?? ""), date: String(t.date ?? ""), lastreply: String(t.lastreply ?? "") }));
+  } catch { return []; }
+}
+
+export async function getTicket(ticketId: number): Promise<SupportTicket & { replies: TicketReply[] }> {
+  const data = await callWhmcs("GetSupportTicket", { ticketid: ticketId });
+  const raw = (data.replies as { reply: WhmcsRaw[] } | undefined)?.reply ?? [];
+  const replies: TicketReply[] = raw.map(r => ({
+    id: Number(r.id ?? 0), userid: Number(r.userid ?? 0),
+    name: String(r.name ?? r.admin ?? "Staff"), email: String(r.email ?? ""),
+    date: String(r.date ?? ""), message: String(r.message ?? ""),
+    type: (r.userid ? "client" : "staff") as "client" | "staff",
+  }));
+  return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies };
+}
+
+export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string }): Promise<{ ticketId: number; tid: string }> {
+  const data = await callWhmcs("OpenSupportTicket", { clientid: params.clientId, subject: params.subject, message: params.message, deptid: params.deptId, priority: params.priority });
+  return { ticketId: Number(data.id ?? 0), tid: String(data.tid ?? "") };
+}
+
+export async function addTicketReply(ticketId: number, clientId: number, message: string): Promise<void> {
+  await callWhmcs("AddTicketReply", { ticketid: ticketId, clientid: clientId, message });
+}
+
+export async function closeTicket(ticketId: number): Promise<void> {
+  await callWhmcs("UpdateSupportTicket", { ticketid: ticketId, status: "Closed" });
+}
+
+export async function updateClientDetails(clientId: number, updates: Record<string, string>): Promise<void> {
+  await callWhmcs("UpdateClientDetails", { clientid: clientId, ...updates });
+}
+
+export function getInvoicePDFUrl(invoiceId: number): string {
+  return `${process.env.WHMCS_URL ?? ""}/viewinvoice.php?id=${invoiceId}&download=1`;
+}
+
+export function getPaymentUrl(invoiceId: number): string {
+  return `${process.env.WHMCS_URL ?? ""}/viewinvoice.php?id=${invoiceId}`;
+}
+
+export async function addAnnouncement(subject: string, message: string): Promise<void> {
+  await callWhmcs("AddAnnouncement", { subject, message, published: 1 });
+}

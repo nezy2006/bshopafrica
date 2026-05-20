@@ -34,16 +34,35 @@ export default function OrdersPage() {
       <SearchBar value={search} onChange={setSearch} placeholder="Search by client name or order ID…" />
 
       <TableCard>
-        <THead cols={["Order ID", "Client", "Amount", "Currency", "Date", "Status"]} />
+        <THead cols={["Order ID", "Client", "Amount", "Date", "Status", "Actions"]} />
         <tbody>
           {loading ? <SkeletonRows cols={6} /> : filtered.length === 0 ? <EmptyState icon="🛒" message="No orders found" /> : filtered.map(o => (
-            <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+            <tr key={o.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${o.status === "Pending" ? "bg-yellow-50/40" : ""}`}>
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">#{o.id}</td>
               <td className="px-5 py-3.5 font-medium text-black">{o.firstname} {o.lastname}</td>
-              <td className="px-5 py-3.5 font-semibold">${o.amount}</td>
-              <td className="px-5 py-3.5 text-gray-500">{o.currencycode}</td>
+              <td className="px-5 py-3.5 font-semibold">${o.amount} <span className="text-xs text-gray-400">{o.currencycode}</span></td>
               <td className="px-5 py-3.5 text-gray-500">{o.date}</td>
               <td className="px-5 py-3.5"><Badge status={o.status} /></td>
+              <td className="px-5 py-3.5">
+                <div className="flex gap-2">
+                  {o.status === "Pending" && (
+                    <button onClick={async () => {
+                      await whmcsAdmin("adminAcceptOrder", { orderId: o.id });
+                      fetch_();
+                    }} className="text-xs px-2.5 py-1 bg-green-100 text-green-700 font-semibold rounded-lg hover:bg-green-200 transition-colors">
+                      Accept
+                    </button>
+                  )}
+                  {(o.status === "Pending" || o.status === "Active") && (
+                    <button onClick={async () => {
+                      await whmcsAdmin("adminCancelOrder", { orderId: o.id });
+                      fetch_();
+                    }} className="text-xs px-2.5 py-1 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 transition-colors">
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>

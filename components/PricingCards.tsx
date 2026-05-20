@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { getCart, saveCart } from "@/lib/cart";
+import { addToCart } from "@/lib/cart";
 
 interface Plan {
   name: string;
@@ -83,7 +83,7 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
   const [mob, setMob] = useState(false);
 
   const handleGetStarted = () => {
-    saveCart({ ...getCart(), hosting: { type: "hosting", name: plan.name, monthly: plan.monthly, yearly: plan.yearly } });
+    addToCart({ id: `hosting_${plan.name}`, type: "hosting", name: plan.name, monthly: plan.monthly, yearly: plan.yearly, cycle: "yearly" });
     router.push("/cart");
   };
 

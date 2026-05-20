@@ -1,525 +1,1071 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
-import type {
-  ClientDetails,
-  ClientProduct,
-  ClientDomain,
-  ClientInvoice,
-} from "@/lib/whmcs";
+import Image from "next/image";
+import {
+  getNotifications, markAllRead, markRead, startNotificationPolling, stopNotificationPolling,
+  type AppNotification,
+} from "@/lib/notifications";
 
+type Section = "overview" | "domains" | "hosting" | "emails" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
-/* ─── Nav config ─────────────────────────────────────────────────────────── */
-type Section = "dashboard" | "domains" | "hosting" | "invoices" | "support" | "settings";
-
-const NAV: { id: Section; label: string; Icon: React.FC<{ cls?: string }> }[] = [
-  { id: "dashboard", label: "Dashboard",        Icon: HomeIcon      },
-  { id: "domains",   label: "My Domains",        Icon: GlobeIcon     },
-  { id: "hosting",   label: "My Hosting",        Icon: ServerIcon    },
-  { id: "invoices",  label: "Invoices",          Icon: FileIcon      },
-  { id: "support",   label: "Support",           Icon: HeadsetIcon   },
-  { id: "settings",  label: "Account Settings",  Icon: SettingsIcon  },
-];
-
-/* ─── SVG Icons ──────────────────────────────────────────────────────────── */
-function HomeIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  );
-}
-function GlobeIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  );
-}
-function ServerIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <rect x="2" y="2"  width="20" height="8" rx="2" ry="2" />
-      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-      <line x1="6" y1="6"  x2="6.01" y2="6"  />
-      <line x1="6" y1="18" x2="6.01" y2="18" />
-    </svg>
-  );
-}
-function FileIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
-    </svg>
-  );
-}
-function HeadsetIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-    </svg>
-  );
-}
-function SettingsIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-function LogoutIcon({ cls = "w-5 h-5" }: { cls?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cls}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
-
 /* ─── API helper ─────────────────────────────────────────────────────────── */
-async function whmcs<T>(action: string, params: Record<string, unknown> = {}): Promise<T | null> {
-  try {
-    const res  = await fetch("/api/whmcs", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ action, params }),
-    });
-    const json = (await res.json()) as { success: boolean; data?: T };
-    return json.success ? (json.data ?? null) : null;
-  } catch { return null; }
+async function whmcs<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
+  const res = await fetch("/api/whmcs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, params }),
+  });
+  const json = (await res.json()) as { success: boolean; data?: T; error?: string };
+  if (!json.success) throw new Error(json.error ?? "API error");
+  return json.data as T;
 }
 
-/* ─── Sidebar ────────────────────────────────────────────────────────────── */
-function Sidebar({
-  active, setActive, client, onLogout,
-}: {
-  active:    Section;
-  setActive: (s: Section) => void;
-  client:    ClientDetails | null;
-  onLogout:  () => void;
-}) {
+/* ─── Types ──────────────────────────────────────────────────────────────── */
+interface ClientDetails { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
+interface ClientProduct { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
+interface ClientDomain  { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; }
+interface ClientInvoice { id: number; date: string; duedate: string; total: string; status: string; }
+interface ClientOrder   { id: number; date: string; total: string; status: string; currencycode: string; }
+interface SupportTicket { id: number; tid: string; title: string; status: string; priority: string; deptname: string; date: string; lastreply: string; replies?: TicketReply[]; }
+interface TicketReply   { id: number; userid: number; name: string; email: string; date: string; message: string; type: "client" | "staff"; }
+
+/* ─── Icons ──────────────────────────────────────────────────────────────── */
+const I = {
+  Home:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  Globe:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  Server:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>,
+  Mail:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  ShoppingBag:() => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
+  FileText:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+  Headset:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>,
+  Bell:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  Settings:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  LogOut:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  Alert:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  Plus:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  X:         () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Check:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><polyline points="20 6 9 17 4 12"/></svg>,
+  ChevronR:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><polyline points="9 18 15 12 9 6"/></svg>,
+  Menu:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  ExternalLink: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  Download:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  Send:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  Refresh:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+};
+
+/* ─── Shared UI ──────────────────────────────────────────────────────────── */
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`bg-gray-200 animate-pulse rounded-lg ${className}`} />;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  const cls =
+    s === "active"     ? "bg-green-100 text-green-700" :
+    s.includes("expir") ? "bg-orange-100 text-orange-700" :
+    s === "expired"    ? "bg-red-100 text-red-700" :
+    s === "pending"    ? "bg-yellow-100 text-yellow-700" :
+    s === "cancelled"  ? "bg-gray-100 text-gray-600" :
+    s === "paid"       ? "bg-green-100 text-green-700" :
+    s === "unpaid"     ? "bg-red-100 text-red-700" :
+    s === "overdue"    ? "bg-red-200 text-red-800" :
+    s === "open"       ? "bg-blue-100 text-blue-700" :
+    s === "answered"   ? "bg-purple-100 text-purple-700" :
+    s === "closed"     ? "bg-gray-100 text-gray-600" :
+                         "bg-gray-100 text-gray-600";
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{status}</span>;
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const p = priority.toLowerCase();
+  const cls =
+    p === "urgent" ? "bg-red-100 text-red-700" :
+    p === "high"   ? "bg-orange-100 text-orange-700" :
+    p === "medium" ? "bg-blue-100 text-blue-700" :
+                     "bg-gray-100 text-gray-600";
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{priority}</span>;
+}
+
+function EmptyState({ icon, title, desc, action }: { icon: React.ReactNode; title: string; desc: string; action?: React.ReactNode }) {
   return (
-    <motion.aside
-      className="hidden lg:flex fixed top-24 left-0 bottom-0 w-64 bg-[#6B21A8] flex-col z-30 shadow-2xl"
-      initial={{ x: -40, opacity: 0 }}
-      animate={{ x: 0,   opacity: 1 }}
-      transition={{ duration: 0.6, ease: EASE }}
-    >
-      {/* logo */}
-      <div className="px-6 py-5 border-b border-white/10">
-        <Image
-          src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"
-          alt="The B.Shop"
-          width={160} height={48}
-          className="h-9 w-auto object-contain"
-        />
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-300">{icon}</div>
+      <h3 className="font-semibold text-gray-900 text-lg mb-1">{title}</h3>
+      <p className="text-gray-500 text-sm mb-6 max-w-xs">{desc}</p>
+      {action}
+    </div>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4 text-red-400"><I.Alert /></div>
+      <h3 className="font-semibold text-gray-900 mb-2">Failed to load data</h3>
+      <p className="text-gray-500 text-sm mb-4">Could not connect to the API. Check your WHMCS configuration.</p>
+      <button onClick={onRetry} className="flex items-center gap-2 px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-lg hover:bg-[#581c87] transition-colors">
+        <I.Refresh />Try again
+      </button>
+    </div>
+  );
+}
+
+function daysUntil(dateStr: string): number {
+  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000);
+}
+
+/* ─── OVERVIEW ───────────────────────────────────────────────────────────── */
+function OverviewSection({ client }: { client: ClientDetails }) {
+  const [domains,  setDomains]  = useState<ClientDomain[]>([]);
+  const [hosting,  setHosting]  = useState<ClientProduct[]>([]);
+  const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
+  const [tickets,  setTickets]  = useState<SupportTicket[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try {
+      const [d, h, inv, t] = await Promise.all([
+        whmcs<ClientDomain[]>("getClientDomains", { clientId: client.id }),
+        whmcs<ClientProduct[]>("getClientProducts", { clientId: client.id }),
+        whmcs<ClientInvoice[]>("getInvoices", { clientId: client.id }),
+        whmcs<SupportTicket[]>("getTickets", { clientId: client.id }),
+      ]);
+      setDomains(d); setHosting(h); setInvoices(inv); setTickets(t);
+    } catch { setError(true); }
+    finally { setLoading(false); }
+  }, [client.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const unpaidInvoices = invoices.filter(i => i.status === "Unpaid" || i.status === "Overdue");
+  const unpaidTotal = unpaidInvoices.reduce((s, i) => s + parseFloat(i.total), 0);
+  const openTickets = tickets.filter(t => t.status === "Open" || t.status === "Customer-Reply");
+  const expiringSoon = [
+    ...domains.map(d => ({ name: d.domainname, type: "Domain", date: d.expirydate || d.nextduedate, days: daysUntil(d.expirydate || d.nextduedate) })),
+    ...hosting.map(h => ({ name: h.domain || h.name, type: "Hosting", date: h.nextduedate, days: daysUntil(h.nextduedate) })),
+  ].filter(x => x.days > 0 && x.days <= 30).sort((a, b) => a.days - b.days);
+
+  if (error) return <ErrorState onRetry={load} />;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Welcome */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Welcome back, {client.firstname}! 👋</h2>
+        <p className="text-gray-500 mt-1">Here's what's happening with your account.</p>
       </div>
 
-      {/* client info */}
-      {client && (
-        <div className="px-6 py-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-              {client.firstname[0]}{client.lastname[0]}
-            </div>
-            <div className="min-w-0">
-              <p className="text-white font-semibold text-sm truncate">
-                {client.firstname} {client.lastname}
-              </p>
-              <p className="text-purple-300 text-xs truncate">{client.email}</p>
-            </div>
-          </div>
+      {/* Renewal alerts */}
+      {!loading && expiringSoon.length > 0 && (
+        <div className="space-y-2">
+          {expiringSoon.map(item => (
+            <motion.div key={item.name} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+              className={`flex items-center gap-3 p-4 rounded-xl border ${item.days <= 7 ? "bg-red-50 border-red-200 text-red-800" : "bg-orange-50 border-orange-200 text-orange-800"}`}>
+              <I.Alert />
+              <div className="flex-1">
+                <span className="font-semibold">{item.name}</span>
+                <span className="text-sm ml-2">({item.type}) expires in {item.days} day{item.days !== 1 ? "s" : ""}</span>
+              </div>
+              <Link href="/hosting" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/60 hover:bg-white transition-colors">Renew Now →</Link>
+            </motion.div>
+          ))}
         </div>
       )}
 
-      {/* nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActive(id)}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left ${
-              active === id
-                ? "bg-white text-[#6B21A8] shadow-md font-bold"
-                : "text-white/80 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <Icon cls="w-4 h-4 flex-shrink-0" />
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {/* logout */}
-      <div className="px-3 py-4 border-t border-white/10">
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:bg-red-500/20 hover:text-white transition-all duration-200"
-        >
-          <LogoutIcon cls="w-4 h-4 flex-shrink-0" />
-          Log Out
-        </button>
-      </div>
-    </motion.aside>
-  );
-}
-
-/* ─── Mobile bottom nav ──────────────────────────────────────────────────── */
-function MobileNav({
-  active, setActive, onLogout,
-}: {
-  active:    Section;
-  setActive: (s: Section) => void;
-  onLogout:  () => void;
-}) {
-  const MOBILE = NAV.slice(0, 4);
-  return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#6B21A8] border-t border-white/10 z-40">
-      <div className="flex items-center justify-around">
-        {MOBILE.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActive(id)}
-            className={`flex flex-col items-center gap-1 py-3 px-4 transition-colors duration-200 ${
-              active === id ? "text-white" : "text-white/50"
-            }`}
-          >
-            <Icon cls="w-5 h-5" />
-            <span className="text-[10px] font-medium">{label}</span>
-          </button>
-        ))}
-        <button
-          onClick={onLogout}
-          className="flex flex-col items-center gap-1 py-3 px-4 text-white/50 hover:text-white transition-colors"
-        >
-          <LogoutIcon cls="w-5 h-5" />
-          <span className="text-[10px] font-medium">Logout</span>
-        </button>
-      </div>
-    </nav>
-  );
-}
-
-/* ─── Stat card ──────────────────────────────────────────────────────────── */
-function StatCard({
-  label, value, icon, color, index,
-}: {
-  label:  string;
-  value:  number | string;
-  icon:   React.ReactNode;
-  color:  "purple" | "blue" | "orange" | "green";
-  index:  number;
-}) {
-  const colors = {
-    purple: { bg: "bg-purple-100", text: "text-[#6B21A8]",   num: "text-[#6B21A8]"   },
-    blue:   { bg: "bg-blue-100",   text: "text-blue-600",     num: "text-blue-700"     },
-    orange: { bg: "bg-orange-100", text: "text-orange-600",   num: "text-orange-700"   },
-    green:  { bg: "bg-green-100",  text: "text-green-600",    num: "text-green-700"    },
-  };
-  const c = colors[color];
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0  }}
-      transition={{ delay: 0.1 + index * 0.08, duration: 0.5, ease: EASE }}
-      className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100"
-    >
-      <div className={`w-11 h-11 rounded-xl ${c.bg} ${c.text} flex items-center justify-center mb-3`}>
-        {icon}
-      </div>
-      <p className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-3xl font-black ${c.num}`}>{value}</p>
-    </motion.div>
-  );
-}
-
-/* ─── Invoice status badge ───────────────────────────────────────────────── */
-function StatusBadge({ status }: { status: string }) {
-  const s = status.toLowerCase();
-  const styles =
-    s === "paid"    ? "bg-green-100 text-green-700" :
-    s === "unpaid"  ? "bg-orange-100 text-orange-700" :
-    s === "overdue" ? "bg-red-100 text-red-700" :
-                      "bg-gray-100 text-gray-600";
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${styles}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {status}
-    </span>
-  );
-}
-
-/* ─── Dashboard main view ────────────────────────────────────────────────── */
-function DashboardView({
-  client, products, domains, invoices,
-}: {
-  client:   ClientDetails | null;
-  products: ClientProduct[];
-  domains:  ClientDomain[];
-  invoices: ClientInvoice[];
-}) {
-  const activeDomains  = domains.filter(d => d.status.toLowerCase()  === "active").length;
-  const activeHosting  = products.filter(p => p.status.toLowerCase() === "active").length;
-  const unpaidInvoices = invoices.filter(i => i.status.toLowerCase() === "unpaid").length;
-  const recentInvoices = invoices.slice(0, 5);
-
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
-  return (
-    <div className="space-y-8">
-      {/* Welcome */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0  }}
-        transition={{ duration: 0.5, ease: EASE }}
-      >
-        <h1 className="text-2xl sm:text-3xl font-black text-black">
-          Welcome back{client ? `, ${client.firstname}` : ""}! 👋
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">{today}</p>
-      </motion.div>
-
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard index={0} label="Active Domains"  value={activeDomains}  color="purple" icon={<GlobeIcon  cls="w-5 h-5" />} />
-        <StatCard index={1} label="Active Hosting"  value={activeHosting}  color="blue"   icon={<ServerIcon cls="w-5 h-5" />} />
-        <StatCard index={2} label="Unpaid Invoices" value={unpaidInvoices} color="orange" icon={<FileIcon   cls="w-5 h-5" />} />
-        <StatCard index={3} label="Open Tickets"    value={0}              color="green"  icon={<HeadsetIcon cls="w-5 h-5" />} />
+        {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />) : (
+          <>
+            {[
+              { label: "Active Domains",    value: domains.filter(d => d.status === "Active").length, color: "text-purple-600", bg: "bg-purple-50", icon: <I.Globe /> },
+              { label: "Active Hosting",    value: hosting.filter(h => h.status === "Active").length, color: "text-blue-600",   bg: "bg-blue-50",   icon: <I.Server /> },
+              { label: "Unpaid Invoices",   value: `${unpaidInvoices.length} ($${unpaidTotal.toFixed(0)})`, color: "text-red-600", bg: "bg-red-50", icon: <I.Alert /> },
+              { label: "Open Tickets",      value: openTickets.length, color: "text-orange-600", bg: "bg-orange-50", icon: <I.Headset /> },
+            ].map(stat => (
+              <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-5">
+                <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-3`}>{stat.icon}</div>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Register Domain",  href: "/domains",   icon: <I.Globe /> },
+            { label: "Add Hosting",      href: "/hosting",   icon: <I.Server /> },
+            { label: "Open Ticket",      href: "#",          icon: <I.Headset />, onClick: "support" },
+            { label: "Pay Invoices",     href: "#",          icon: <I.FileText />, onClick: "invoices" },
+          ].map(a => (
+            <Link key={a.label} href={a.href}
+              className="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent rounded-xl text-center transition-all group">
+              <span className="text-gray-400 group-hover:text-[#6B21A8] transition-colors">{a.icon}</span>
+              <span className="text-xs font-medium text-gray-600 group-hover:text-[#6B21A8]">{a.label}</span>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Recent invoices */}
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0  }}
-        transition={{ delay: 0.4, duration: 0.55, ease: EASE }}
-        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-black text-base">Recent Invoices</h2>
-          <button
-            onClick={() => {}}
-            className="text-xs text-[#6B21A8] font-semibold hover:underline"
-          >
-            View all →
-          </button>
+      {!loading && invoices.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Recent Invoices</h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {invoices.slice(0, 3).map(inv => (
+              <div key={inv.id} className="flex items-center gap-4 px-5 py-3">
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 text-sm">Invoice #{inv.id}</p>
+                  <p className="text-xs text-gray-400">Due: {inv.duedate}</p>
+                </div>
+                <span className="font-semibold text-gray-900">${inv.total}</span>
+                <StatusBadge status={inv.status} />
+                {(inv.status === "Unpaid" || inv.status === "Overdue") && (
+                  <a href={`https://bshopafrica.com/billing/viewinvoice.php?id=${inv.id}`} target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors">
+                    Pay Now
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {recentInvoices.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-10">No invoices yet.</p>
-        ) : (
+/* ─── DOMAINS ────────────────────────────────────────────────────────────── */
+function DomainsSection({ clientId }: { clientId: number }) {
+  const [domains, setDomains] = useState<ClientDomain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(false);
+  const [search,  setSearch]  = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try { setDomains(await whmcs<ClientDomain[]>("getClientDomains", { clientId })); }
+    catch { setError(true); }
+    finally { setLoading(false); }
+  }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = domains.filter(d => d.domainname.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">My Domains</h2>
+        <Link href="/domains" className="inline-flex items-center gap-2 px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
+          <I.Plus />Register New Domain
+        </Link>
+      </div>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search domains…"
+        className="w-full sm:w-72 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+
+      {error ? <ErrorState onRetry={load} /> :
+       loading ? <Skeleton className="h-48" /> :
+       filtered.length === 0 ? (
+        search ? <p className="text-gray-400 text-sm">No results for "{search}"</p> :
+        <EmptyState icon={<I.Globe />} title="No domains yet" desc="Register your first domain and start building your online presence."
+          action={<Link href="/domains" className="px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl text-sm">Register Domain</Link>} />
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[500px]">
-              <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Invoice</th>
-                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Date</th>
-                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Due Date</th>
-                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Amount</th>
-                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Status</th>
-                </tr>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>{["Domain","Expires","Status","Auto-Renew","Actions"].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {recentInvoices.map((inv, i) => (
-                  <motion.tr
-                    key={inv.id}
-                    initial={{ opacity: 0, x: -12 }}
-                    animate={{ opacity: 1, x: 0   }}
-                    transition={{ delay: 0.45 + i * 0.06, duration: 0.4 }}
-                    className="hover:bg-gray-50 transition-colors duration-150"
-                  >
-                    <td className="px-6 py-3.5 font-bold text-[#6B21A8]">#{inv.id}</td>
-                    <td className="px-6 py-3.5 text-gray-600">{inv.date}</td>
-                    <td className="px-6 py-3.5 text-gray-600">{inv.duedate}</td>
-                    <td className="px-6 py-3.5 font-semibold text-black">${inv.total}</td>
-                    <td className="px-6 py-3.5"><StatusBadge status={inv.status} /></td>
-                  </motion.tr>
+                {filtered.map(d => {
+                  const days = daysUntil(d.expirydate || d.nextduedate);
+                  const effectiveStatus = days <= 0 ? "Expired" : days <= 30 ? "Expiring Soon" : d.status;
+                  return (
+                    <tr key={d.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-4 font-medium text-gray-900">{d.domainname}</td>
+                      <td className="px-5 py-4 text-gray-500">{d.expirydate || d.nextduedate}</td>
+                      <td className="px-5 py-4"><StatusBadge status={effectiveStatus} /></td>
+                      <td className="px-5 py-4"><span className="text-green-600 text-xs font-semibold">Enabled</span></td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <button className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Renew</button>
+                          <button className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">DNS</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── HOSTING ────────────────────────────────────────────────────────────── */
+function HostingSection({ clientId }: { clientId: number }) {
+  const [products, setProducts] = useState<ClientProduct[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try { setProducts(await whmcs<ClientProduct[]>("getClientProducts", { clientId })); }
+    catch { setError(true); }
+    finally { setLoading(false); }
+  }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">My Hosting</h2>
+        <Link href="/hosting" className="inline-flex items-center gap-2 px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
+          <I.Plus />Add Hosting
+        </Link>
+      </div>
+      {error ? <ErrorState onRetry={load} /> :
+       loading ? <div className="grid sm:grid-cols-2 gap-4">{[0,1].map(i => <Skeleton key={i} className="h-48" />)}</div> :
+       products.length === 0 ? (
+        <EmptyState icon={<I.Server />} title="No hosting accounts" desc="Get started with our affordable hosting plans."
+          action={<Link href="/hosting" className="px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl text-sm">View Plans</Link>} />
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {products.map(p => (
+            <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{p.domain || p.name}</p>
+                  <p className="text-sm text-gray-500">{p.name}</p>
+                </div>
+                <StatusBadge status={p.status} />
+              </div>
+              {/* Disk usage placeholder */}
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Disk Usage</span><span>— / 10 GB</span></div>
+                <div className="h-1.5 bg-gray-100 rounded-full"><div className="h-1.5 bg-[#6B21A8] rounded-full w-1/4" /></div>
+              </div>
+              <div className="text-xs text-gray-400">Renews: {p.nextduedate} · {p.billingcycle}</div>
+              <div className="flex flex-wrap gap-2">
+                <a href="https://bshopafrica.com/billing/clientarea.php?action=productdetails" target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors">
+                  <I.ExternalLink />cPanel Login
+                </a>
+                <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
+                <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Renew</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── EMAILS ─────────────────────────────────────────────────────────────── */
+function EmailsSection({ clientId }: { clientId: number }) {
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">My Emails</h2>
+        <a href="https://bshopafrica.com/webmail" target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
+          <I.ExternalLink />Open Webmail
+        </a>
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-200 p-8">
+        <EmptyState icon={<I.Mail />} title="Manage email accounts via cPanel"
+          desc="Create and manage email accounts, set up forwarders, and access webmail through your hosting cPanel."
+          action={
+            <div className="flex gap-3 flex-wrap justify-center">
+              <a href="https://bshopafrica.com/webmail" target="_blank" rel="noopener noreferrer"
+                className="px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl text-sm">Open Webmail</a>
+              <a href="https://bshopafrica.com/billing/clientarea.php" target="_blank" rel="noopener noreferrer"
+                className="px-5 py-2.5 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm hover:border-purple-300 transition-colors">Go to cPanel</a>
+            </div>
+          } />
+      </div>
+    </div>
+  );
+}
+
+/* ─── ORDERS ─────────────────────────────────────────────────────────────── */
+function OrdersSection({ clientId }: { clientId: number }) {
+  const [orders,  setOrders]  = useState<ClientOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try { setOrders(await whmcs<ClientOrder[]>("getClientOrders", { clientId })); }
+    catch { setError(true); }
+    finally { setLoading(false); }
+  }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="p-6 space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">My Orders</h2>
+      {error ? <ErrorState onRetry={load} /> :
+       loading ? <Skeleton className="h-48" /> :
+       orders.length === 0 ? <EmptyState icon={<I.ShoppingBag />} title="No orders yet" desc="Your orders will appear here after checkout." /> : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>{["Order #","Date","Total","Currency","Status"].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.map(o => (
+                  <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-4 font-medium text-gray-900">#{o.id}</td>
+                    <td className="px-5 py-4 text-gray-500">{o.date}</td>
+                    <td className="px-5 py-4 font-semibold">${o.total}</td>
+                    <td className="px-5 py-4 text-gray-500">{o.currencycode}</td>
+                    <td className="px-5 py-4"><StatusBadge status={o.status} /></td>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </motion.div>
-
-      {/* Quick actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0  }}
-        transition={{ delay: 0.55, duration: 0.55, ease: EASE }}
-      >
-        <h2 className="font-bold text-black text-base mb-4">Quick Actions</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            { label: "Register Domain",  icon: "🌍", href: "/domains",  desc: "Find and register a new domain"    },
-            { label: "Upgrade Hosting",  icon: "🚀", href: "/hosting",  desc: "Scale up your hosting plan"        },
-            { label: "Open Ticket",      icon: "🎧", href: "/contact",  desc: "Get help from our support team"    },
-          ].map((action, i) => (
-            <motion.div
-              key={action.label}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0  }}
-              transition={{ delay: 0.6 + i * 0.08, duration: 0.45, ease: EASE }}
-              whileHover={{ y: -4, boxShadow: "0 12px 32px rgba(107,33,168,0.12)" }}
-            >
-              <Link
-                href={action.href}
-                className="flex items-start gap-4 bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:border-purple-200 transition-colors duration-200 block"
-              >
-                <span className="text-3xl">{action.icon}</span>
-                <div>
-                  <p className="font-bold text-black text-sm">{action.label}</p>
-                  <p className="text-gray-400 text-xs mt-0.5">{action.desc}</p>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
         </div>
-      </motion.div>
+      )}
     </div>
   );
 }
 
-/* ─── Placeholder for other sections ────────────────────────────────────── */
-function PlaceholderView({ section }: { section: Section }) {
-  const labels: Record<Section, string> = {
-    dashboard: "Dashboard",
-    domains:   "My Domains",
-    hosting:   "My Hosting",
-    invoices:  "Invoices",
-    support:   "Support",
-    settings:  "Account Settings",
-  };
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0  }}
-      className="flex flex-col items-center justify-center min-h-[40vh] text-center"
-    >
-      <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center text-[#6B21A8] mb-4">
-        <ServerIcon cls="w-8 h-8" />
-      </div>
-      <h2 className="text-xl font-black text-black mb-2">{labels[section]}</h2>
-      <p className="text-gray-400 text-sm">This section is coming soon.</p>
-    </motion.div>
-  );
-}
-
-/* ─── Loading skeleton ───────────────────────────────────────────────────── */
-function LoadingSkeleton() {
-  return (
-    <div className="min-h-screen pt-24 flex items-center justify-center bg-gray-50">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-full border-4 border-[#6B21A8] border-t-transparent animate-spin" />
-        <p className="text-gray-500 font-medium text-sm">Loading your dashboard…</p>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Dashboard page ─────────────────────────────────────────────────────── */
-export default function DashboardPage() {
-  const router = useRouter();
-
-  const [activeSection, setActiveSection] = useState<Section>("dashboard");
-  const [loading,  setLoading]  = useState(true);
-  const [client,   setClient]   = useState<ClientDetails   | null>(null);
-  const [products, setProducts] = useState<ClientProduct[]>([]);
-  const [domains,  setDomains]  = useState<ClientDomain[]>([]);
+/* ─── INVOICES ───────────────────────────────────────────────────────────── */
+function InvoicesSection({ clientId }: { clientId: number }) {
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(false);
+  const [filter,   setFilter]   = useState("All");
 
-  const fetchAll = useCallback(async (id: number) => {
-    const [c, p, d, inv] = await Promise.all([
-      whmcs<ClientDetails  >("getClientDetails",  { clientId: id }),
-      whmcs<ClientProduct[]>("getClientProducts", { clientId: id }),
-      whmcs<ClientDomain[]  >("getClientDomains",  { clientId: id }),
-      whmcs<ClientInvoice[] >("getInvoices",       { clientId: id }),
-    ]);
-    if (c)   setClient(c);
-    if (p)   setProducts(p);
-    if (d)   setDomains(d);
-    if (inv) setInvoices(inv);
-  }, []);
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try { setInvoices(await whmcs<ClientInvoice[]>("getInvoices", { clientId })); }
+    catch { setError(true); }
+    finally { setLoading(false); }
+  }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const tabs = ["All", "Unpaid", "Paid", "Overdue", "Cancelled"];
+  const filtered = filter === "All" ? invoices : invoices.filter(i => i.status === filter);
+
+  return (
+    <div className="p-6 space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Invoices</h2>
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
+        {tabs.map(t => (
+          <button key={t} onClick={() => setFilter(t)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${filter === t ? "bg-white shadow text-[#6B21A8]" : "text-gray-500 hover:text-gray-700"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+      {error ? <ErrorState onRetry={load} /> :
+       loading ? <Skeleton className="h-48" /> :
+       filtered.length === 0 ? <EmptyState icon={<I.FileText />} title="No invoices" desc="Your invoices will appear here." /> : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>{["Invoice #","Date","Due Date","Total","Status","Actions"].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map(inv => (
+                  <tr key={inv.id} className={`hover:bg-gray-50 transition-colors ${inv.status === "Overdue" ? "bg-red-50/30" : ""}`}>
+                    <td className="px-5 py-4 font-medium text-gray-900">#{inv.id}</td>
+                    <td className="px-5 py-4 text-gray-500">{inv.date}</td>
+                    <td className="px-5 py-4 text-gray-500">{inv.duedate}</td>
+                    <td className="px-5 py-4 font-semibold">${inv.total}</td>
+                    <td className="px-5 py-4"><StatusBadge status={inv.status} /></td>
+                    <td className="px-5 py-4">
+                      <div className="flex gap-2">
+                        {(inv.status === "Unpaid" || inv.status === "Overdue") && (
+                          <a href={`https://bshopafrica.com/billing/viewinvoice.php?id=${inv.id}`} target="_blank" rel="noopener noreferrer"
+                            className="text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors flex items-center gap-1">
+                            Pay Now
+                          </a>
+                        )}
+                        {inv.status === "Paid" && (
+                          <a href={`https://bshopafrica.com/billing/viewinvoice.php?id=${inv.id}&download=1`} target="_blank" rel="noopener noreferrer"
+                            className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors flex items-center gap-1">
+                            <I.Download />PDF
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── SUPPORT ────────────────────────────────────────────────────────────── */
+function SupportSection({ client }: { client: ClientDetails }) {
+  const [tickets,    setTickets]    = useState<SupportTicket[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState(false);
+  const [filter,     setFilter]     = useState("All");
+  const [selected,   setSelected]   = useState<SupportTicket | null>(null);
+  const [ticketData, setTicketData] = useState<(SupportTicket & { replies: TicketReply[] }) | null>(null);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [replyText,  setReplyText]  = useState("");
+  const [replying,   setReplying]   = useState(false);
+  const [newTicket,  setNewTicket]  = useState(false);
+  const [form,       setForm]       = useState({ subject: "", message: "", dept: "1", priority: "Medium" });
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try { setTickets(await whmcs<SupportTicket[]>("getTickets", { clientId: client.id })); }
+    catch { setError(true); }
+    finally { setLoading(false); }
+  }, [client.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function openTicket(t: SupportTicket) {
+    setSelected(t); setTicketLoading(true);
+    try { setTicketData(await whmcs("getTicket", { ticketId: t.id })); }
+    catch { setTicketData(null); }
+    finally { setTicketLoading(false); }
+  }
+
+  async function submitReply() {
+    if (!selected || !replyText.trim()) return;
+    setReplying(true);
+    try {
+      await whmcs("addTicketReply", { ticketId: selected.id, clientId: client.id, message: replyText });
+      setReplyText("");
+      openTicket(selected);
+    } catch { /* ignore */ }
+    finally { setReplying(false); }
+  }
+
+  async function submitNewTicket() {
+    if (!form.subject.trim() || !form.message.trim()) return;
+    setSubmitting(true);
+    try {
+      await whmcs("openTicket", { clientId: client.id, subject: form.subject, message: form.message, deptId: Number(form.dept), priority: form.priority });
+      setNewTicket(false); setForm({ subject: "", message: "", dept: "1", priority: "Medium" });
+      load();
+    } catch { /* ignore */ }
+    finally { setSubmitting(false); }
+  }
+
+  const tabs = ["All", "Open", "Answered", "Closed"];
+  const filtered = filter === "All" ? tickets : tickets.filter(t => t.status === filter || (filter === "Open" && t.status === "Customer-Reply"));
+
+  if (selected) {
+    return (
+      <div className="p-6 space-y-6">
+        <button onClick={() => { setSelected(null); setTicketData(null); }}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
+          ← Back to tickets
+        </button>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{selected.title}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <StatusBadge status={selected.status} />
+              <PriorityBadge priority={selected.priority} />
+              <span className="text-xs text-gray-400">#{selected.tid} · {selected.deptname}</span>
+            </div>
+          </div>
+          <button onClick={async () => { await whmcs("closeTicket", { ticketId: selected.id }); setSelected(null); load(); }}
+            className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg hover:border-red-300 hover:text-red-500 transition-colors">
+            Close Ticket
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-5">
+          {ticketLoading ? <Skeleton className="h-32" /> :
+           !ticketData ? <p className="text-gray-400 text-sm">Could not load replies.</p> :
+           ticketData.replies.length === 0 ? <p className="text-gray-400 text-sm">No replies yet.</p> :
+           ticketData.replies.map(r => (
+            <div key={r.id} className={`flex gap-3 ${r.type === "staff" ? "flex-row-reverse" : ""}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${r.type === "staff" ? "bg-[#6B21A8]" : "bg-gray-400"}`}>
+                {r.name.charAt(0).toUpperCase()}
+              </div>
+              <div className={`max-w-lg rounded-2xl px-4 py-3 ${r.type === "staff" ? "bg-[#6B21A8]/10 text-gray-900" : "bg-gray-100 text-gray-900"}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-semibold">{r.name}</span>
+                  <span className="text-xs text-gray-400">{r.date}</span>
+                </div>
+                <p className="text-sm whitespace-pre-wrap">{r.message}</p>
+              </div>
+            </div>
+           ))
+          }
+        </div>
+
+        {selected.status !== "Closed" && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <h3 className="font-semibold text-gray-900 mb-3">Reply</h3>
+            <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={4} placeholder="Type your reply…"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
+            <button onClick={submitReply} disabled={replying || !replyText.trim()}
+              className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+              <I.Send />{replying ? "Sending…" : "Send Reply"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Support Tickets</h2>
+        <button onClick={() => setNewTicket(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
+          <I.Plus />Open New Ticket
+        </button>
+      </div>
+
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {tabs.map(t => (
+          <button key={t} onClick={() => setFilter(t)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${filter === t ? "bg-white shadow text-[#6B21A8]" : "text-gray-500 hover:text-gray-700"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {error ? <ErrorState onRetry={load} /> :
+       loading ? <Skeleton className="h-48" /> :
+       filtered.length === 0 ? <EmptyState icon={<I.Headset />} title="No tickets" desc="Open a support ticket and we'll get back to you quickly." /> : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            {filtered.map(t => (
+              <button key={t.id} onClick={() => openTicket(t)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{t.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">#{t.tid} · {t.deptname} · {t.date}</p>
+                </div>
+                <PriorityBadge priority={t.priority} />
+                <StatusBadge status={t.status} />
+                <I.ChevronR />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* New ticket modal */}
+      <AnimatePresence>
+        {newTicket && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6"
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-gray-900">Open Support Ticket</h3>
+                <button onClick={() => setNewTicket(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><I.X /></button>
+              </div>
+              <div className="space-y-4">
+                <input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Subject"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+                <div className="grid grid-cols-2 gap-3">
+                  <select value={form.dept} onChange={e => setForm(f => ({ ...f, dept: e.target.value }))}
+                    className="px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors bg-white">
+                    <option value="1">Technical Support</option>
+                    <option value="2">Billing</option>
+                    <option value="3">General</option>
+                  </select>
+                  <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
+                    className="px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors bg-white">
+                    {["Low", "Medium", "High", "Urgent"].map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+                <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={5} placeholder="Describe your issue…"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setNewTicket(false)} className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm">Cancel</button>
+                <button onClick={submitNewTicket} disabled={submitting || !form.subject.trim() || !form.message.trim()}
+                  className="flex-1 py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors text-sm">
+                  {submitting ? "Submitting…" : "Submit Ticket"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── NOTIFICATIONS ──────────────────────────────────────────────────────── */
+function NotificationsSection() {
+  const [notifs, setNotifs] = useState<AppNotification[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("bshop_client_id");
-    if (!stored) { router.replace("/login"); return; }
-    const id = parseInt(stored, 10);
-    fetchAll(id).finally(() => setLoading(false));
-  }, [router, fetchAll]);
+    setNotifs(getNotifications());
+    const sync = () => setNotifs(getNotifications());
+    window.addEventListener("bshop_notifications_update", sync);
+    return () => window.removeEventListener("bshop_notifications_update", sync);
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("bshop_client_id");
-    router.replace("/login");
+  const typeColors: Record<AppNotification["type"], string> = {
+    domain_expiring: "bg-orange-100 text-orange-600", invoice_due: "bg-red-100 text-red-600",
+    ticket_replied:  "bg-blue-100 text-blue-600",     order_completed: "bg-green-100 text-green-600",
+    service_suspended: "bg-red-200 text-red-700",     info: "bg-gray-100 text-gray-600",
   };
 
-  if (loading) return <LoadingSkeleton />;
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
+        {notifs.some(n => !n.read) && (
+          <button onClick={() => { markAllRead(); setNotifs(getNotifications()); }}
+            className="text-sm text-[#6B21A8] hover:underline">Mark all as read</button>
+        )}
+      </div>
+      {notifs.length === 0 ? (
+        <EmptyState icon={<I.Bell />} title="All caught up!" desc="No notifications at the moment." />
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-50 overflow-hidden">
+          {notifs.map(n => (
+            <div key={n.id} onClick={() => { markRead(n.id); setNotifs(getNotifications()); }}
+              className={`flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? "bg-purple-50/30" : ""}`}>
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${typeColors[n.type]}`}>
+                {n.type === "domain_expiring" ? <I.Globe /> : n.type === "invoice_due" ? <I.FileText /> : n.type === "ticket_replied" ? <I.Headset /> : <I.Bell />}
+              </span>
+              <div className="flex-1">
+                <p className={`text-sm ${!n.read ? "font-semibold text-gray-900" : "text-gray-700"}`}>{n.message}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{new Date(n.date).toLocaleString()}</p>
+              </div>
+              {!n.read && <span className="w-2 h-2 bg-[#6B21A8] rounded-full mt-1.5 flex-shrink-0" />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── ACCOUNT SETTINGS ───────────────────────────────────────────────────── */
+function AccountSettingsSection({ client }: { client: ClientDetails }) {
+  const [tab,     setTab]     = useState<"profile" | "security" | "billing">("profile");
+  const [form,    setForm]    = useState({ firstname: client.firstname, lastname: client.lastname, email: client.email, phonenumber: client.phonenumber });
+  const [pwForm,  setPwForm]  = useState({ current: "", newPw: "", confirm: "" });
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+
+  async function saveProfile() {
+    setSaving(true);
+    try {
+      await whmcs("updateClientDetails", { clientId: client.id, updates: form });
+      setSaved(true); setTimeout(() => setSaved(false), 3000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  }
 
   return (
-    <div className="pt-24 min-h-screen bg-gray-50">
-      <Sidebar
-        active={activeSection}
-        setActive={setActiveSection}
-        client={client}
-        onLogout={handleLogout}
-      />
+    <div className="p-6 space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {(["profile", "security", "billing"] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-all duration-200 ${tab === t ? "bg-white shadow text-[#6B21A8]" : "text-gray-500 hover:text-gray-700"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
 
-      {/* Page content — offset for sidebar on desktop */}
-      <div className="lg:pl-64">
-        <main className="p-6 lg:p-8 max-w-5xl pb-24 lg:pb-10">
+      {tab === "profile" && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-lg">
+          <h3 className="font-semibold text-gray-900">Personal Information</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {([["firstname","First Name"],["lastname","Last Name"]] as const).map(([k,label]) => (
+              <div key={k}>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+                <input value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+              </div>
+            ))}
+          </div>
+          {([["email","Email Address"],["phonenumber","Phone Number"]] as const).map(([k,label]) => (
+            <div key={k}>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+              <input value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+            </div>
+          ))}
+          <div className="flex items-center gap-3">
+            <button onClick={saveProfile} disabled={saving}
+              className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+            {saved && <span className="text-sm text-green-600 flex items-center gap-1"><I.Check />Saved!</span>}
+          </div>
+        </div>
+      )}
+
+      {tab === "security" && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-lg">
+          <h3 className="font-semibold text-gray-900">Change Password</h3>
+          {[["current","Current Password"],["newPw","New Password"],["confirm","Confirm New Password"]].map(([k,label]) => (
+            <div key={k}>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
+              <input type="password" value={pwForm[k as keyof typeof pwForm]} onChange={e => setPwForm(f => ({ ...f, [k]: e.target.value }))}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+            </div>
+          ))}
+          <button className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
+            Update Password
+          </button>
+        </div>
+      )}
+
+      {tab === "billing" && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 max-w-lg">
+          <h3 className="font-semibold text-gray-900 mb-4">Payment Methods</h3>
+          <div className="space-y-3">
+            {[
+              { name: "PayPal", desc: "Pay securely via PayPal" },
+              { name: "PawaPay", desc: "Mobile money payments" },
+            ].map(pm => (
+              <div key={pm.name} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-purple-200 transition-colors">
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">{pm.name}</p>
+                  <p className="text-xs text-gray-500">{pm.desc}</p>
+                </div>
+                <a href={`https://bshopafrica.com/billing/clientarea.php?action=paymentmethods`} target="_blank" rel="noopener noreferrer"
+                  className="text-xs font-semibold text-[#6B21A8] hover:underline flex items-center gap-1">
+                  Manage <I.ExternalLink />
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── SIDEBAR ────────────────────────────────────────────────────────────── */
+const NAV: { id: Section; label: string; icon: React.ReactNode }[] = [
+  { id: "overview",       label: "Overview",          icon: <I.Home /> },
+  { id: "domains",        label: "My Domains",        icon: <I.Globe /> },
+  { id: "hosting",        label: "My Hosting",        icon: <I.Server /> },
+  { id: "emails",         label: "My Emails",         icon: <I.Mail /> },
+  { id: "orders",         label: "My Orders",         icon: <I.ShoppingBag /> },
+  { id: "invoices",       label: "Invoices",          icon: <I.FileText /> },
+  { id: "support",        label: "Support Tickets",   icon: <I.Headset /> },
+  { id: "notifications",  label: "Notifications",     icon: <I.Bell /> },
+  { id: "settings",       label: "Account Settings",  icon: <I.Settings /> },
+];
+
+function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
+  client: ClientDetails; active: Section; onSelect: (s: Section) => void;
+  onLogout: () => void; collapsed: boolean; onToggle: () => void;
+}) {
+  return (
+    <aside className={`flex flex-col bg-[#1e0a2e] transition-all duration-300 ${collapsed ? "w-16" : "w-64"} overflow-hidden flex-shrink-0`}>
+      {/* Logo + toggle */}
+      <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
+        {!collapsed && (
+          <Image src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" alt="B.Shop" width={120} height={36} className="h-8 w-auto" />
+        )}
+        <button onClick={onToggle} className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0">
+          <I.Menu />
+        </button>
+      </div>
+
+      {/* Avatar */}
+      {!collapsed && (
+        <div className="px-4 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-[#6B21A8] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {client.firstname.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-white font-semibold text-sm truncate">{client.firstname} {client.lastname}</p>
+              <p className="text-white/50 text-xs truncate">{client.email}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {collapsed && (
+        <div className="flex justify-center py-3 border-b border-white/10">
+          <div className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center text-white font-bold text-sm">
+            {client.firstname.charAt(0).toUpperCase()}
+          </div>
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 py-3 overflow-y-auto">
+        {NAV.map(item => (
+          <button key={item.id} onClick={() => onSelect(item.id)}
+            title={collapsed ? item.label : undefined}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 transition-all duration-150 text-sm font-medium ${
+              active === item.id
+                ? "bg-[#6B21A8] text-white"
+                : "text-white/60 hover:text-white hover:bg-white/10"
+            } ${collapsed ? "justify-center" : ""}`}>
+            <span className="flex-shrink-0">{item.icon}</span>
+            {!collapsed && <span>{item.label}</span>}
+          </button>
+        ))}
+      </nav>
+
+      {/* Logout */}
+      <div className="border-t border-white/10 p-2">
+        <button onClick={onLogout}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors text-sm ${collapsed ? "justify-center" : ""}`}>
+          <I.LogOut />{!collapsed && "Logout"}
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── MAIN PAGE ──────────────────────────────────────────────────────────── */
+function DashboardInner() {
+  const router  = useRouter();
+  const params  = useSearchParams();
+  const [client,    setClient]    = useState<ClientDetails | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [section, setSection]    = useState<Section>("overview");
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const id   = localStorage.getItem("bshop_client_id");
+    const name = localStorage.getItem("bshop_client_name");
+    const email = localStorage.getItem("bshop_client_email");
+    if (!id) { router.replace("/login"); return; }
+
+    const clientId = Number(id);
+    setAuthLoading(false);
+
+    // Start notification polling
+    startNotificationPolling(clientId);
+
+    // Load client details
+    whmcs<ClientDetails>("getClientDetails", { clientId })
+      .then(c => setClient(c))
+      .catch(() => {
+        // Fallback to localStorage data
+        setClient({
+          id: clientId,
+          firstname: name?.split(" ")[0] ?? "Client",
+          lastname:  name?.split(" ")[1] ?? "",
+          email:     email ?? "",
+          phonenumber: "",
+          status:    "Active",
+          datecreated: "",
+        });
+      });
+
+    // Handle ?s= query param for section navigation from header dropdown
+    const s = params.get("s") as Section | null;
+    if (s && NAV.some(n => n.id === s)) setSection(s);
+
+    return () => stopNotificationPolling();
+  }, [router, params]);
+
+  function handleLogout() {
+    localStorage.removeItem("bshop_client_id");
+    localStorage.removeItem("bshop_client_name");
+    localStorage.removeItem("bshop_client_email");
+    stopNotificationPolling();
+    router.push("/");
+  }
+
+  if (authLoading || !client) {
+    return (
+      <div className="min-h-screen pt-[96px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 text-sm">Loading your dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {mobileOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
+
+      <div className="flex overflow-hidden" style={{ height: "calc(100vh - 96px)", marginTop: "96px" }}>
+        {/* Sidebar - hidden on mobile, slide over */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-40 md:z-auto transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+          style={{ top: "96px", height: "calc(100vh - 96px)" }}>
+          <Sidebar client={client} active={section} onSelect={s => { setSection(s); setMobileOpen(false); }}
+            onLogout={handleLogout} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+        </div>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto bg-gray-50">
+          {/* Mobile header */}
+          <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-20">
+            <button onClick={() => setMobileOpen(true)} className="p-2 text-gray-500 hover:text-[#6B21A8]"><I.Menu /></button>
+            <span className="font-semibold text-gray-900">{NAV.find(n => n.id === section)?.label}</span>
+          </div>
+
           <AnimatePresence mode="wait">
-            {activeSection === "dashboard" ? (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{    opacity: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <DashboardView
-                  client={client}
-                  products={products}
-                  domains={domains}
-                  invoices={invoices}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key={activeSection}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{    opacity: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <PlaceholderView section={activeSection} />
-              </motion.div>
-            )}
+            <motion.div key={section}
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}>
+              {section === "overview"      && <OverviewSection client={client} />}
+              {section === "domains"       && <DomainsSection clientId={client.id} />}
+              {section === "hosting"       && <HostingSection clientId={client.id} />}
+              {section === "emails"        && <EmailsSection clientId={client.id} />}
+              {section === "orders"        && <OrdersSection clientId={client.id} />}
+              {section === "invoices"      && <InvoicesSection clientId={client.id} />}
+              {section === "support"       && <SupportSection client={client} />}
+              {section === "notifications" && <NotificationsSection />}
+              {section === "settings"      && <AccountSettingsSection client={client} />}
+            </motion.div>
           </AnimatePresence>
         </main>
       </div>
+    </>
+  );
+}
 
-      <MobileNav
-        active={activeSection}
-        setActive={setActiveSection}
-        onLogout={handleLogout}
-      />
-    </div>
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen pt-[96px] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <DashboardInner />
+    </Suspense>
   );
 }
