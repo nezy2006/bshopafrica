@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { PaymentIconsRow } from "@/components/PaymentIcons";
 
 /* ─── Social icons ──────────────────────────────────────────────────────── */
 function FacebookIcon() {
@@ -40,10 +41,10 @@ function LinkedinIcon() {
 }
 
 const SOCIALS = [
-  { icon: <FacebookIcon />,  href: "#", label: "Facebook"  },
-  { icon: <TwitterIcon />,   href: "#", label: "Twitter"   },
-  { icon: <InstagramIcon />, href: "#", label: "Instagram" },
-  { icon: <LinkedinIcon />,  href: "#", label: "LinkedIn"  },
+  { icon: <FacebookIcon />,  href: "https://facebook.com/bshopafrica",            label: "Facebook"  },
+  { icon: <TwitterIcon />,   href: "https://twitter.com/bshopafrica",             label: "Twitter"   },
+  { icon: <InstagramIcon />, href: "https://instagram.com/bshopafrica",           label: "Instagram" },
+  { icon: <LinkedinIcon />,  href: "https://linkedin.com/company/bshopafrica",    label: "LinkedIn"  },
 ];
 
 const FOOTER_LINKS = {
@@ -251,16 +252,10 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Payment badges */}
-          <div className="flex items-center gap-2 flex-wrap justify-center">
-            {PAYMENTS.map((p) => (
-              <span
-                key={p}
-                className="px-3 py-1.5 bg-white/10 border border-white/10 rounded-lg text-xs text-gray-400 font-medium"
-              >
-                {p}
-              </span>
-            ))}
+          {/* Payment icons */}
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">We Accept</span>
+            <PaymentIconsRow />
           </div>
         </motion.div>
       </div>

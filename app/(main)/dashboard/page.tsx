@@ -159,8 +159,8 @@ function OverviewSection({ client }: { client: ClientDetails }) {
     <div className="p-6 space-y-6">
       {/* Welcome */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Welcome back, {client.firstname}! 👋</h2>
-        <p className="text-gray-500 mt-1">Here's what's happening with your account.</p>
+        <h2 className="text-2xl font-bold text-gray-900">Welcome back, {client.firstname}!</h2>
+        <p className="text-gray-500 mt-1">Here&apos;s what&apos;s happening with your account.</p>
       </div>
 
       {/* Renewal alerts */}
@@ -199,6 +199,46 @@ function OverviewSection({ client }: { client: ClientDetails }) {
           </>
         )}
       </div>
+
+      {/* Onboarding checklist — shown only for new clients with no services */}
+      {!loading && domains.length === 0 && hosting.length === 0 && (
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold text-gray-900">Let&apos;s Get You Started</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Complete these steps to launch your online presence</p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-black text-[#6B21A8]">1<span className="text-gray-300">/5</span></span>
+              <p className="text-xs text-gray-400">steps done</p>
+            </div>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-5">
+            <div className="bg-[#6B21A8] h-1.5 rounded-full" style={{ width: "20%" }} />
+          </div>
+          <div className="space-y-3">
+            {[
+              { done: true,  label: "Account created",          href: null },
+              { done: false, label: "Register your first domain", href: "/domains" },
+              { done: false, label: "Choose a hosting plan",     href: "/hosting" },
+              { done: false, label: "Set up professional email", href: "/hosting" },
+              { done: false, label: "Launch your website",       href: "/hosting" },
+            ].map((step, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${step.done ? "border-[#6B21A8] bg-[#6B21A8]" : "border-gray-300"}`}>
+                  {step.done && <I.Check />}
+                </div>
+                <span className={`text-sm flex-1 ${step.done ? "text-gray-400 line-through" : "text-gray-700 font-medium"}`}>{step.label}</span>
+                {!step.done && step.href && (
+                  <Link href={step.href} className="text-xs font-semibold text-[#6B21A8] hover:underline flex items-center gap-1">
+                    Start <I.ChevronR />
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5">
@@ -320,7 +360,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
 }
 
 /* ─── HOSTING ────────────────────────────────────────────────────────────── */
-function HostingSection({ clientId }: { clientId: number }) {
+function HostingSection({ clientId, clientEmail }: { clientId: number; clientEmail: string }) {
   const [products, setProducts] = useState<ClientProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(false);
@@ -365,10 +405,17 @@ function HostingSection({ clientId }: { clientId: number }) {
               </div>
               <div className="text-xs text-gray-400">Renews: {p.nextduedate} · {p.billingcycle}</div>
               <div className="flex flex-wrap gap-2">
-                <a href="https://bshopafrica.com/billing/clientarea.php?action=productdetails" target="_blank" rel="noopener noreferrer"
+                <button onClick={async () => {
+                    try {
+                      const res = await whmcs<string>("getAutoAuthUrl", { email: clientEmail, destination: "clientarea.php" });
+                      window.open(res, "_blank", "noopener");
+                    } catch {
+                      window.open("https://bshopafrica.com/billing/clientarea.php", "_blank", "noopener");
+                    }
+                  }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors">
                   <I.ExternalLink />cPanel Login
-                </a>
+                </button>
                 <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
                 <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Renew</button>
               </div>
@@ -1043,7 +1090,7 @@ function DashboardInner() {
               transition={{ duration: 0.2, ease: EASE }}>
               {section === "overview"      && <OverviewSection client={client} />}
               {section === "domains"       && <DomainsSection clientId={client.id} />}
-              {section === "hosting"       && <HostingSection clientId={client.id} />}
+              {section === "hosting"       && <HostingSection clientId={client.id} clientEmail={client.email} />}
               {section === "emails"        && <EmailsSection clientId={client.id} />}
               {section === "orders"        && <OrdersSection clientId={client.id} />}
               {section === "invoices"      && <InvoicesSection clientId={client.id} />}

@@ -1,4 +1,5 @@
 "use client";
+import { Mail } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { PageHeader, SearchBar, TableCard, THead, SkeletonRows, EmptyState } from "@/lib/admin-utils";
@@ -51,7 +52,7 @@ export default function NewsletterPage() {
       <TableCard>
         <THead cols={["Email", "Subscribed", "Action"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={3} /> : filtered.length === 0 ? <EmptyState icon="📧" message="No subscribers yet" /> : filtered.map(s => (
+          {loading ? <SkeletonRows cols={3} /> : filtered.length === 0 ? <EmptyState icon={<Mail className="w-5 h-5" />} message="No subscribers yet" /> : filtered.map(s => (
             <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-medium text-black">{s.email}</td>
               <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(s.createdAt).toLocaleDateString()}</td>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { Zap, Palette, Globe, Smartphone, Rocket } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -48,7 +49,7 @@ export default function AIBuilderTeaser() {
           initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
           className="text-4xl sm:text-5xl font-bold text-white mb-6 leading-tight">
-          🚀 AI Website Builder
+          AI Website Builder
         </motion.h2>
 
         <motion.p
@@ -65,14 +66,14 @@ export default function AIBuilderTeaser() {
           transition={{ duration: 0.6, delay: 0.3, ease: EASE }}
           className="flex flex-wrap justify-center gap-3 mb-12">
           {[
-            "⚡ Generate in 60 seconds",
-            "🎨 Auto design + copy",
-            "🌍 Multilingual support",
-            "📱 Mobile-first always",
-            "🔌 One-click publish",
-          ].map(f => (
-            <span key={f} className="px-4 py-2 bg-white/10 border border-white/20 rounded-full text-white/80 text-sm">
-              {f}
+            { icon: Zap,        label: "Generate in 60 seconds" },
+            { icon: Palette,    label: "Auto design + copy" },
+            { icon: Globe,      label: "Multilingual support" },
+            { icon: Smartphone, label: "Mobile-first always" },
+            { icon: Rocket,     label: "One-click publish" },
+          ].map(({ icon: Icon, label }) => (
+            <span key={label} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 rounded-full text-white/80 text-sm">
+              <Icon className="w-3.5 h-3.5" />{label}
             </span>
           ))}
         </motion.div>

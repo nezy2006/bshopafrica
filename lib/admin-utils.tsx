@@ -125,8 +125,8 @@ export function Pagination({ page, total, perPage, onChange }: { page: number; t
 }
 
 /* ─── Empty state ────────────────────────────────────────────────────────── */
-export function EmptyState({ icon, message }: { icon: string; message: string }) {
-  return <tr><td colSpan={99}><div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">{icon}</div><p className="text-sm font-medium">{message}</p></div></td></tr>;
+export function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
+  return <tr><td colSpan={99}><div className="text-center py-16 text-gray-400"><div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center bg-gray-100 rounded-full text-gray-400">{icon}</div><p className="text-sm font-medium">{message}</p></div></td></tr>;
 }
 
 /* ─── Simple bar chart ───────────────────────────────────────────────────── */

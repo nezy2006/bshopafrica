@@ -8,6 +8,7 @@ import {
   getCart, removeFromCart, updateCartItem, calculateTotal, addToCart,
   type CartItem, type CartDomain, type CartHosting, type CartSSL, type CartEmail,
 } from "@/lib/cart";
+import { PaymentIconsRow } from "@/components/PaymentIcons";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -289,6 +290,10 @@ export default function CartPage() {
                 </div>
 
                 <p className="text-center text-xs text-gray-400 mt-3">All prices in USD. Billed annually.</p>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 text-center mb-2">We Accept</p>
+                  <PaymentIconsRow className="justify-center" />
+                </div>
               </motion.div>
             </div>
           </div>

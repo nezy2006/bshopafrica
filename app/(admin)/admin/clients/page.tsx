@@ -1,4 +1,5 @@
 "use client";
+import { Users } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
@@ -32,7 +33,7 @@ export default function ClientsPage() {
       <TableCard>
         <THead cols={["Name", "Email", "Phone", "Country", "Joined", "Status"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={6} /> : clients.length === 0 ? <EmptyState icon="👥" message="No clients found" /> : clients.map(c => (
+          {loading ? <SkeletonRows cols={6} /> : clients.length === 0 ? <EmptyState icon={<Users className="w-5 h-5" />} message="No clients found" /> : clients.map(c => (
             <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-semibold text-black">{c.firstname} {c.lastname}</td>
               <td className="px-5 py-3.5 text-gray-500 text-xs">{c.email}</td>

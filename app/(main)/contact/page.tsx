@@ -172,15 +172,17 @@ const fadeUp  = {
 function ContactForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [name,     setName]     = useState("");
-  const [email,    setEmail]    = useState("");
-  const [phone,    setPhone]    = useState("");
-  const [subject,  setSubject]  = useState(SUBJECTS[0]);
-  const [message,  setMessage]  = useState("");
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [errors,   setErrors]   = useState<Record<string, string>>({});
-  const [loading,  setLoading]  = useState(false);
-  const [sent,     setSent]     = useState(false);
+  const [name,        setName]        = useState("");
+  const [email,       setEmail]       = useState("");
+  const [phone,       setPhone]       = useState("");
+  const [subject,     setSubject]     = useState(SUBJECTS[0]);
+  const [message,     setMessage]     = useState("");
+  const [fileName,    setFileName]    = useState<string | null>(null);
+  const [errors,      setErrors]      = useState<Record<string, string>>({});
+  const [loading,     setLoading]     = useState(false);
+  const [sent,        setSent]        = useState(false);
+  const [ticketId,    setTicketId]    = useState("");
+  const [submitError, setSubmitError] = useState("");
 
   const validate = useCallback(() => {
     const e: Record<string, string> = {};
@@ -200,9 +202,25 @@ function ContactForm() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1600));
-    setLoading(false);
-    setSent(true);
+    setSubmitError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ name, email, phone, subject, message }),
+      });
+      const json = (await res.json()) as { success: boolean; ticketId?: string; error?: string };
+      if (json.success) {
+        setTicketId(json.ticketId ?? "");
+        setSent(true);
+      } else {
+        setSubmitError(json.error ?? "Failed to send. Please try again.");
+      }
+    } catch {
+      setSubmitError("Network error. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (sent) {
@@ -244,7 +262,7 @@ function ContactForm() {
           transition={{ delay: 0.5, duration: 0.4 }}
           className="text-gray-500 mb-8 max-w-xs"
         >
-          We&apos;ll get back to you within 48 hours.
+          {ticketId ? `Ticket #${ticketId} created. ` : ""}We&apos;ll reply within 48 hours.
         </motion.p>
         <motion.button
           initial={{ opacity: 0 }}
@@ -370,6 +388,13 @@ function ContactForm() {
             )}
           </button>
         </motion.div>
+
+        {/* Error */}
+        {submitError && (
+          <motion.div variants={fadeUp} className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            {submitError}
+          </motion.div>
+        )}
 
         {/* Submit */}
         <motion.div variants={fadeUp}>

@@ -1,4 +1,5 @@
 "use client";
+import { Globe } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
@@ -43,7 +44,7 @@ export default function DomainsPage() {
       <TableCard>
         <THead cols={["Domain", "Client", "Expiry Date", "Registrar", "Status"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={5} /> : filtered.length === 0 ? <EmptyState icon="🌐" message="No domains found" /> : filtered.map(d => (
+          {loading ? <SkeletonRows cols={5} /> : filtered.length === 0 ? <EmptyState icon={<Globe className="w-5 h-5" />} message="No domains found" /> : filtered.map(d => (
             <tr key={d.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{d.domainname}</td>
               <td className="px-5 py-3.5 text-gray-700">{d.firstname} {d.lastname}</td>

@@ -2,25 +2,30 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { Zap, Tag, Handshake, Globe } from "lucide-react";
 
 const FEATURES = [
   {
-    icon: "⚡",
+    Icon: Zap,
+    color: "bg-yellow-50 text-yellow-600",
     title: "Effortless & Fast",
     desc: "LiteSpeed servers and optimised stacks mean your site loads in milliseconds — anywhere on the continent.",
   },
   {
-    icon: "🏷️",
+    Icon: Tag,
+    color: "bg-green-50 text-green-600",
     title: "Transparently Priced",
     desc: "One price, no surprises. What you see on our pricing page is exactly what you pay, forever.",
   },
   {
-    icon: "🤝",
+    Icon: Handshake,
+    color: "bg-blue-50 text-blue-600",
     title: "Powered by Partnership",
     desc: "We grow when you grow. Our team of experts is invested in your success from day one.",
   },
   {
-    icon: "🌍",
+    Icon: Globe,
+    color: "bg-purple-50 text-purple-600",
     title: "Proudly African",
     desc: "Built in Africa, for Africa. Local support, local understanding, global infrastructure.",
   },
@@ -96,7 +101,9 @@ export default function Features() {
                 }}
                 className="bg-white rounded-2xl p-4 border border-gray-100 shadow-md hover:border-purple-200 cursor-default"
               >
-                <div className="text-3xl mb-3">{feat.icon}</div>
+                <div className={`w-11 h-11 rounded-xl ${feat.color} flex items-center justify-center mb-3`}>
+                  <feat.Icon className="w-5 h-5" />
+                </div>
                 <h3 className="text-base font-bold text-black mb-2">
                   {feat.title}
                 </h3>

@@ -1,4 +1,5 @@
 "use client";
+import { Server } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
@@ -44,7 +45,7 @@ export default function HostingPage() {
       <TableCard>
         <THead cols={["Domain", "Client", "Plan", "Billing", "Amount", "Next Due", "Status"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon="🖥" message="No hosting accounts found" /> : filtered.map(a => (
+          {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon={<Server className="w-5 h-5" />} message="No hosting accounts found" /> : filtered.map(a => (
             <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{a.domain || "—"}</td>
               <td className="px-5 py-3.5 text-gray-700">{a.firstname} {a.lastname}</td>

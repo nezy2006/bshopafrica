@@ -1,4 +1,5 @@
 "use client";
+import { FileText } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -53,7 +54,7 @@ export default function BlogListPage() {
       <TableCard>
         <THead cols={["Title", "Category", "Author", "Date", "Status", "Actions"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={6} /> : filtered.length === 0 ? <EmptyState icon="📝" message="No blog posts yet" /> : filtered.map(p => (
+          {loading ? <SkeletonRows cols={6} /> : filtered.length === 0 ? <EmptyState icon={<FileText className="w-5 h-5" />} message="No blog posts yet" /> : filtered.map(p => (
             <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-semibold text-black max-w-xs truncate">{p.title}</td>
               <td className="px-5 py-3.5"><span className="px-2.5 py-0.5 bg-purple-100 text-[#6B21A8] rounded-full text-xs font-bold">{p.category}</span></td>

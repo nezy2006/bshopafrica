@@ -16,7 +16,13 @@
       "PowerShell(Remove-Item *)",
       "Bash(git checkout *)",
       "Bash(git rm *)",
-      "Bash(grep -E \"^\\\\?\\\\?.*\\\\.\\(zip|sst\\)$\")"
+      "Bash(grep -E \"^\\\\?\\\\?.*\\\\.\\(zip|sst\\)$\")",
+      "Bash(node -e \"const lr = require\\('./node_modules/lucide-react/dist/cjs/lucide-react.js'\\); ['Handshake', 'Lightbulb', 'Microscope', 'PiggyBank', 'Rocket', 'Newspaper', 'BookOpen', 'Cpu', 'Wifi', 'HardDrive', 'Monitor', 'Laptop', 'SmartphoneIcon', 'Smartphone', 'ExternalLink', 'Link', 'Link2', 'Globe2', 'Flag', 'Heart', 'ThumbsUp', 'Users', 'UserCheck', 'Package', 'Box', 'Archive', 'ChevronUp', 'ChevronLeft', 'ArrowRight', 'Send', 'MessageSquare', 'MessageCircle', 'PlayCircle', 'PauseCircle', 'Volume2', 'Layers', 'Grid', 'Layout', 'Sidebar', 'PanelLeft', 'Columns', 'SlidersHorizontal', 'Filter', 'SortAsc', 'Table', 'List', 'MoreHorizontal', 'MoreVertical', 'Dot', 'Copy'].forEach\\(k => console.log\\(k, lr[k] ? 'YES' : 'NO'\\)\\)\")",
+      "Bash(sed -i 's/EmptyState icon=\"📝\"/EmptyState icon={<FileText className=\"w-5 h-5\" \\\\/>}/g' \"app/\\(admin\\)/admin/blog/page.tsx\")",
+      "Bash(sed -i 's/EmptyState icon=\"👥\"/EmptyState icon={<Users className=\"w-5 h-5\" \\\\/>}/g' \"app/\\(admin\\)/admin/clients/page.tsx\")",
+      "Bash(sed -i 's/EmptyState icon=\"🌐\"/EmptyState icon={<Globe className=\"w-5 h-5\" \\\\/>}/g' \"app/\\(admin\\)/admin/domains/page.tsx\")",
+      "Bash(sed -i 's|EmptyState icon=\"🖥\"|EmptyState icon={<Server className=\"w-5 h-5\" />}|g' \"app/\\(admin\\)/admin/hosting/page.tsx\")",
+      "Bash(sed -i 's/EmptyState icon=\"💰\"/EmptyState icon={<Receipt className=\"w-5 h-5\" \\\\/>}/g' \"app/\\(admin\\)/admin/invoices/page.tsx\")"
     ]
   }
 }

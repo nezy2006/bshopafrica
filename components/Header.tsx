@@ -309,11 +309,16 @@ export default function Header() {
               </>
             )}
 
-            {/* Get Started */}
-            <Link href="/get-started" className="relative overflow-hidden ml-1 inline-flex items-center px-5 py-2.5 rounded-full bg-[#6B21A8] text-white text-sm font-semibold transition-shadow duration-300 hover:shadow-[0_0_25px_rgba(107,33,168,0.55)]">
+            {/* Get Started — inverted when over dark hero, normal when scrolled */}
+            <Link href="/get-started"
+              className={`relative overflow-hidden ml-1 inline-flex items-center px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
+                scrolled
+                  ? "bg-[#6B21A8] text-white hover:shadow-[0_0_25px_rgba(107,33,168,0.55)]"
+                  : "bg-white text-[#6B21A8] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
+              }`}>
               <span className="relative z-10">Get Started</span>
               <motion.span
-                className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-black/10 to-transparent"
                 initial={{ x: "-150%" }} whileHover={{ x: "250%" }}
                 transition={{ duration: 0.55, ease: "easeInOut" }}
               />

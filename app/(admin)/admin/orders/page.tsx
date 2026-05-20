@@ -1,4 +1,5 @@
 "use client";
+import { ShoppingCart } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
@@ -36,7 +37,7 @@ export default function OrdersPage() {
       <TableCard>
         <THead cols={["Order ID", "Client", "Amount", "Date", "Status", "Actions"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={6} /> : filtered.length === 0 ? <EmptyState icon="🛒" message="No orders found" /> : filtered.map(o => (
+          {loading ? <SkeletonRows cols={6} /> : filtered.length === 0 ? <EmptyState icon={<ShoppingCart className="w-5 h-5" />} message="No orders found" /> : filtered.map(o => (
             <tr key={o.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${o.status === "Pending" ? "bg-yellow-50/40" : ""}`}>
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">#{o.id}</td>
               <td className="px-5 py-3.5 font-medium text-black">{o.firstname} {o.lastname}</td>

@@ -1,5 +1,7 @@
 // Server-only — never import this from client components.
 
+import crypto from "crypto";
+
 type WhmcsRaw = Record<string, unknown>;
 
 /* ─── Client-facing types ────────────────────────────────────────────────── */
@@ -304,4 +306,12 @@ export function getPaymentUrl(invoiceId: number): string {
 
 export async function addAnnouncement(subject: string, message: string): Promise<void> {
   await callWhmcs("AddAnnouncement", { subject, message, published: 1 });
+}
+
+export function generateAutoAuthUrl(email: string, destination = "clientarea.php"): string {
+  const whmcsUrl     = process.env.WHMCS_URL          ?? "";
+  const autoAuthKey  = process.env.WHMCS_AUTOAUTH_KEY ?? "";
+  const timestamp    = Math.floor(Date.now() / 1000);
+  const hash         = crypto.createHash("sha1").update(email + timestamp + autoAuthKey).digest("hex");
+  return `${whmcsUrl}/dologin.php?email=${encodeURIComponent(email)}&timestamp=${timestamp}&hash=${hash}&goto=${encodeURIComponent(destination)}`;
 }

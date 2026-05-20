@@ -2,28 +2,29 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { Lightbulb, Search, Handshake, Globe } from "lucide-react";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
 const VALUES = [
   {
-    icon: "💡",
+    Icon: Lightbulb, color: "bg-yellow-50 text-yellow-600",
     title: "Innovation",
     desc: "We constantly push the boundaries of what African web infrastructure can be, embracing new technologies to serve our clients better.",
   },
   {
-    icon: "🔍",
+    Icon: Search, color: "bg-blue-50 text-blue-600",
     title: "Transparency",
     desc: "No hidden fees. No surprises. What you see is exactly what you pay — forever. Honest pricing is the foundation of trust.",
   },
   {
-    icon: "🤝",
+    Icon: Handshake, color: "bg-green-50 text-green-600",
     title: "Partnership",
     desc: "We don't just sell hosting — we invest in your success. Our team grows when our clients grow. Your win is our win.",
   },
   {
-    icon: "🌍",
+    Icon: Globe, color: "bg-purple-50 text-purple-600",
     title: "African Pride",
     desc: "Built in Africa, for Africa. We understand local markets, local challenges, and the immense potential of the African digital economy.",
   },
@@ -178,7 +179,9 @@ function ValuesSection() {
               whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.14)" }}
               className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:border-purple-200 transition-colors duration-300 cursor-default"
             >
-              <div className="text-4xl mb-4">{v.icon}</div>
+              <div className={`w-12 h-12 rounded-xl ${v.color} flex items-center justify-center mb-4`}>
+                <v.Icon className="w-6 h-6" />
+              </div>
               <h3 className="text-base font-bold text-black mb-2">{v.title}</h3>
               <p className="text-sm text-gray-500 leading-relaxed">{v.desc}</p>
             </motion.div>
