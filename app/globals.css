@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* ── System font stack (Inter-equivalent, no external fetch required) ── */
+body {
+  font-family: Inter, "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ── Smooth scroll ── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar {
+  width: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: #6b21a8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9333ea;
+}
+
+/* ── Custom keyframes ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-22px); }
+}
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1);   opacity: 0.55; }
+  50%       { transform: scale(1.2); opacity: 0.85; }
+}
+
+@keyframes shimmer-move {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes border-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(107,33,168,0.4), 0 0 30px rgba(107,33,168,0.2);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(107,33,168,0.9), 0 0 60px rgba(107,33,168,0.55);
+  }
+}
+
+/* ── Utility animation classes ── */
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-float-slow {
+  animation: float 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.orb-breathe {
+  animation: orb-breathe 4s ease-in-out infinite;
+}
+
+.animate-border-pulse {
+  animation: border-pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* ── Announcement-bar shimmer text ── */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #ffffff 20%,
+    #c084fc 50%,
+    #ffffff 80%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-move 3.5s linear infinite;
+}

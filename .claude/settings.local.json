@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(findstr -i tailwind)",
+      "Bash(taskkill *)",
+      "Bash(ping -n 4 127.0.0.1)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(vercel --prod)",
+      "Bash(npm install *)",
+      "PowerShell(Remove-Item *)",
+      "Bash(git checkout *)",
+      "Bash(git rm *)",
+      "Bash(grep -E \"^\\\\?\\\\?.*\\\\.\\(zip|sst\\)$\")"
+    ]
+  }
+}
