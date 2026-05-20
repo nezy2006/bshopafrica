@@ -155,14 +155,17 @@ export default function LoginPage() {
       });
       const json = (await res.json()) as {
         success: boolean;
-        data?:   { clientId: number };
+        data?:   { clientId: number; firstname: string; lastname: string; email: string };
         error?:  string;
       };
       if (!json.success || !json.data?.clientId) {
         setError("Invalid email or password. Please try again.");
         return;
       }
-      localStorage.setItem("bshop_client_id", String(json.data.clientId));
+      const { clientId, firstname, lastname, email: clientEmail } = json.data;
+      localStorage.setItem("bshop_client_id",    String(clientId));
+      localStorage.setItem("bshop_client_name",  `${firstname} ${lastname}`.trim() || email);
+      localStorage.setItem("bshop_client_email", clientEmail || email);
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getCartCount } from "@/lib/cart";
 import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
 
@@ -77,8 +77,12 @@ function NotifIcon({ type }: { type: AppNotification["type"] }) {
   return <span className={`${cls} ${colors[type]}`} />;
 }
 
+// Pages whose hero section has a dark/purple background — white nav text is readable there
+const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout", "/dashboard"];
+
 export default function Header() {
-  const router = useRouter();
+  const router   = useRouter();
+  const pathname = usePathname();
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -138,11 +142,13 @@ export default function Header() {
     router.push("/");
   }
 
-  const navTextCls = scrolled
+  // White text only when: not scrolled AND current page has a dark hero
+  const onDarkHero = !scrolled && DARK_HERO_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
+  const navTextCls = (scrolled || !onDarkHero)
     ? "text-gray-800 hover:text-[#6B21A8]"
     : "text-white hover:text-white/80";
-  const underlineCls = scrolled ? "bg-[#6B21A8]" : "bg-white";
-  const iconBtnCls = `relative p-2 rounded-lg transition-colors ${scrolled ? "text-gray-700 hover:bg-gray-100" : "text-white hover:bg-white/20"}`;
+  const underlineCls = (scrolled || !onDarkHero) ? "bg-[#6B21A8]" : "bg-white";
+  const iconBtnCls = `relative p-2 rounded-lg transition-colors ${(scrolled || !onDarkHero) ? "text-gray-700 hover:bg-gray-100" : "text-white hover:bg-white/20"}`;
 
   return (
     <motion.header
@@ -161,7 +167,7 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex-shrink-0">
             <Image
-              src={scrolled ? "/logo.png" : "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"}
+              src={(scrolled || !onDarkHero) ? "/logo.png" : "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"}
               alt="The B.Shop"
               width={160} height={50}
               className="h-10 w-auto object-contain transition-opacity duration-300"
@@ -253,7 +259,7 @@ export default function Header() {
                   className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full hover:bg-white/20 transition-colors"
                 >
                   <span className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center text-white font-bold text-sm">
-                    {clientName.charAt(0).toUpperCase() || "U"}
+                    {clientName.trim().charAt(0).toUpperCase() || "?"}
                   </span>
                   <ChevronDown />
                 </button>
@@ -299,11 +305,11 @@ export default function Header() {
             ) : (
               <>
                 <Link href="/login"
-                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${scrolled ? "text-gray-700 hover:text-[#6B21A8]" : "text-white hover:text-white/80"}`}>
+                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${(scrolled || !onDarkHero) ? "text-gray-700 hover:text-[#6B21A8]" : "text-white hover:text-white/80"}`}>
                   Login
                 </Link>
                 <Link href="/signup"
-                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${scrolled ? "text-gray-700 hover:text-[#6B21A8]" : "text-white hover:text-white/80"}`}>
+                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${(scrolled || !onDarkHero) ? "text-gray-700 hover:text-[#6B21A8]" : "text-white hover:text-white/80"}`}>
                   Signup
                 </Link>
               </>
@@ -312,7 +318,7 @@ export default function Header() {
             {/* Get Started — inverted when over dark hero, normal when scrolled */}
             <Link href="/get-started"
               className={`relative overflow-hidden ml-1 inline-flex items-center px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
-                scrolled
+                (scrolled || !onDarkHero)
                   ? "bg-[#6B21A8] text-white hover:shadow-[0_0_25px_rgba(107,33,168,0.55)]"
                   : "bg-white text-[#6B21A8] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
               }`}>
@@ -327,12 +333,12 @@ export default function Header() {
 
           {/* Mobile hamburger */}
           <button
-            className={`md:hidden relative p-2 flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors ${scrolled ? "hover:bg-gray-100" : "hover:bg-white/20"}`}
+            className={`md:hidden relative p-2 flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors ${(scrolled || !onDarkHero) ? "hover:bg-gray-100" : "hover:bg-white/20"}`}
             onClick={() => setMenuOpen(o => !o)} aria-label="Toggle menu"
           >
             {(["top", "mid", "bot"] as const).map((pos, i) => (
               <motion.span key={pos}
-                className={`block w-6 h-0.5 origin-center transition-colors duration-300 ${i > 0 ? "mt-1.5" : ""} ${scrolled ? "bg-gray-800" : "bg-white"}`}
+                className={`block w-6 h-0.5 origin-center transition-colors duration-300 ${i > 0 ? "mt-1.5" : ""} ${(scrolled || !onDarkHero) ? "bg-gray-800" : "bg-white"}`}
                 animate={
                   pos === "top" ? (menuOpen ? { rotate: 45,  y: 6 }  : { rotate: 0, y: 0 }) :
                   pos === "mid" ? (menuOpen ? { opacity: 0, scaleX: 0 } : { opacity: 1, scaleX: 1 }) :

@@ -7,7 +7,7 @@ type WhmcsRaw = Record<string, unknown>;
 /* ─── Client-facing types ────────────────────────────────────────────────── */
 export interface DomainCheckResult  { available: boolean; domain: string; price: number | null; }
 export interface WhmcsProduct       { pid: number; name: string; description: string; pricing: Record<string, unknown>; features: string[]; }
-export interface LoginResult        { clientId: number; passwordHash: string; }
+export interface LoginResult        { clientId: number; passwordHash: string; firstname: string; lastname: string; email: string; }
 export interface RegisterResult     { clientId: number; }
 export interface OrderResult        { orderId: number; invoiceId: number; }
 export interface ClientDetails      { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
@@ -107,7 +107,13 @@ export async function loginClient(email: string, password: string): Promise<Logi
   const data = await callWhmcs("ValidateLogin", { email, password2: password });
   const clientId = Number(data.userid ?? 0);
   if (!clientId) throw new Error("Authentication failed");
-  return { clientId, passwordHash: String(data.passwordhash ?? "") };
+  return {
+    clientId,
+    passwordHash: String(data.passwordhash ?? ""),
+    firstname:    String(data.firstname   ?? ""),
+    lastname:     String(data.lastname    ?? ""),
+    email:        String(data.email       ?? email),
+  };
 }
 
 export async function registerClient(clientData: Record<string, string>): Promise<RegisterResult> {
