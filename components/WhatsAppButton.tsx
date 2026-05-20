@@ -23,7 +23,7 @@ export default function WhatsAppButton() {
       </AnimatePresence>
 
       <motion.a
-        href="https://wa.me/250780000000"
+        href="https://wa.me/250724684369"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat with us on WhatsApp"
