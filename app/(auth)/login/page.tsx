@@ -163,9 +163,10 @@ export default function LoginPage() {
         return;
       }
       const { clientId, firstname, lastname, email: clientEmail } = json.data;
-      localStorage.setItem("bshop_client_id",    String(clientId));
-      localStorage.setItem("bshop_client_name",  `${firstname} ${lastname}`.trim() || email);
-      localStorage.setItem("bshop_client_email", clientEmail || email);
+      localStorage.setItem("bshop_client_id",        String(clientId));
+      localStorage.setItem("bshop_client_firstname", firstname || email.split("@")[0]);
+      localStorage.setItem("bshop_client_name",      `${firstname} ${lastname}`.trim() || email);
+      localStorage.setItem("bshop_client_email",     clientEmail || email);
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");

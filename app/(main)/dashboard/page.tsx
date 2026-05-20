@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -950,24 +951,25 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
         </button>
       </div>
 
-      {/* Avatar */}
+      {/* User info */}
       {!collapsed && (
         <div className="px-4 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#6B21A8] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              {client.firstname.charAt(0).toUpperCase()}
+            <div className="w-10 h-10 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
+              <User className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-white font-semibold text-sm truncate">{client.firstname} {client.lastname}</p>
-              <p className="text-white/50 text-xs truncate">{client.email}</p>
+              <p className="text-white font-bold text-base leading-tight truncate">{client.firstname}</p>
+              <p className="text-white/60 text-xs leading-tight truncate">{client.firstname} {client.lastname}</p>
+              <p className="text-white/40 text-xs leading-tight truncate">{client.email}</p>
             </div>
           </div>
         </div>
       )}
       {collapsed && (
         <div className="flex justify-center py-3 border-b border-white/10">
-          <div className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center text-white font-bold text-sm">
-            {client.firstname.charAt(0).toUpperCase()}
+          <div className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center">
+            <User className="w-4 h-4 text-white" />
           </div>
         </div>
       )}
@@ -1010,9 +1012,12 @@ function DashboardInner() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const id   = localStorage.getItem("bshop_client_id");
-    const name = localStorage.getItem("bshop_client_name");
-    const email = localStorage.getItem("bshop_client_email");
+    const id        = localStorage.getItem("bshop_client_id");
+    const firstname = localStorage.getItem("bshop_client_firstname")
+                      || localStorage.getItem("bshop_client_name")?.split(" ")[0]
+                      || "Client";
+    const fullName  = localStorage.getItem("bshop_client_name") ?? "";
+    const email     = localStorage.getItem("bshop_client_email") ?? "";
     if (!id) { router.replace("/login"); return; }
 
     const clientId = Number(id);
@@ -1027,12 +1032,12 @@ function DashboardInner() {
       .catch(() => {
         // Fallback to localStorage data
         setClient({
-          id: clientId,
-          firstname: name?.split(" ")[0] ?? "Client",
-          lastname:  name?.split(" ")[1] ?? "",
-          email:     email ?? "",
+          id:          clientId,
+          firstname,
+          lastname:    fullName.split(" ").slice(1).join(" "),
+          email,
           phonenumber: "",
-          status:    "Active",
+          status:      "Active",
           datecreated: "",
         });
       });
@@ -1047,6 +1052,7 @@ function DashboardInner() {
   function handleLogout() {
     localStorage.removeItem("bshop_client_id");
     localStorage.removeItem("bshop_client_name");
+    localStorage.removeItem("bshop_client_firstname");
     localStorage.removeItem("bshop_client_email");
     stopNotificationPolling();
     router.push("/");

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { User } from "lucide-react";
 import { getCartCount } from "@/lib/cart";
 import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
 
@@ -88,8 +89,10 @@ export default function Header() {
   const [cartCount, setCartCount] = useState(0);
   const [unread,    setUnread]    = useState(0);
   const [notifs,    setNotifs]    = useState<AppNotification[]>([]);
-  const [loggedIn,  setLoggedIn]  = useState(false);
-  const [clientName, setClientName] = useState("");
+  const [loggedIn,     setLoggedIn]     = useState(false);
+  const [clientName,   setClientName]   = useState("");
+  const [clientFirst,  setClientFirst]  = useState("");
+  const [clientEmail,  setClientEmail]  = useState("");
   const [userDropOpen,  setUserDropOpen]  = useState(false);
   const [notifDropOpen, setNotifDropOpen] = useState(false);
   const userRef  = useRef<HTMLDivElement>(null);
@@ -101,10 +104,16 @@ export default function Header() {
       setCartCount(getCartCount());
       setUnread(getUnreadCount());
       setNotifs(getNotifications().slice(0, 5));
-      const id   = localStorage.getItem("bshop_client_id");
-      const name = localStorage.getItem("bshop_client_name") ?? "";
+      const id    = localStorage.getItem("bshop_client_id");
+      const name  = localStorage.getItem("bshop_client_name") ?? "";
+      const first = localStorage.getItem("bshop_client_firstname")
+                    || name.split(" ")[0]
+                    || "";
+      const email = localStorage.getItem("bshop_client_email") ?? "";
       setLoggedIn(!!id);
       setClientName(name);
+      setClientFirst(first);
+      setClientEmail(email);
     }
     sync();
     window.addEventListener("bshop_cart_update",          sync);
@@ -136,6 +145,7 @@ export default function Header() {
   function handleLogout() {
     localStorage.removeItem("bshop_client_id");
     localStorage.removeItem("bshop_client_name");
+    localStorage.removeItem("bshop_client_firstname");
     localStorage.removeItem("bshop_client_email");
     setLoggedIn(false);
     setUserDropOpen(false);
@@ -256,10 +266,13 @@ export default function Header() {
               <div ref={userRef} className="relative ml-1">
                 <button
                   onClick={() => { setUserDropOpen(o => !o); setNotifDropOpen(false); }}
-                  className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full hover:bg-white/20 transition-colors"
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-full transition-colors ${(scrolled || !onDarkHero) ? "hover:bg-gray-100" : "hover:bg-white/20"}`}
                 >
-                  <span className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center text-white font-bold text-sm">
-                    {clientName.trim().charAt(0).toUpperCase() || "?"}
+                  <span className="w-7 h-7 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
+                    <User className="w-3.5 h-3.5 text-white" />
+                  </span>
+                  <span className={`text-sm font-semibold hidden lg:block ${(scrolled || !onDarkHero) ? "text-gray-800" : "text-white"}`}>
+                    {clientFirst || "Account"}
                   </span>
                   <ChevronDown />
                 </button>
@@ -275,8 +288,8 @@ export default function Header() {
                       className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50"
                     >
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{clientName}</p>
-                        <p className="text-xs text-gray-400">Client Account</p>
+                        <p className="font-semibold text-gray-900 text-sm truncate">{clientName || clientFirst}</p>
+                        <p className="text-xs text-gray-400 truncate">{clientEmail || "Client Account"}</p>
                       </div>
                       {([
                         { href: "/dashboard",              label: "Dashboard",        Icon: DashIcon },
