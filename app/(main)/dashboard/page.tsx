@@ -940,7 +940,7 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
   onLogout: () => void; collapsed: boolean; onToggle: () => void;
 }) {
   return (
-    <aside className={`flex flex-col bg-[#1e0a2e] transition-all duration-300 ${collapsed ? "w-16" : "w-64"} overflow-hidden flex-shrink-0`}>
+    <aside className="flex flex-col bg-[#1e0a2e] w-full h-full overflow-hidden">
       {/* Logo + toggle */}
       <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
         {!collapsed && (
@@ -1074,21 +1074,20 @@ function DashboardInner() {
       {/* Mobile overlay */}
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
 
-      <div className="flex overflow-hidden" style={{ height: "calc(100vh - 96px)", marginTop: "96px" }}>
-        {/* Sidebar - hidden on mobile, slide over */}
-        <div className={`fixed md:relative inset-y-0 left-0 z-40 md:z-auto transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
-          style={{ top: "96px", height: "calc(100vh - 96px)" }}>
-          <Sidebar client={client} active={section} onSelect={s => { setSection(s); setMobileOpen(false); }}
-            onLogout={handleLogout} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
-        </div>
+      {/* Sidebar — fixed, starts below announcement bar + header (96px) */}
+      <div className={`fixed left-0 z-30 transition-transform duration-300 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ top: "96px", height: "calc(100vh - 96px)", width: collapsed ? "64px" : "256px" }}>
+        <Sidebar client={client} active={section} onSelect={s => { setSection(s); setMobileOpen(false); }}
+          onLogout={handleLogout} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      </div>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
-          {/* Mobile header */}
-          <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-20">
-            <button onClick={() => setMobileOpen(true)} className="p-2 text-gray-500 hover:text-[#6B21A8]"><I.Menu /></button>
-            <span className="font-semibold text-gray-900">{NAV.find(n => n.id === section)?.label}</span>
-          </div>
+      {/* Main content — offset by sidebar width and header height */}
+      <main className={`bg-gray-50 min-h-screen pt-24 transition-all duration-300 ${collapsed ? "md:ml-16" : "md:ml-64"}`}>
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-24 z-20">
+          <button onClick={() => setMobileOpen(true)} className="p-2 text-gray-500 hover:text-[#6B21A8]"><I.Menu /></button>
+          <span className="font-semibold text-gray-900">{NAV.find(n => n.id === section)?.label}</span>
+        </div>
 
           <AnimatePresence mode="wait">
             <motion.div key={section}
@@ -1106,7 +1105,6 @@ function DashboardInner() {
             </motion.div>
           </AnimatePresence>
         </main>
-      </div>
     </>
   );
 }

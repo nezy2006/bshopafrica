@@ -107,12 +107,12 @@ export default function Header() {
       const id    = localStorage.getItem("bshop_client_id");
       const name  = localStorage.getItem("bshop_client_name") ?? "";
       const first = localStorage.getItem("bshop_client_firstname")
-                    || name.split(" ")[0]
-                    || "";
+                    || (name.trim() ? name.trim().split(/\s+/)[0] : null)
+                    || null;
       const email = localStorage.getItem("bshop_client_email") ?? "";
-      setLoggedIn(!!id);
+      setLoggedIn(!!id && !!first);   // only "logged in" display when we have a real name
       setClientName(name);
-      setClientFirst(first);
+      setClientFirst(first ?? "");
       setClientEmail(email);
     }
     sync();
@@ -272,7 +272,7 @@ export default function Header() {
                     <User className="w-3.5 h-3.5 text-white" />
                   </span>
                   <span className={`text-sm font-semibold hidden lg:block ${(scrolled || !onDarkHero) ? "text-gray-800" : "text-white"}`}>
-                    {clientFirst || "Account"}
+                    {clientFirst}
                   </span>
                   <ChevronDown />
                 </button>
