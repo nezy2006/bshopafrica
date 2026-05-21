@@ -9,16 +9,24 @@ import { User } from "lucide-react";
 import { getCartCount } from "@/lib/cart";
 import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
 
-const NAV_LINKS = [
-  { label: "Home",             href: "/"                 },
-  { label: "Hosting",          href: "/hosting"          },
-  { label: "Domains",          href: "/domains"          },
-  { label: "Transfer",         href: "/transfer"         },
-  { label: "Website Builder",  href: "/website-builder", badge: "Soon" },
-  { label: "About Us",         href: "/about"            },
-  { label: "Digital Campfire", href: "/digital-campfire" },
-  { label: "Contact Us",       href: "/contact"          },
+// Primary links — always shown on md+ screens
+const PRIMARY_NAV = [
+  { label: "Home",     href: "/"         },
+  { label: "Hosting",  href: "/hosting"  },
+  { label: "Domains",  href: "/domains"  },
+  { label: "Transfer", href: "/transfer" },
 ];
+
+// Secondary links — shown inline on xl+, in "More" dropdown on md–lg
+const SECONDARY_NAV = [
+  { label: "Builder",  href: "/website-builder"  },
+  { label: "About",    href: "/about"             },
+  { label: "Campfire", href: "/digital-campfire"  },
+  { label: "Contact",  href: "/contact"           },
+];
+
+// All links combined — used for mobile drawer
+const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV];
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -68,54 +76,61 @@ function LogoutSmIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 }
 
-/* ─── Notification dropdown ──────────────────────────────────────────────── */
+/* ─── Notification icon dot ──────────────────────────────────────────────── */
 function NotifIcon({ type }: { type: AppNotification["type"] }) {
   const cls = "w-2 h-2 rounded-full flex-shrink-0 mt-1.5";
   const colors: Record<AppNotification["type"], string> = {
-    domain_expiring:    "bg-orange-400",
-    invoice_due:        "bg-red-400",
-    ticket_replied:     "bg-blue-400",
-    order_completed:    "bg-green-400",
-    service_suspended:  "bg-red-600",
-    info:               "bg-gray-400",
+    domain_expiring:   "bg-orange-400",
+    invoice_due:       "bg-red-400",
+    ticket_replied:    "bg-blue-400",
+    order_completed:   "bg-green-400",
+    service_suspended: "bg-red-600",
+    info:              "bg-gray-400",
   };
   return <span className={`${cls} ${colors[type]}`} />;
 }
 
-// Pages with dark/purple hero — white nav text is readable there
-// /dashboard excluded: it has a white/gray bg; sidebar owns the logo there
-const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout", "/transfer", "/website-builder"];
+// Pages with dark/purple hero — white nav text reads well there.
+// /cart and /dashboard are excluded: white/gray background needs dark text.
+const DARK_HERO_PATHS = [
+  "/about", "/contact", "/domains", "/hosting",
+  "/digital-campfire", "/login", "/signup",
+  "/checkout", "/transfer", "/website-builder",
+];
 
 export default function Header() {
   const router   = useRouter();
   const pathname = usePathname();
-  const [scrolled,  setScrolled]  = useState(false);
-  const [menuOpen,  setMenuOpen]  = useState(false);
-  const [cartCount, setCartCount] = useState(0);
-  const [unread,    setUnread]    = useState(0);
-  const [notifs,    setNotifs]    = useState<AppNotification[]>([]);
-  const [loggedIn,     setLoggedIn]     = useState(false);
-  const [clientName,   setClientName]   = useState("");
-  const [clientFirst,  setClientFirst]  = useState("");
-  const [clientEmail,  setClientEmail]  = useState("");
+
+  const [scrolled,      setScrolled]      = useState(false);
+  const [menuOpen,      setMenuOpen]      = useState(false);
+  const [moreOpen,      setMoreOpen]      = useState(false);
+  const [cartCount,     setCartCount]     = useState(0);
+  const [unread,        setUnread]        = useState(0);
+  const [notifs,        setNotifs]        = useState<AppNotification[]>([]);
+  const [loggedIn,      setLoggedIn]      = useState(false);
+  const [clientName,    setClientName]    = useState("");
+  const [clientFirst,   setClientFirst]   = useState("");
+  const [clientEmail,   setClientEmail]   = useState("");
   const [userDropOpen,  setUserDropOpen]  = useState(false);
   const [notifDropOpen, setNotifDropOpen] = useState(false);
+
   const userRef  = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const moreRef  = useRef<HTMLDivElement>(null);
 
-  /* Sync cart + notifications + auth on mount and storage events */
+  /* Sync cart + notifications + auth */
   useEffect(() => {
     function sync() {
       setCartCount(getCartCount());
       setUnread(getUnreadCount());
       setNotifs(getNotifications().slice(0, 5));
-      const id    = localStorage.getItem("bshop_client_id");
-      const name  = localStorage.getItem("bshop_client_name") ?? "";
-      const raw   = localStorage.getItem("bshop_client_firstname") ?? "";
-      // Use raw firstname if it looks like a real name (no @ or .), else fall back to first word of full name
+      const id   = localStorage.getItem("bshop_client_id");
+      const name = localStorage.getItem("bshop_client_name") ?? "";
+      const raw  = localStorage.getItem("bshop_client_firstname") ?? "";
       const first = (raw && !raw.includes("@") && !raw.includes("."))
-                    ? raw
-                    : name.trim().split(/\s+/)[0] ?? "";
+        ? raw
+        : name.trim().split(/\s+/)[0] ?? "";
       const email = localStorage.getItem("bshop_client_email") ?? "";
       setLoggedIn(!!id && !!first);
       setClientName(name);
@@ -133,11 +148,12 @@ export default function Header() {
     };
   }, []);
 
-  /* Close dropdowns on outside click */
+  /* Close all dropdowns on outside click */
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (userRef.current  && !userRef.current.contains(e.target as Node))  setUserDropOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifDropOpen(false);
+      if (moreRef.current  && !moreRef.current.contains(e.target as Node))  setMoreOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -159,12 +175,27 @@ export default function Header() {
     router.push("/");
   }
 
-  const isDashboard = pathname.startsWith("/dashboard");
-  // White text only when: not scrolled AND on a dark-hero page AND not dashboard
-  const onDarkHero  = !scrolled && !isDashboard && DARK_HERO_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
-  const navTextCls  = onDarkHero ? "text-white hover:text-white/80" : "text-gray-800 hover:text-[#6B21A8]";
+  const isDashboard  = pathname.startsWith("/dashboard");
+  const onDarkHero   = !scrolled && !isDashboard &&
+    DARK_HERO_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
+
+  const navTextCls   = onDarkHero ? "text-white hover:text-white/80" : "text-gray-800 hover:text-[#6B21A8]";
   const underlineCls = onDarkHero ? "bg-white" : "bg-[#6B21A8]";
   const iconBtnCls   = `relative p-2 rounded-lg transition-colors ${onDarkHero ? "text-white hover:bg-white/20" : "text-gray-700 hover:bg-gray-100"}`;
+
+  /* Shared nav link renderer */
+  function NavLink({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
+    return (
+      <Link
+        href={href}
+        onClick={onClick}
+        className={`relative group whitespace-nowrap text-xs lg:text-sm font-medium transition-colors duration-200 ${navTextCls}`}
+      >
+        {label}
+        <span className={`absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full transition-all duration-300 ease-out group-hover:w-full ${underlineCls}`} />
+      </Link>
+    );
+  }
 
   return (
     <motion.header
@@ -178,39 +209,78 @@ export default function Header() {
       transition={{ duration: 0.7, ease: EASE }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 gap-2">
 
-          {/* Logo — hidden on /dashboard (sidebar owns it there) */}
+          {/* Logo */}
           {!isDashboard && (
             <Link href="/" className="flex-shrink-0">
               <Image
-                src={onDarkHero ? "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" : "/logo.png"}
+                src={onDarkHero
+                  ? "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"
+                  : "/logo.png"}
                 alt="The B.Shop"
-                width={220} height={60}
-                className="h-12 w-auto object-contain transition-opacity duration-300"
+                width={180} height={48}
+                className="h-9 lg:h-11 w-auto object-contain transition-opacity duration-300"
                 priority
               />
             </Link>
           )}
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            {NAV_LINKS.map((link) => (
-              <Link key={link.label} href={link.href}
-                className={`relative group flex items-center gap-1.5 text-sm font-medium transition-colors duration-200 ${navTextCls}`}>
-                {link.label}
-                {"badge" in link && link.badge && (
-                  <span className="px-1.5 py-0.5 bg-[#6B21A8] text-white text-[9px] font-bold rounded-full leading-none">
-                    {link.badge}
-                  </span>
-                )}
-                <span className={`absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full transition-all duration-300 ease-out group-hover:w-full ${underlineCls}`} />
-              </Link>
+          {/* Desktop nav — primary links always visible (md+) */}
+          <nav className="hidden md:flex items-center gap-3 lg:gap-5 flex-nowrap min-w-0">
+
+            {/* Primary: always shown */}
+            {PRIMARY_NAV.map(link => (
+              <NavLink key={link.href} href={link.href} label={link.label} />
             ))}
+
+            {/* Secondary: shown inline on xl+ */}
+            {SECONDARY_NAV.map(link => (
+              <span key={link.href} className="hidden xl:block">
+                <NavLink href={link.href} label={link.label} />
+              </span>
+            ))}
+
+            {/* "More" dropdown: shown on md–lg when secondary links are hidden */}
+            <div ref={moreRef} className="xl:hidden relative">
+              <button
+                onClick={() => { setMoreOpen(o => !o); setUserDropOpen(false); setNotifDropOpen(false); }}
+                className={`flex items-center gap-1 text-xs lg:text-sm font-medium transition-colors duration-200 whitespace-nowrap ${navTextCls}`}
+              >
+                More
+                <motion.span animate={{ rotate: moreOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown />
+                </motion.span>
+              </button>
+
+              <AnimatePresence>
+                {moreOpen && (
+                  <motion.div
+                    key="more-drop"
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.18, ease: EASE }}
+                    className="absolute left-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 py-1"
+                  >
+                    {SECONDARY_NAV.map(link => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMoreOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 hover:text-[#6B21A8] transition-colors font-medium"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </nav>
 
-          {/* Right side */}
-          <div className="hidden md:flex items-center gap-1">
+          {/* Right side: icons + auth + CTA */}
+          <div className="hidden md:flex items-center gap-1 flex-shrink-0">
 
             {/* Cart */}
             <Link href="/cart" className={iconBtnCls}>
@@ -224,7 +294,10 @@ export default function Header() {
 
             {/* Notifications */}
             <div ref={notifRef} className="relative">
-              <button className={iconBtnCls} onClick={() => { setNotifDropOpen(o => !o); setUserDropOpen(false); }}>
+              <button
+                className={iconBtnCls}
+                onClick={() => { setNotifDropOpen(o => !o); setUserDropOpen(false); setMoreOpen(false); }}
+              >
                 <BellIcon />
                 {unread > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
@@ -246,8 +319,12 @@ export default function Header() {
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                       <span className="font-semibold text-gray-900 text-sm">Notifications</span>
                       {unread > 0 && (
-                        <button onClick={() => { markAllRead(); setUnread(0); setNotifs(notifs.map(n => ({...n, read: true}))); }}
-                          className="text-xs text-[#6B21A8] hover:underline">Mark all read</button>
+                        <button
+                          onClick={() => { markAllRead(); setUnread(0); setNotifs(notifs.map(n => ({ ...n, read: true }))); }}
+                          className="text-xs text-[#6B21A8] hover:underline"
+                        >
+                          Mark all read
+                        </button>
                       )}
                     </div>
                     {notifs.length === 0 ? (
@@ -274,15 +351,13 @@ export default function Header() {
               </AnimatePresence>
             </div>
 
-            {/* Auth: logged in → avatar + dropdown | logged out → Login/Signup */}
+            {/* Auth */}
             {loggedIn ? (
               <div ref={userRef} className="relative ml-1">
                 <button
-                  onClick={() => { setUserDropOpen(o => !o); setNotifDropOpen(false); }}
+                  onClick={() => { setUserDropOpen(o => !o); setNotifDropOpen(false); setMoreOpen(false); }}
                   className={`flex items-center gap-2 px-2 py-1.5 rounded-full transition-colors ${
-                    onDarkHero
-                      ? "bg-white/15 hover:bg-white/25"   /* always visible on dark, brighter on hover */
-                      : "hover:bg-gray-100"               /* subtle on light, only on hover */
+                    onDarkHero ? "bg-white/15 hover:bg-white/25" : "hover:bg-gray-100"
                   }`}
                 >
                   <span className="w-7 h-7 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
@@ -311,12 +386,12 @@ export default function Header() {
                         {clientEmail && <p className="text-xs text-gray-400 truncate mt-0.5">{clientEmail}</p>}
                       </div>
                       {([
-                        { href: "/dashboard",              label: "Dashboard",        Icon: DashIcon },
-                        { href: "/dashboard?s=domains",    label: "My Domains",       Icon: GlobeSmIcon },
-                        { href: "/dashboard?s=hosting",    label: "My Hosting",       Icon: ServerSmIcon },
-                        { href: "/dashboard?s=invoices",   label: "Invoices",         Icon: InvoiceSmIcon },
-                        { href: "/dashboard?s=support",    label: "Support",          Icon: SupportSmIcon },
-                        { href: "/dashboard?s=settings",   label: "Account Settings", Icon: SettingsSmIcon },
+                        { href: "/dashboard",            label: "Dashboard",        Icon: DashIcon },
+                        { href: "/dashboard?s=domains",  label: "My Domains",       Icon: GlobeSmIcon },
+                        { href: "/dashboard?s=hosting",  label: "My Hosting",       Icon: ServerSmIcon },
+                        { href: "/dashboard?s=invoices", label: "Invoices",         Icon: InvoiceSmIcon },
+                        { href: "/dashboard?s=support",  label: "Support",          Icon: SupportSmIcon },
+                        { href: "/dashboard?s=settings", label: "Account Settings", Icon: SettingsSmIcon },
                       ] as { href: string; label: string; Icon: () => React.ReactElement }[]).map(item => (
                         <Link key={item.label} href={item.href}
                           onClick={() => setUserDropOpen(false)}
@@ -337,19 +412,23 @@ export default function Header() {
             ) : (
               <>
                 <Link href="/login"
-                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${onDarkHero ? "text-white hover:text-white/80" : "text-gray-700 hover:text-[#6B21A8]"}`}>
+                  className={`text-xs lg:text-sm font-medium transition-colors px-3 py-2 rounded-lg ${
+                    onDarkHero ? "text-white hover:text-white/80" : "text-gray-700 hover:text-[#6B21A8]"
+                  }`}>
                   Login
                 </Link>
                 <Link href="/signup"
-                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${onDarkHero ? "text-white hover:text-white/80" : "text-gray-700 hover:text-[#6B21A8]"}`}>
+                  className={`text-xs lg:text-sm font-medium transition-colors px-3 py-2 rounded-lg ${
+                    onDarkHero ? "text-white hover:text-white/80" : "text-gray-700 hover:text-[#6B21A8]"
+                  }`}>
                   Signup
                 </Link>
               </>
             )}
 
-            {/* Get Started — inverted when over dark hero, normal when scrolled */}
-            <Link href="/get-started"
-              className={`relative overflow-hidden ml-1 inline-flex items-center px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
+            {/* Get Started → /hosting */}
+            <Link href="/hosting"
+              className={`relative overflow-hidden ml-1 inline-flex items-center px-4 lg:px-5 py-2.5 rounded-full text-xs lg:text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
                 onDarkHero
                   ? "bg-white text-[#6B21A8] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
                   : "bg-[#6B21A8] text-white hover:shadow-[0_0_25px_rgba(107,33,168,0.55)]"
@@ -365,16 +444,21 @@ export default function Header() {
 
           {/* Mobile hamburger */}
           <button
-            className={`md:hidden relative p-2 flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors ${onDarkHero ? "hover:bg-white/20" : "hover:bg-gray-100"}`}
-            onClick={() => setMenuOpen(o => !o)} aria-label="Toggle menu"
+            className={`md:hidden relative p-2 flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors ${
+              onDarkHero ? "hover:bg-white/20" : "hover:bg-gray-100"
+            }`}
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label="Toggle menu"
           >
             {(["top", "mid", "bot"] as const).map((pos, i) => (
               <motion.span key={pos}
-                className={`block w-6 h-0.5 origin-center transition-colors duration-300 ${i > 0 ? "mt-1.5" : ""} ${onDarkHero ? "bg-white" : "bg-gray-800"}`}
+                className={`block w-6 h-0.5 origin-center transition-colors duration-300 ${i > 0 ? "mt-1.5" : ""} ${
+                  onDarkHero ? "bg-white" : "bg-gray-800"
+                }`}
                 animate={
-                  pos === "top" ? (menuOpen ? { rotate: 45,  y: 6 }  : { rotate: 0, y: 0 }) :
-                  pos === "mid" ? (menuOpen ? { opacity: 0, scaleX: 0 } : { opacity: 1, scaleX: 1 }) :
-                                  (menuOpen ? { rotate: -45, y: -6 } : { rotate: 0, y: 0 })
+                  pos === "top" ? (menuOpen ? { rotate: 45,  y: 6 }          : { rotate: 0,  y: 0 }) :
+                  pos === "mid" ? (menuOpen ? { opacity: 0, scaleX: 0 }      : { opacity: 1, scaleX: 1 }) :
+                                  (menuOpen ? { rotate: -45, y: -6 }         : { rotate: 0,  y: 0 })
                 }
                 transition={{ duration: pos === "mid" ? 0.2 : 0.25 }}
               />
@@ -389,35 +473,38 @@ export default function Header() {
           <motion.div key="mobile-menu"
             initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.35, ease: EASE }}
-            className="md:hidden overflow-hidden bg-white border-t border-gray-100 shadow-lg">
+            className="md:hidden overflow-hidden bg-white border-t border-gray-100 shadow-lg"
+          >
             <div className="px-4 pt-3 pb-5 flex flex-col gap-1">
-              {NAV_LINKS.map((link, i) => (
-                <motion.div key={link.label} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.07 + 0.05, duration: 0.3 }}>
+              {ALL_NAV.map((link, i) => (
+                <motion.div key={link.href} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: i * 0.05 + 0.04, duration: 0.3 }}>
                   <Link href={link.href} onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2.5 text-gray-800 font-medium rounded-lg hover:bg-purple-50 hover:text-[#6B21A8] transition-colors">
+                    className="block px-3 py-2.5 text-gray-800 font-medium rounded-lg hover:bg-purple-50 hover:text-[#6B21A8] transition-colors text-sm">
                     {link.label}
-                    {"badge" in link && link.badge && (
-                      <span className="px-1.5 py-0.5 bg-[#6B21A8] text-white text-[9px] font-bold rounded-full leading-none">
-                        {link.badge}
-                      </span>
-                    )}
                   </Link>
                 </motion.div>
               ))}
               <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                <Link href="/cart" className="relative flex-1 text-center py-2.5 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                  Cart{cartCount > 0 && <span className="ml-1 bg-[#6B21A8] text-white text-xs rounded-full px-1.5">{cartCount}</span>}
+                <Link href="/cart" className="relative flex-1 text-center py-2.5 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                  Cart{cartCount > 0 && (
+                    <span className="ml-1 bg-[#6B21A8] text-white text-xs rounded-full px-1.5">{cartCount}</span>
+                  )}
                 </Link>
                 {loggedIn ? (
-                  <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="flex-1 text-center py-2.5 text-[#6B21A8] font-semibold rounded-lg hover:bg-purple-50 transition-colors">Dashboard</Link>
+                  <Link href="/dashboard" onClick={() => setMenuOpen(false)}
+                    className="flex-1 text-center py-2.5 text-[#6B21A8] font-semibold rounded-lg hover:bg-purple-50 transition-colors text-sm">
+                    Dashboard
+                  </Link>
                 ) : (
                   <>
-                    <Link href="/login"  className="flex-1 text-center py-2.5 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Login</Link>
-                    <Link href="/signup" className="flex-1 text-center py-2.5 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Signup</Link>
+                    <Link href="/login"  className="flex-1 text-center py-2.5 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">Login</Link>
+                    <Link href="/signup" className="flex-1 text-center py-2.5 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">Signup</Link>
                   </>
                 )}
-                <Link href="/get-started" className="flex-1 text-center py-2.5 bg-[#6B21A8] text-white font-semibold rounded-full hover:bg-[#581c87] transition-colors">Get Started</Link>
+                <Link href="/hosting" className="flex-1 text-center py-2.5 bg-[#6B21A8] text-white font-semibold rounded-full hover:bg-[#581c87] transition-colors text-sm">
+                  Get Started
+                </Link>
               </div>
             </div>
           </motion.div>
