@@ -941,8 +941,11 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
 }) {
   return (
     <aside className="flex flex-col bg-[#1e0a2e] w-full h-full overflow-hidden">
-      {/* Logo + toggle */}
-      <div className="flex items-center justify-between px-4 h-16 border-b border-white/10">
+      {/* Spacer — pushes content below announcement bar (h-8) + header (h-16) */}
+      <div className="h-24 flex-shrink-0" />
+
+      {/* Logo + collapse toggle */}
+      <div className="flex items-center justify-between px-4 pb-4 border-b border-white/10">
         {!collapsed && (
           <Image src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" alt="B.Shop" width={120} height={36} className="h-8 w-auto" />
         )}
@@ -959,9 +962,10 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
               <User className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-white font-bold text-base leading-tight truncate">{client.firstname}</p>
-              <p className="text-white/60 text-xs leading-tight truncate">{client.firstname} {client.lastname}</p>
-              <p className="text-white/40 text-xs leading-tight truncate">{client.email}</p>
+              <p className="text-white font-bold text-sm leading-tight truncate">
+                {[client.firstname, client.lastname].filter(Boolean).join(" ")}
+              </p>
+              <p className="text-purple-300 text-xs leading-tight truncate mt-0.5">{client.email}</p>
             </div>
           </div>
         </div>
@@ -1074,9 +1078,9 @@ function DashboardInner() {
       {/* Mobile overlay */}
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
 
-      {/* Sidebar — fixed, starts below announcement bar + header (96px) */}
-      <div className={`fixed left-0 z-30 transition-transform duration-300 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
-        style={{ top: "96px", height: "calc(100vh - 96px)", width: collapsed ? "64px" : "256px" }}>
+      {/* Sidebar — fixed, full height from top-0, internal spacer pushes content below header */}
+      <div className={`fixed left-0 top-0 z-30 h-screen transition-transform duration-300 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ width: collapsed ? "64px" : "256px" }}>
         <Sidebar client={client} active={section} onSelect={s => { setSection(s); setMobileOpen(false); }}
           onLogout={handleLogout} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
       </div>

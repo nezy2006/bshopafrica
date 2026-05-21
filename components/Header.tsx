@@ -107,13 +107,15 @@ export default function Header() {
       setNotifs(getNotifications().slice(0, 5));
       const id    = localStorage.getItem("bshop_client_id");
       const name  = localStorage.getItem("bshop_client_name") ?? "";
-      const first = localStorage.getItem("bshop_client_firstname")
-                    || (name.trim() ? name.trim().split(/\s+/)[0] : null)
-                    || null;
+      const raw   = localStorage.getItem("bshop_client_firstname") ?? "";
+      // Use raw firstname if it looks like a real name (no @ or .), else fall back to first word of full name
+      const first = (raw && !raw.includes("@") && !raw.includes("."))
+                    ? raw
+                    : name.trim().split(/\s+/)[0] ?? "";
       const email = localStorage.getItem("bshop_client_email") ?? "";
-      setLoggedIn(!!id && !!first);   // only "logged in" display when we have a real name
+      setLoggedIn(!!id && !!first);
       setClientName(name);
-      setClientFirst(first ?? "");
+      setClientFirst(first);
       setClientEmail(email);
     }
     sync();
