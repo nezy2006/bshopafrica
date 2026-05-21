@@ -174,7 +174,7 @@ function FlipCard({ card, index }: { card: typeof FLIP_CARDS[number]; index: num
         {/* Back */}
         <div
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${card.color} p-6 text-white shadow-xl`}
+          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${card.color} pt-5 px-6 pb-8 text-white shadow-xl overflow-hidden`}
         >
           <h3 className="text-base font-bold mb-3">{card.title} Features</h3>
           <ul className="space-y-1.5">
