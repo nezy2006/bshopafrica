@@ -192,22 +192,15 @@ function CartSummary({ cart, couponDiscount = 0 }: { cart: Cart; couponDiscount?
 
 /* ─── Step 2: Account ────────────────────────────────────────────────────── */
 function StepAccount({ onDone }: { onDone: () => void }) {
-  const [tab,        setTab]        = useState<"login" | "register">("login");
-  const [email,      setEmail]      = useState("");
-  const [password,   setPassword]   = useState("");
-  const [showPw,     setShowPw]     = useState(false);
-  const [firstName,  setFirstName]  = useState("");
-  const [lastName,   setLastName]   = useState("");
-  const [phone,      setPhone]      = useState("");
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [loggedIn,   setLoggedIn]   = useState(false);
-  const [clientName, setClientName] = useState("");
-
-  useEffect(() => {
-    const id = localStorage.getItem("bshop_client_id");
-    if (id) { setLoggedIn(true); }
-  }, []);
+  const [tab,       setTab]       = useState<"login" | "register">("login");
+  const [email,     setEmail]     = useState("");
+  const [password,  setPassword]  = useState("");
+  const [showPw,    setShowPw]    = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName,  setLastName]  = useState("");
+  const [phone,     setPhone]     = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,9 +211,14 @@ function StepAccount({ onDone }: { onDone: () => void }) {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ action: "loginClient", params: { email, password } }),
       });
-      const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
+      const json = (await res.json()) as { success: boolean; data?: { clientId: number; firstname: string; lastname: string; email: string }; error?: string };
       if (!json.success || !json.data?.clientId) { setError("Invalid email or password."); return; }
-      localStorage.setItem("bshop_client_id", String(json.data.clientId));
+      const { clientId, firstname, lastname, email: clientEmail } = json.data;
+      localStorage.setItem("bshop_client_id",        String(clientId));
+      localStorage.setItem("bshop_client_firstname", firstname ?? "");
+      localStorage.setItem("bshop_client_name",      `${firstname ?? ""} ${lastname ?? ""}`.trim());
+      localStorage.setItem("bshop_client_email",     clientEmail || email);
+      window.dispatchEvent(new Event("bshop_cart_update"));
       onDone();
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
@@ -248,31 +246,15 @@ function StepAccount({ onDone }: { onDone: () => void }) {
       });
       const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
       if (!json.success || !json.data?.clientId) { setError(json.error ?? "Registration failed."); return; }
-      localStorage.setItem("bshop_client_id", String(json.data.clientId));
+      localStorage.setItem("bshop_client_id",        String(json.data.clientId));
+      localStorage.setItem("bshop_client_firstname", firstName);
+      localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
+      localStorage.setItem("bshop_client_email",     email);
+      window.dispatchEvent(new Event("bshop_cart_update"));
       onDone();
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   };
-
-  if (loggedIn) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0  }}
-        className="text-center py-8"
-      >
-        <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center text-[#6B21A8] text-2xl mx-auto mb-4">👤</div>
-        <h2 className="text-2xl font-black text-black mb-2">You&apos;re already logged in</h2>
-        <p className="text-gray-500 mb-8">Continue with your existing account to complete your order.</p>
-        <button
-          onClick={onDone}
-          className="px-8 py-3.5 bg-[#6B21A8] text-white font-bold rounded-full text-sm hover:bg-[#581c87] transition-colors"
-        >
-          Continue to Payment →
-        </button>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}>

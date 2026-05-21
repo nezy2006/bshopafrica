@@ -128,11 +128,10 @@ export default function Header() {
       const id   = localStorage.getItem("bshop_client_id");
       const name = localStorage.getItem("bshop_client_name") ?? "";
       const raw  = localStorage.getItem("bshop_client_firstname") ?? "";
-      // Never display an email address as a name
       const ok  = (s: string) => !!s && !s.includes("@") && !s.includes(".");
       const first = ok(raw) ? raw : ok(name.trim().split(/\s+/)[0] ?? "") ? (name.trim().split(/\s+/)[0]) : "";
       const email = localStorage.getItem("bshop_client_email") ?? "";
-      setLoggedIn(!!id); // show user menu whenever a client ID exists
+      setLoggedIn(!!id);
       setClientName(name);
       setClientFirst(first);
       setClientEmail(email);
@@ -147,6 +146,28 @@ export default function Header() {
       window.removeEventListener("storage",                    sync);
     };
   }, []);
+
+  /* If logged in but name is missing (e.g. logged in via checkout), fetch it once */
+  useEffect(() => {
+    if (!loggedIn || clientFirst) return;
+    const clientId = localStorage.getItem("bshop_client_id");
+    if (!clientId) return;
+    fetch("/api/whmcs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getClientDetails", params: { clientId: Number(clientId) } }),
+    })
+      .then(r => r.json())
+      .then((json: { success: boolean; data?: { firstname?: string; lastname?: string; email?: string } }) => {
+        if (json.success && json.data?.firstname) {
+          localStorage.setItem("bshop_client_firstname", json.data.firstname);
+          localStorage.setItem("bshop_client_name", `${json.data.firstname} ${json.data.lastname ?? ""}`.trim());
+          if (json.data.email) localStorage.setItem("bshop_client_email", json.data.email);
+          window.dispatchEvent(new Event("bshop_cart_update"));
+        }
+      })
+      .catch(() => { /* non-fatal */ });
+  }, [loggedIn, clientFirst]);
 
   /* Close all dropdowns on outside click */
   useEffect(() => {
