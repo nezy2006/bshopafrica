@@ -128,11 +128,11 @@ export default function Header() {
       const id   = localStorage.getItem("bshop_client_id");
       const name = localStorage.getItem("bshop_client_name") ?? "";
       const raw  = localStorage.getItem("bshop_client_firstname") ?? "";
-      const first = (raw && !raw.includes("@") && !raw.includes("."))
-        ? raw
-        : name.trim().split(/\s+/)[0] ?? "";
+      // Never display an email address as a name
+      const ok  = (s: string) => !!s && !s.includes("@") && !s.includes(".");
+      const first = ok(raw) ? raw : ok(name.trim().split(/\s+/)[0] ?? "") ? (name.trim().split(/\s+/)[0]) : "";
       const email = localStorage.getItem("bshop_client_email") ?? "";
-      setLoggedIn(!!id && !!first);
+      setLoggedIn(!!id); // show user menu whenever a client ID exists
       setClientName(name);
       setClientFirst(first);
       setClientEmail(email);
@@ -189,7 +189,7 @@ export default function Header() {
       <Link
         href={href}
         onClick={onClick}
-        className={`relative group whitespace-nowrap text-sm font-medium transition-colors duration-200 ${navTextCls}`}
+        className={`relative group whitespace-nowrap text-[15px] font-medium transition-colors duration-200 ${navTextCls}`}
       >
         {label}
         <span className={`absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full transition-all duration-300 ease-out group-hover:w-full ${underlineCls}`} />
@@ -219,30 +219,30 @@ export default function Header() {
                   ? "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"
                   : "/logo.png"}
                 alt="The B.Shop"
-                width={180} height={48}
-                className="h-9 lg:h-11 w-auto object-contain transition-opacity duration-300"
+                width={220} height={56}
+                className="h-11 lg:h-12 w-auto object-contain transition-opacity duration-300"
                 priority
               />
             </Link>
           )}
 
           {/* Desktop nav — primary links always visible (md+) */}
-          <nav className="hidden md:flex items-center gap-2 lg:gap-3 flex-nowrap min-w-0">
+          <nav className="hidden md:flex items-center gap-4 lg:gap-5 xl:gap-6 flex-nowrap min-w-0">
 
             {/* Primary: always shown */}
             {PRIMARY_NAV.map(link => (
               <NavLink key={link.href} href={link.href} label={link.label} />
             ))}
 
-            {/* Secondary: shown inline on lg+ */}
+            {/* Secondary: shown inline on xl+ */}
             {SECONDARY_NAV.map(link => (
-              <span key={link.href} className="hidden lg:block">
+              <span key={link.href} className="hidden xl:block">
                 <NavLink href={link.href} label={link.label} />
               </span>
             ))}
 
-            {/* "More" dropdown: shown on md only when secondary links are hidden */}
-            <div ref={moreRef} className="lg:hidden relative">
+            {/* "More" dropdown: shown on md–lg when secondary links are hidden */}
+            <div ref={moreRef} className="xl:hidden relative">
               <button
                 onClick={() => { setMoreOpen(o => !o); setUserDropOpen(false); setNotifDropOpen(false); }}
                 className={`flex items-center gap-1 text-xs lg:text-sm font-medium transition-colors duration-200 whitespace-nowrap ${navTextCls}`}
@@ -367,8 +367,8 @@ export default function Header() {
                   <span className="w-7 h-7 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
                     <User className="w-3.5 h-3.5 text-white" />
                   </span>
-                  <span className={`text-sm font-semibold hidden lg:block ${onDarkHero ? "text-white" : "text-gray-800"}`}>
-                    {clientFirst}
+                  <span className={`text-sm font-semibold ${onDarkHero ? "text-white" : "text-gray-800"}`}>
+                    {clientFirst || "Account"}
                   </span>
                   <span className={onDarkHero ? "text-white" : "text-gray-400"}>
                     <ChevronDown />
