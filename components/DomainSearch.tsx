@@ -105,12 +105,7 @@ function AvailableCard({ result, tld, onReset }: { result: DomainCheckResult; tl
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {result.price != null && (
-            <span className="text-2xl font-black text-green-700">
-              ${result.price}<span className="text-sm font-medium text-green-500">/yr</span>
-            </span>
-          )}
-          <motion.button
+            <motion.button
             onClick={handleAddToCart}
             disabled={added}
             animate={!added ? { boxShadow: ["0 0 0 0 rgba(22,163,74,0)", "0 0 0 8px rgba(22,163,74,0.2)", "0 0 0 0 rgba(22,163,74,0)"] } : {}}
@@ -205,25 +200,6 @@ export default function DomainSearch() {
   const [loading,    setLoading]    = useState(false);
   const [result,     setResult]     = useState<DomainCheckResult | null>(null);
   const [error,      setError]      = useState<string | null>(null);
-  const [tldPrices,  setTldPrices]  = useState<Record<string, number | null>>({});
-
-  // Fetch live TLD prices on mount
-  useEffect(() => {
-    fetch("/api/whmcs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getTLDPricing" }),
-    })
-      .then(r => r.json())
-      .then((json: { success: boolean; data?: Record<string, { register: number | null }> }) => {
-        if (json.success && json.data) {
-          const prices: Record<string, number | null> = {};
-          for (const [tld, p] of Object.entries(json.data)) prices[tld] = p.register;
-          setTldPrices(prices);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const reset = useCallback(() => { setResult(null); setError(null); }, []);
 
@@ -333,22 +309,19 @@ export default function DomainSearch() {
           </AnimatePresence>
 
           <div className={`mt-8 flex flex-wrap gap-2 justify-center transition-all duration-300 ${mode === "transfer" ? "opacity-0 pointer-events-none h-0 mt-0 overflow-hidden" : ""}`}>
-            {TLDS.map((tld, i) => {
-              const price = tldPrices[tld];
-              return (
-                <motion.button key={tld} type="button"
-                  onClick={() => { setSelected(tld); reset(); }}
-                  custom={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                  whileHover={{ scale: 1.1, y: -3 }} whileTap={{ scale: 0.96 }}
-                  className="px-4 py-1.5 rounded-full text-sm font-semibold border-2 transition-all duration-200 cursor-pointer"
-                  style={selected === tld
-                    ? { backgroundColor: "#6B21A8", borderColor: "#6B21A8", color: "#fff" }
-                    : { backgroundColor: "#fff", borderColor: "#e5e7eb", color: "#4b5563" }
-                  }>
-                  {tld}{price != null ? ` $${price}` : ""}
-                </motion.button>
-              );
-            })}
+            {TLDS.map((tld, i) => (
+              <motion.button key={tld} type="button"
+                onClick={() => { setSelected(tld); reset(); }}
+                custom={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                whileHover={{ scale: 1.1, y: -3 }} whileTap={{ scale: 0.96 }}
+                className="px-4 py-1.5 rounded-full text-sm font-semibold border-2 transition-all duration-200 cursor-pointer"
+                style={selected === tld
+                  ? { backgroundColor: "#6B21A8", borderColor: "#6B21A8", color: "#fff" }
+                  : { backgroundColor: "#fff", borderColor: "#e5e7eb", color: "#4b5563" }
+                }>
+                {tld}
+              </motion.button>
+            ))}
           </div>
 
           {/* Results */}

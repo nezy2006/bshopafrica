@@ -10,13 +10,13 @@ const EASE: Ease = [0.22, 1, 0.36, 1];
 /* ─── TLD Showcase data ──────────────────────────────────────────────────── */
 
 const TLDS_SHOWCASE = [
-  { ext: ".com",    price: "$12",  delay: 0,    x: 0,   y: 0   },
-  { ext: ".net",    price: "$14",  delay: 0.1,  x: -8,  y: 12  },
-  { ext: ".org",    price: "$12",  delay: 0.2,  x: 5,   y: -8  },
-  { ext: ".biz",    price: "$14",  delay: 0.3,  x: -4,  y: 6   },
-  { ext: ".xyz",    price: "$9",   delay: 0.4,  x: 8,   y: -4  },
-  { ext: ".africa", price: "$20",  delay: 0.5,  x: -6,  y: -10 },
-  { ext: ".co.rw",  price: "$25",  delay: 0.6,  x: 4,   y: 8   },
+  { ext: ".com",    delay: 0,    x: 0,   y: 0   },
+  { ext: ".net",    delay: 0.1,  x: -8,  y: 12  },
+  { ext: ".org",    delay: 0.2,  x: 5,   y: -8  },
+  { ext: ".biz",    delay: 0.3,  x: -4,  y: 6   },
+  { ext: ".xyz",    delay: 0.4,  x: 8,   y: -4  },
+  { ext: ".africa", delay: 0.5,  x: -6,  y: -10 },
+  { ext: ".co.rw",  delay: 0.6,  x: 4,   y: 8   },
 ];
 
 /* ─── Journey steps ──────────────────────────────────────────────────────── */
@@ -325,10 +325,9 @@ export function ExtensionShowcase() {
               >
                 <Link
                   href={`/domains?tld=${tld.ext}`}
-                  className="group flex flex-col items-center gap-1.5 px-6 py-4 bg-white/15 hover:bg-white/25 border border-white/25 hover:border-white/50 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm"
+                  className="group flex items-center justify-center px-6 py-3.5 bg-white/15 hover:bg-white/25 border border-white/25 hover:border-white/50 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm"
                 >
                   <span className="text-white font-black text-xl">{tld.ext}</span>
-                  <span className="text-purple-200 text-xs font-semibold">{tld.price}/yr</span>
                 </Link>
               </div>
             </motion.div>

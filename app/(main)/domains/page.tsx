@@ -1,44 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { DomainJourney, ExtensionShowcase } from "@/components/DomainJourney";
 
-// Fallback prices shown while fetching / if API fails
-const TLDS_DEFAULT = [
-  { ext: ".com",    reg: null as number | null, renewal: null as number | null, transfer: null as number | null },
-  { ext: ".net",    reg: null, renewal: null, transfer: null },
-  { ext: ".org",    reg: null, renewal: null, transfer: null },
-  { ext: ".biz",    reg: null, renewal: null, transfer: null },
-  { ext: ".xyz",    reg: null, renewal: null, transfer: null },
-  { ext: ".africa", reg: null, renewal: null, transfer: null },
-  { ext: ".co.rw",  reg: null, renewal: null, transfer: null },
-];
-
-type TLDRow = { ext: string; reg: number | null; renewal: number | null; transfer: number | null };
-
-function useTLDs(): TLDRow[] {
-  const [tlds, setTlds] = useState<TLDRow[]>(TLDS_DEFAULT);
-  useEffect(() => {
-    fetch("/api/whmcs", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getTLDPricing" }),
-    })
-      .then(r => r.json())
-      .then((json: { success: boolean; data?: Record<string, { register: number | null; renewal: number | null; transfer: number | null }> }) => {
-        if (!json.success || !json.data) return;
-        setTlds(TLDS_DEFAULT.map(t => {
-          const p = json.data![t.ext];
-          return p ? { ext: t.ext, reg: p.register, renewal: p.renewal, transfer: p.transfer } : t;
-        }));
-      })
-      .catch(() => {});
-  }, []);
-  return tlds;
-}
-
-const fmt = (v: number | null) => v != null ? `$${v}/yr` : "Check price";
+const TLDS = [".com", ".net", ".org", ".biz", ".xyz", ".africa", ".co.rw"];
 
 const WHY_CARDS = [
   {
@@ -99,7 +66,6 @@ function HeroSection() {
   const [query,       setQuery]       = useState("");
   const [selectedTld, setSelectedTld] = useState(".com");
   const [loading,     setLoading]     = useState(false);
-  const tlds = useTLDs();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,8 +146,8 @@ function HeroSection() {
             onChange={(e) => setSelectedTld(e.target.value)}
             className="px-4 py-3.5 text-sm font-bold text-[#6B21A8] bg-purple-50 border-0 rounded-xl outline-none cursor-pointer"
           >
-            {tlds.map((t) => (
-              <option key={t.ext} value={t.ext}>{t.ext}</option>
+            {TLDS.map((ext) => (
+              <option key={ext} value={ext}>{ext}</option>
             ))}
           </select>
           <button
@@ -201,23 +167,23 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.65, duration: 0.6 }}
         >
-          {tlds.map((t, i) => (
+          {TLDS.map((ext, i) => (
             <motion.button
-              key={t.ext}
+              key={ext}
               type="button"
-              onClick={() => setSelectedTld(t.ext)}
+              onClick={() => setSelectedTld(ext)}
               whileHover={{ scale: 1.08, y: -2 }}
               whileTap={{ scale: 0.96 }}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 + i * 0.05, duration: 0.4 }}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold border-2 transition-all duration-200 cursor-pointer ${
-                selectedTld === t.ext
+                selectedTld === ext
                   ? "bg-white text-[#6B21A8] border-white shadow-lg"
                   : "bg-transparent text-white border-white/30 hover:border-white/70"
               }`}
             >
-              {t.ext}{t.reg != null && <span className="opacity-70">&nbsp;${t.reg}/yr</span>}
+              {ext}
             </motion.button>
           ))}
         </motion.div>
@@ -334,79 +300,6 @@ function TransferSection() {
   );
 }
 
-/* ─── Pricing Table ──────────────────────────────────────────────────────── */
-function PricingTable() {
-  const tlds = useTLDs();
-  return (
-    <section className="bg-white py-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <motion.div
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.65 }}
-        >
-          <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-4">
-            Pricing
-          </span>
-          <h2 className="text-4xl sm:text-5xl font-black text-black">Domain Pricing</h2>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7, ease: EASE }}
-          className="rounded-2xl overflow-hidden shadow-xl border border-gray-100"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[#6B21A8] text-white">
-                  {["Extension", "Registration", "Renewal", "Transfer"].map((h) => (
-                    <th key={h} className="px-6 py-4 text-left font-bold tracking-wide whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tlds.map((t, i) => (
-                  <motion.tr
-                    key={t.ext}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.07, duration: 0.45 }}
-                    className={`border-b border-gray-100 transition-colors duration-150 hover:bg-purple-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-gray-50/70"
-                    }`}
-                  >
-                    <td className="px-6 py-4 font-bold text-[#6B21A8]">{t.ext}</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">{fmt(t.reg)}</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">{fmt(t.renewal)}</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">{fmt(t.transfer)}</td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-
-        <motion.p
-          className="mt-6 text-center text-sm text-gray-400"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.5, duration: 0.6 }}
-        >
-          All prices in USD · Free domain included with any hosting plan for the first year
-        </motion.p>
-      </div>
-    </section>
-  );
-}
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 function TransferBanner() {
@@ -432,7 +325,6 @@ export default function DomainsPage() {
       <HeroSection />
       <WhySection />
       <TransferSection />
-      <PricingTable />
       <DomainJourney />
       <ExtensionShowcase />
     </>
