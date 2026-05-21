@@ -82,6 +82,37 @@ async function callWhmcs(action: string, params: Record<string, string | number 
   return data;
 }
 
+/* ─── Coupon validation ──────────────────────────────────────────────────── */
+export interface CouponResult {
+  valid:    boolean;
+  code:     string;
+  type:     "percentage" | "fixed";
+  value:    number;
+  message:  string;
+}
+
+export async function validateCoupon(code: string): Promise<CouponResult> {
+  const invalid = (msg: string): CouponResult => ({ valid: false, code, type: "percentage", value: 0, message: msg });
+  if (!code.trim()) return invalid("Enter a coupon code");
+  try {
+    const data = await callWhmcs("GetPromotions", { code: code.trim().toUpperCase() });
+    const raw  = data.promotions as { promotion?: Record<string, string>[] } | undefined;
+    const promo = raw?.promotion?.[0];
+    if (!promo) return invalid("Coupon not found or invalid");
+    if (promo.expirationdate && promo.expirationdate !== "0000-00-00" && new Date(promo.expirationdate) < new Date()) {
+      return invalid("This coupon has expired");
+    }
+    if (promo.maxuses && promo.maxuses !== "0" && Number(promo.uses ?? 0) >= Number(promo.maxuses)) {
+      return invalid("This coupon has reached its usage limit");
+    }
+    const type  = String(promo.type ?? "").toLowerCase().includes("percent") ? "percentage" : "fixed";
+    const value = parseFloat(String(promo.value ?? "0"));
+    return { valid: true, code: code.trim().toUpperCase(), type, value, message: `${value}${type === "percentage" ? "%" : "$"} discount applied` };
+  } catch {
+    return invalid("Could not validate coupon — please try again");
+  }
+}
+
 /* ─── TLD price cache ────────────────────────────────────────────────────── */
 let tldPriceCache: Record<string, number> | null = null;
 async function getTLDPrice(tld: string): Promise<number | null> {

@@ -23,7 +23,52 @@ function itemsToCart(items: CartItem[]): Cart {
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 type Step = 2 | 3 | 4;
-type PayMethod = "paypal" | "pawapay";
+type PayMethod = "card" | "paypal";
+type CardBrand = "visa" | "mastercard" | "amex" | "discover" | null;
+
+interface CouponState {
+  code:     string;
+  applied:  boolean;
+  loading:  boolean;
+  type:     "percentage" | "fixed";
+  value:    number;
+  discount: number;
+  message:  string;
+  error:    string;
+}
+
+/* ─── Card helpers ───────────────────────────────────────────────────────── */
+function detectBrand(num: string): CardBrand {
+  const n = num.replace(/\s/g, "");
+  if (/^4/.test(n)) return "visa";
+  if (/^(5[1-5]|2[2-7])/.test(n)) return "mastercard";
+  if (/^3[47]/.test(n)) return "amex";
+  if (/^(6011|622|64[4-9]|65)/.test(n)) return "discover";
+  return null;
+}
+function fmtCard(num: string): string {
+  const n = num.replace(/\D/g, "").slice(0, /^3[47]/.test(num.replace(/\D/g, "")) ? 15 : 16);
+  if (/^3[47]/.test(n)) return n.replace(/(\d{4})(\d{0,6})(\d{0,5})/, (_, a, b, c) => [a, b, c].filter(Boolean).join(" "));
+  return n.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+function fmtExpiry(val: string): string {
+  const n = val.replace(/\D/g, "").slice(0, 4);
+  return n.length > 2 ? n.slice(0, 2) + "/" + n.slice(2) : n;
+}
+
+function BrandBadge({ brand }: { brand: CardBrand }) {
+  if (!brand) return null;
+  const map: Record<NonNullable<CardBrand>, { label: string; bg: string; text: string }> = {
+    visa:       { label: "VISA",       bg: "bg-blue-700",   text: "text-white"  },
+    mastercard: { label: "Mastercard", bg: "bg-red-600",    text: "text-white"  },
+    amex:       { label: "AMEX",       bg: "bg-blue-500",   text: "text-white"  },
+    discover:   { label: "Discover",   bg: "bg-orange-400", text: "text-white"  },
+  };
+  const { label, bg, text } = map[brand];
+  return (
+    <span className={`${bg} ${text} text-[10px] font-black px-2 py-0.5 rounded tracking-widest`}>{label}</span>
+  );
+}
 
 const INPUT =
   "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black placeholder-gray-400 outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]";
@@ -94,13 +139,14 @@ function StepIndicator({ current }: { current: Step }) {
 }
 
 /* ─── Cart summary (right sidebar in payment step) ──────────────────────── */
-function CartSummary({ cart }: { cart: Cart }) {
+function CartSummary({ cart, couponDiscount = 0 }: { cart: Cart; couponDiscount?: number }) {
   const hasBundle     = !!(cart.domain && cart.hosting);
   const domainPrice   = cart.domain?.price ?? 0;
   const hostingYearly = cart.hosting?.yearly ?? 0;
   const wbPrice       = cart.websiteBuilder?.price ?? 0;
-  const discount      = hasBundle ? domainPrice : 0;
-  const total         = domainPrice + hostingYearly + wbPrice - discount;
+  const bundleDiscount = hasBundle ? domainPrice : 0;
+  const subtotal      = domainPrice + hostingYearly + wbPrice - bundleDiscount;
+  const total         = Math.max(0, subtotal - couponDiscount);
 
   return (
     <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
@@ -109,7 +155,7 @@ function CartSummary({ cart }: { cart: Cart }) {
         {cart.domain && (
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">{cart.domain.domain}</span>
-            {discount > 0
+            {bundleDiscount > 0
               ? <span className="text-green-600 font-bold">FREE</span>
               : <span className="font-semibold">${cart.domain.price}/yr</span>}
           </div>
@@ -126,14 +172,19 @@ function CartSummary({ cart }: { cart: Cart }) {
             <span className="font-semibold">${cart.websiteBuilder.price}</span>
           </div>
         )}
-        {discount > 0 && (
+        {bundleDiscount > 0 && (
           <div className="flex justify-between text-xs text-green-600 font-medium">
-            <span>Free domain saving</span><span>−${discount}</span>
+            <span>Free domain saving</span><span>−${bundleDiscount}</span>
+          </div>
+        )}
+        {couponDiscount > 0 && (
+          <div className="flex justify-between text-xs text-purple-600 font-semibold">
+            <span>Coupon discount</span><span>−${couponDiscount.toFixed(2)}</span>
           </div>
         )}
       </div>
       <div className="border-t border-gray-200 pt-3 flex justify-between font-black text-black">
-        <span>Total</span><span>${total}{cart.hosting || cart.domain ? "/yr" : ""}</span>
+        <span>Total</span><span>${total.toFixed(2)}{cart.hosting || cart.domain ? "/yr" : ""}</span>
       </div>
     </div>
   );
@@ -321,53 +372,84 @@ function StepAccount({ onDone }: { onDone: () => void }) {
 
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
 function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, hasWB: boolean) => void }) {
-  const [method,  setMethod]  = useState<PayMethod>("paypal");
-  const [phone,   setPhone]   = useState("");
+  const [method,  setMethod]  = useState<PayMethod>("card");
   const [agreed,  setAgreed]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
+  // Card fields
+  const [cardNum,  setCardNum]  = useState("");
+  const [expiry,   setExpiry]   = useState("");
+  const [cvv,      setCvv]      = useState("");
+  const [cardName, setCardName] = useState("");
+
+  const brand = detectBrand(cardNum);
+
+  // Coupon
+  const [coupon, setCoupon] = useState<CouponState>({
+    code: "", applied: false, loading: false,
+    type: "percentage", value: 0, discount: 0, message: "", error: "",
+  });
+
+  // Compute cart subtotal for coupon discount calculation
+  const subtotal = (cart.domain?.price ?? 0) + (cart.hosting?.yearly ?? 0) + (cart.websiteBuilder?.price ?? 0);
+
+  async function applyCoupon() {
+    if (!coupon.code.trim()) return;
+    setCoupon(c => ({ ...c, loading: true, error: "", message: "" }));
+    try {
+      const res  = await fetch("/api/whmcs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validateCoupon", params: { code: coupon.code } }),
+      });
+      const json = (await res.json()) as { success: boolean; data?: { valid: boolean; type: "percentage" | "fixed"; value: number; message: string } };
+      const d = json.data;
+      if (!json.success || !d?.valid) {
+        setCoupon(c => ({ ...c, loading: false, applied: false, error: d?.message ?? "Invalid coupon" }));
+        return;
+      }
+      const discount = d.type === "percentage"
+        ? Math.min(subtotal, subtotal * (d.value / 100))
+        : Math.min(subtotal, d.value);
+      setCoupon(c => ({ ...c, loading: false, applied: true, type: d.type, value: d.value, discount, message: d.message, error: "" }));
+    } catch {
+      setCoupon(c => ({ ...c, loading: false, error: "Could not validate coupon" }));
+    }
+  }
+
   const handleComplete = async () => {
     if (!agreed) { setError("Please agree to the Terms of Service to continue."); return; }
-    if (method === "pawapay" && !phone.trim()) { setError("Please enter your mobile money number."); return; }
+    if (method === "card") {
+      if (!cardNum.replace(/\s/g, "")) { setError("Please enter your card number."); return; }
+      if (!expiry || expiry.length < 5)  { setError("Please enter a valid expiry date."); return; }
+      if (!cvv)                           { setError("Please enter your CVV."); return; }
+      if (!cardName.trim())               { setError("Please enter the cardholder name."); return; }
+    }
     setLoading(true); setError(null);
-    await new Promise(r => setTimeout(r, 2200)); // simulate payment processing
+    await new Promise(r => setTimeout(r, 2200));
 
     const items    = getCart();
     const clientId = localStorage.getItem("bshop_client_id");
 
-    // Initiate transfer via WHMCS if cart has a transfer item
     try {
       const transferItem = items.find(i => i.type === "transfer");
       if (transferItem && "authCode" in transferItem && clientId) {
         await fetch("/api/whmcs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "initiateTransfer",
-            params: { clientId: Number(clientId), domain: transferItem.domain, authCode: transferItem.authCode },
-          }),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "initiateTransfer", params: { clientId: Number(clientId), domain: transferItem.domain, authCode: transferItem.authCode } }),
         });
       }
     } catch { /* non-fatal */ }
 
-    // Deploy website builder if present
     let wbDeployed = false;
     try {
       const wbItem = items.find(i => i.type === "website_builder") as CartWebsiteBuilder | undefined;
       if (wbItem) {
-        // Retrieve domain from cart or localStorage
         const domainItem = items.find(i => i.type === "domain");
         const domain = domainItem && "domain" in domainItem ? (domainItem as CartDomain).domain : "";
         const deployRes = await fetch("/api/website-builder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action:   "deploy",
-            clientId: clientId ? Number(clientId) : 0,
-            domain,
-            siteData: wbItem.siteData,
-          }),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "deploy", clientId: clientId ? Number(clientId) : 0, domain, siteData: wbItem.siteData }),
         });
         const deployJson = (await deployRes.json()) as { success: boolean };
         wbDeployed = deployJson.success;
@@ -386,62 +468,136 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
 
       <div className="grid lg:grid-cols-[1fr_280px] gap-8">
         <div className="space-y-6">
+
           {/* Method tabs */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
             <div className="grid grid-cols-2 gap-3">
-              {(["paypal", "pawapay"] as PayMethod[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => { setMethod(m); setError(null); }}
+              {(["card", "paypal"] as PayMethod[]).map(m => (
+                <button key={m} onClick={() => { setMethod(m); setError(null); }}
                   className={`flex items-center justify-center gap-2 py-3.5 rounded-xl border-2 font-bold text-sm transition-all duration-200 ${
                     method === m
                       ? "border-[#6B21A8] bg-purple-50 text-[#6B21A8] shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
                       : "border-gray-200 text-gray-600 hover:border-gray-300"
-                  }`}
-                >
-                  {m === "paypal" ? "🅿 PayPal" : "📱 PawaPay"}
+                  }`}>
+                  {m === "card" ? "💳 Credit / Debit Card" : "🅿 PayPal"}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Payment panel */}
           <AnimatePresence mode="wait">
-            {method === "paypal" ? (
-              <motion.div key="paypal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-                className="bg-[#FFC439] rounded-2xl p-6 text-center"
-              >
+            {method === "card" ? (
+              <motion.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
+                className="space-y-4">
+                {/* Card number */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Card Number</label>
+                  <div className="relative">
+                    <input
+                      type="text" inputMode="numeric" autoComplete="cc-number"
+                      value={cardNum}
+                      onChange={e => setCardNum(fmtCard(e.target.value))}
+                      placeholder="0000 0000 0000 0000"
+                      maxLength={19}
+                      className={`${INPUT} pr-24`}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                      <BrandBadge brand={brand} />
+                    </div>
+                  </div>
+                </div>
+                {/* Expiry + CVV */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiry Date</label>
+                    <input
+                      type="text" inputMode="numeric" autoComplete="cc-exp"
+                      value={expiry}
+                      onChange={e => setExpiry(fmtExpiry(e.target.value))}
+                      placeholder="MM/YY" maxLength={5}
+                      className={INPUT}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      CVV {brand === "amex" ? "(4 digits)" : "(3 digits)"}
+                    </label>
+                    <input
+                      type="text" inputMode="numeric" autoComplete="cc-csc"
+                      value={cvv}
+                      onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, brand === "amex" ? 4 : 3))}
+                      placeholder={brand === "amex" ? "0000" : "000"}
+                      className={INPUT}
+                    />
+                  </div>
+                </div>
+                {/* Cardholder name */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cardholder Name</label>
+                  <input
+                    type="text" autoComplete="cc-name"
+                    value={cardName} onChange={e => setCardName(e.target.value)}
+                    placeholder="Name on card"
+                    className={INPUT}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                  <LockIcon />
+                  Payments are processed securely via PayPal. We never store your card details.
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div key="paypal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
+                className="bg-[#FFC439] rounded-2xl p-6 text-center">
                 <p className="font-black text-[#003087] text-base mb-1">Pay with PayPal</p>
                 <p className="text-[#003087]/70 text-sm">
                   You&apos;ll be redirected to PayPal to complete your payment securely.
                 </p>
               </motion.div>
-            ) : (
-              <motion.div key="pawapay" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-                className="bg-green-50 border-2 border-green-200 rounded-2xl p-6"
-              >
-                <p className="font-bold text-green-800 text-sm mb-1">Mobile Money via PawaPay</p>
-                <p className="text-green-600 text-xs mb-4">Enter your MTN Mobile Money or Airtel Money number.</p>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile Number</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="+250 700 000 000"
-                  className={INPUT}
-                />
-              </motion.div>
             )}
           </AnimatePresence>
 
+          {/* Coupon code */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">Coupon Code</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={coupon.code}
+                onChange={e => setCoupon(c => ({ ...c, code: e.target.value.toUpperCase(), applied: false, error: "", message: "" }))}
+                placeholder="Enter coupon code"
+                disabled={coupon.applied}
+                className={`${INPUT} flex-1 text-sm uppercase tracking-widest`}
+                onKeyDown={e => e.key === "Enter" && applyCoupon()}
+              />
+              <button
+                onClick={coupon.applied ? () => setCoupon(c => ({ ...c, applied: false, code: "", discount: 0, message: "", error: "" })) : applyCoupon}
+                disabled={coupon.loading || (!coupon.applied && !coupon.code.trim())}
+                className={`px-4 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 whitespace-nowrap ${
+                  coupon.applied
+                    ? "bg-red-100 text-red-600 hover:bg-red-200"
+                    : "bg-[#6B21A8] text-white hover:bg-[#581c87]"
+                }`}
+              >
+                {coupon.loading ? <Spinner sm /> : coupon.applied ? "Remove" : "Apply"}
+              </button>
+            </div>
+            {coupon.message && (
+              <p className="mt-1.5 text-xs text-green-600 font-semibold flex items-center gap-1">✓ {coupon.message}</p>
+            )}
+            {coupon.error && (
+              <p className="mt-1.5 text-xs text-red-500 font-medium">{coupon.error}</p>
+            )}
+          </div>
+
           {/* Terms */}
           <label className="flex items-start gap-3 cursor-pointer group">
-            <div
-              onClick={() => setAgreed(v => !v)}
+            <div onClick={() => setAgreed(v => !v)}
               className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
                 agreed ? "bg-[#6B21A8] border-[#6B21A8]" : "border-gray-300 group-hover:border-[#6B21A8]"
-              }`}
-            >
+              }`}>
               {agreed && (
                 <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
                   <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -458,18 +614,13 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
 
           {error && <p className="text-sm text-red-500 font-medium bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>}
 
-          <button
-            onClick={handleComplete}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70"
-          >
-            {loading ? <><Spinner /><span>Processing…</span></> : (
-              <><LockIcon /><span>Complete Order</span></>
-            )}
+          <button onClick={handleComplete} disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70">
+            {loading ? <><Spinner /><span>Processing…</span></> : <><LockIcon /><span>Complete Order</span></>}
           </button>
         </div>
 
-        <CartSummary cart={cart} />
+        <CartSummary cart={cart} couponDiscount={coupon.applied ? coupon.discount : 0} />
       </div>
     </motion.div>
   );

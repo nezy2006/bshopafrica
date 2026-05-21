@@ -8,6 +8,7 @@ import {
   getAdminDomains, getAdminHosting, getAdminTickets, acceptOrder,
   cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
   getTLDPricing,
+  validateCoupon,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
       case "getAutoAuthUrl":        data = generateAutoAuthUrl(s("email"), s("destination", "clientarea.php")); break;
       case "initiateTransfer":      data = await initiateTransfer(n("clientId"), s("domain"), s("authCode")); break;
       case "getTLDPricing":         data = await getTLDPricing(); break;
+      case "validateCoupon":        data = await validateCoupon(s("code")); break;
 
       default:
         return NextResponse.json({ success: false, error: `Unknown action: "${action}"` }, { status: 400 });

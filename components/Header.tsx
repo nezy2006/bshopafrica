@@ -95,7 +95,7 @@ function NotifIcon({ type }: { type: AppNotification["type"] }) {
 const DARK_HERO_PATHS = [
   "/about", "/contact", "/domains", "/hosting",
   "/digital-campfire", "/login", "/signup",
-  "/checkout", "/transfer", "/website-builder",
+  "/transfer", "/website-builder",
 ];
 
 export default function Header() {
