@@ -270,7 +270,11 @@ export default function Header() {
               <div ref={userRef} className="relative ml-1">
                 <button
                   onClick={() => { setUserDropOpen(o => !o); setNotifDropOpen(false); }}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded-full transition-colors ${onDarkHero ? "hover:bg-white/20" : "hover:bg-gray-100"}`}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-full transition-colors ${
+                    onDarkHero
+                      ? "bg-white/15 hover:bg-white/25"   /* always visible on dark, brighter on hover */
+                      : "hover:bg-gray-100"               /* subtle on light, only on hover */
+                  }`}
                 >
                   <span className="w-7 h-7 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
                     <User className="w-3.5 h-3.5 text-white" />
@@ -278,7 +282,9 @@ export default function Header() {
                   <span className={`text-sm font-semibold hidden lg:block ${onDarkHero ? "text-white" : "text-gray-800"}`}>
                     {clientFirst}
                   </span>
-                  <ChevronDown />
+                  <span className={onDarkHero ? "text-white" : "text-gray-400"}>
+                    <ChevronDown />
+                  </span>
                 </button>
 
                 <AnimatePresence>
