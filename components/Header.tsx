@@ -17,12 +17,12 @@ const PRIMARY_NAV = [
   { label: "Transfer", href: "/transfer" },
 ];
 
-// Secondary links — shown inline on xl+, in "More" dropdown on md–lg
+// Secondary links — shown inline on lg+, in "More" dropdown on md only
 const SECONDARY_NAV = [
-  { label: "Website Builder",  href: "/website-builder"  },
-  { label: "About",            href: "/about"             },
-  { label: "Digital Campfire", href: "/digital-campfire"  },
-  { label: "Contact",          href: "/contact"           },
+  { label: "Builder",  href: "/website-builder"  },
+  { label: "About",    href: "/about"             },
+  { label: "Campfire", href: "/digital-campfire"  },
+  { label: "Contact",  href: "/contact"           },
 ];
 
 // All links combined — used for mobile drawer
@@ -189,7 +189,7 @@ export default function Header() {
       <Link
         href={href}
         onClick={onClick}
-        className={`relative group whitespace-nowrap text-xs font-medium transition-colors duration-200 ${navTextCls}`}
+        className={`relative group whitespace-nowrap text-sm font-medium transition-colors duration-200 ${navTextCls}`}
       >
         {label}
         <span className={`absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full transition-all duration-300 ease-out group-hover:w-full ${underlineCls}`} />
@@ -208,7 +208,7 @@ export default function Header() {
       animate={{ y: 0,   opacity: 1 }}
       transition={{ duration: 0.7, ease: EASE }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 gap-2">
 
           {/* Logo */}
@@ -227,22 +227,22 @@ export default function Header() {
           )}
 
           {/* Desktop nav — primary links always visible (md+) */}
-          <nav className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-5 flex-nowrap min-w-0">
+          <nav className="hidden md:flex items-center gap-2 lg:gap-3 flex-nowrap min-w-0">
 
             {/* Primary: always shown */}
             {PRIMARY_NAV.map(link => (
               <NavLink key={link.href} href={link.href} label={link.label} />
             ))}
 
-            {/* Secondary: shown inline on xl+ */}
+            {/* Secondary: shown inline on lg+ */}
             {SECONDARY_NAV.map(link => (
-              <span key={link.href} className="hidden xl:block">
+              <span key={link.href} className="hidden lg:block">
                 <NavLink href={link.href} label={link.label} />
               </span>
             ))}
 
-            {/* "More" dropdown: shown on md–lg when secondary links are hidden */}
-            <div ref={moreRef} className="xl:hidden relative">
+            {/* "More" dropdown: shown on md only when secondary links are hidden */}
+            <div ref={moreRef} className="lg:hidden relative">
               <button
                 onClick={() => { setMoreOpen(o => !o); setUserDropOpen(false); setNotifDropOpen(false); }}
                 className={`flex items-center gap-1 text-xs lg:text-sm font-medium transition-colors duration-200 whitespace-nowrap ${navTextCls}`}
@@ -286,7 +286,9 @@ export default function Header() {
             <Link href="/cart" className={iconBtnCls}>
               <CartIcon />
               {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#6B21A8] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] text-[10px] font-bold rounded-full flex items-center justify-center px-1 ${
+                  onDarkHero ? "bg-white text-[#6B21A8]" : "bg-[#6B21A8] text-white"
+                }`}>
                   {cartCount}
                 </span>
               )}
@@ -300,7 +302,9 @@ export default function Header() {
               >
                 <BellIcon />
                 {unread > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] text-[10px] font-bold rounded-full flex items-center justify-center px-1 ${
+                    onDarkHero ? "bg-white text-red-500" : "bg-red-500 text-white"
+                  }`}>
                     {unread}
                   </span>
                 )}

@@ -17,8 +17,8 @@ export default function Home() {
       </div>
       <DomainSearch />
       <PricingCards />
-      <Features />
       <DemoSection />
+      <Features />
       <AIBuilderTeaser />
       <FAQ />
       <TawkChat />

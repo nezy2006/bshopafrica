@@ -30,7 +30,8 @@
       "Bash(findstr -i \"dash\\\\|sidebar\\\\|panel\")",
       "PowerShell(Select-String *)",
       "Bash(findstr /i \"anthropic\" package.json)",
-      "Bash(node -e \"require\\('@anthropic-ai/sdk'\\)\")"
+      "Bash(node -e \"require\\('@anthropic-ai/sdk'\\)\")",
+      "Bash(findstr /ri /s \"hello@bshopafrica\" *.tsx *.ts)"
     ]
   }
 }

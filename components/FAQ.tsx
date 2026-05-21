@@ -158,10 +158,10 @@ export default function FAQ() {
                 Chat with Support
               </a>
               <a
-                href="mailto:hello@bshopafrica.com"
+                href="mailto:admin@bshopafrica.com"
                 className="flex items-center justify-center w-full py-3.5 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-sm hover:border-[#6B21A8] hover:text-[#6B21A8] transition-all duration-200"
               >
-                hello@bshopafrica.com
+                admin@bshopafrica.com
               </a>
 
             </div>

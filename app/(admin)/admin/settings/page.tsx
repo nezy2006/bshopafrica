@@ -7,7 +7,7 @@ const INPUT = "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 t
 
 const DEFAULTS: Record<string, string> = {
   site_name:           "The B.Shop",
-  contact_email:       "hello@bshopafrica.com",
+  contact_email:       "admin@bshopafrica.com",
   support_hours:       "Monday–Friday, 9AM–5PM CAT",
   announcement_text:   "Get a FREE DOMAIN on Your First Year",
   announcement_enabled:"true",

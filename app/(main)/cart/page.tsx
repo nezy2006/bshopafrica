@@ -24,8 +24,59 @@ function TagIcon()     { return <svg className="w-4 h-4" viewBox="0 0 24 24" fil
 function CheckIcon()   { return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>; }
 function PlusIcon()    { return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>; }
 
-const SSL_UPSELL:   CartSSL   = { id: "ssl_basic",   type: "ssl",   name: "SSL Certificate (Basic)", price: 9.99 };
-const EMAIL_UPSELL: CartEmail = { id: "email_pro",   type: "email", name: "Professional Email (5 accounts)", price: 4.99 };
+const SSL_UPSELL:   CartSSL   = { id: "ssl_basic",  type: "ssl",   name: "SSL Certificate (Basic)",         price: 9.99 };
+const EMAIL_UPSELL: CartEmail = { id: "email_pro",  type: "email", name: "Professional Email (5 accounts)", price: 4.99 };
+
+const HOSTING_UPSELL_PLANS = [
+  { id: "hosting_starter", name: "Business Starter Kit", monthly: 8,  yearly: 96,  disk: "10 GB",  emails: "10", best: false },
+  { id: "hosting_grower",  name: "Business Grower Kit",  monthly: 12, yearly: 144, disk: "25 GB",  emails: "15", best: true  },
+  { id: "hosting_plus",    name: "Business Plus Kit",    monthly: 16, yearly: 192, disk: "40 GB",  emails: "30", best: false },
+] as const;
+
+function HostingUpsell({ onAdd }: { onAdd: (plan: typeof HOSTING_UPSELL_PLANS[number]) => void }) {
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: EASE }}
+      className="mt-2 rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <ServerIcon />
+        <div>
+          <p className="font-bold text-gray-900 text-sm">Complete your online presence with hosting</p>
+          <p className="text-xs text-gray-500">Your domain needs a home. Add hosting to go live today.</p>
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-3">
+        {HOSTING_UPSELL_PLANS.map(plan => (
+          <div key={plan.id} className={`rounded-xl p-4 border-2 flex flex-col gap-2 ${
+            plan.best ? "border-[#6B21A8] bg-[#6B21A8] text-white" : "border-gray-200 bg-white"
+          }`}>
+            {plan.best && (
+              <span className="text-[10px] font-black tracking-widest uppercase text-purple-200 mb-0.5">Best Value</span>
+            )}
+            <p className={`font-black text-sm leading-tight ${plan.best ? "text-white" : "text-gray-900"}`}>{plan.name}</p>
+            <p className={`text-2xl font-black leading-none ${plan.best ? "text-white" : "text-[#6B21A8]"}`}>
+              ${plan.monthly}<span className={`text-xs font-medium ${plan.best ? "text-purple-200" : "text-gray-400"}`}>/mo</span>
+            </p>
+            <ul className={`text-xs space-y-0.5 ${plan.best ? "text-purple-200" : "text-gray-500"}`}>
+              <li>📦 {plan.disk} disk</li>
+              <li>📧 {plan.emails} email accounts</li>
+              <li>🔒 Free SSL</li>
+              <li>⚙️ cPanel included</li>
+            </ul>
+            <button onClick={() => onAdd(plan)}
+              className={`mt-auto w-full py-2 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 ${
+                plan.best
+                  ? "bg-white text-[#6B21A8] hover:bg-purple-50"
+                  : "bg-[#6B21A8] text-white hover:bg-[#581c87]"
+              }`}>
+              Add to Cart
+            </button>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 /* ─── Cart item cards ────────────────────────────────────────────────────── */
 function DomainCard({ item, onRemove }: { item: CartDomain; onRemove: () => void }) {
@@ -325,7 +376,13 @@ export default function CartPage() {
               )}
 
               {/* Upsells */}
-              {(items.length > 0) && (
+              {domain && !hosting ? (
+                /* Domain-only cart: push hosting upsell, skip SSL/email */
+                <HostingUpsell onAdd={plan => {
+                  addToCart({ id: plan.id, type: "hosting", name: plan.name, monthly: plan.monthly, yearly: plan.yearly, cycle: "yearly" });
+                  setItems(getCart());
+                }} />
+              ) : items.length > 0 && (
                 <div className="space-y-3 mt-2">
                   {!ssl   && <UpsellCard item={SSL_UPSELL}   onAdd={() => { addToCart(SSL_UPSELL);   setItems(getCart()); }} />}
                   {!email && <UpsellCard item={EMAIL_UPSELL} onAdd={() => { addToCart(EMAIL_UPSELL); setItems(getCart()); }} />}

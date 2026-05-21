@@ -47,7 +47,7 @@ export default function Features() {
           >
             <div>
               <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-4">
-                Why The B.Shop
+                The B.Shop Africa
               </span>
               <h2 className="text-4xl sm:text-5xl font-black text-black leading-tight">
                 The Foundation for{" "}

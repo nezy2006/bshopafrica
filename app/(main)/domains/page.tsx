@@ -1,19 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { DomainJourney, ExtensionShowcase } from "@/components/DomainJourney";
 
-const TLDS = [
-  { ext: ".com",    reg: 12, renewal: 14, transfer: 12 },
-  { ext: ".net",    reg: 14, renewal: 14, transfer: 14 },
-  { ext: ".org",    reg: 12, renewal: 12, transfer: 12 },
-  { ext: ".biz",    reg: 14, renewal: 15, transfer: 14 },
-  { ext: ".xyz",    reg: 9,  renewal: 10, transfer: 9  },
-  { ext: ".africa", reg: 20, renewal: 22, transfer: 20 },
-  { ext: ".co.rw",  reg: 25, renewal: 25, transfer: 25 },
+// Fallback prices shown while fetching / if API fails
+const TLDS_DEFAULT = [
+  { ext: ".com",    reg: null as number | null, renewal: null as number | null, transfer: null as number | null },
+  { ext: ".net",    reg: null, renewal: null, transfer: null },
+  { ext: ".org",    reg: null, renewal: null, transfer: null },
+  { ext: ".biz",    reg: null, renewal: null, transfer: null },
+  { ext: ".xyz",    reg: null, renewal: null, transfer: null },
+  { ext: ".africa", reg: null, renewal: null, transfer: null },
+  { ext: ".co.rw",  reg: null, renewal: null, transfer: null },
 ];
+
+type TLDRow = { ext: string; reg: number | null; renewal: number | null; transfer: number | null };
+
+function useTLDs(): TLDRow[] {
+  const [tlds, setTlds] = useState<TLDRow[]>(TLDS_DEFAULT);
+  useEffect(() => {
+    fetch("/api/whmcs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getTLDPricing" }),
+    })
+      .then(r => r.json())
+      .then((json: { success: boolean; data?: Record<string, { register: number | null; renewal: number | null; transfer: number | null }> }) => {
+        if (!json.success || !json.data) return;
+        setTlds(TLDS_DEFAULT.map(t => {
+          const p = json.data![t.ext];
+          return p ? { ext: t.ext, reg: p.register, renewal: p.renewal, transfer: p.transfer } : t;
+        }));
+      })
+      .catch(() => {});
+  }, []);
+  return tlds;
+}
+
+const fmt = (v: number | null) => v != null ? `$${v}/yr` : "Check price";
 
 const WHY_CARDS = [
   {
@@ -74,6 +99,7 @@ function HeroSection() {
   const [query,       setQuery]       = useState("");
   const [selectedTld, setSelectedTld] = useState(".com");
   const [loading,     setLoading]     = useState(false);
+  const tlds = useTLDs();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,7 +180,7 @@ function HeroSection() {
             onChange={(e) => setSelectedTld(e.target.value)}
             className="px-4 py-3.5 text-sm font-bold text-[#6B21A8] bg-purple-50 border-0 rounded-xl outline-none cursor-pointer"
           >
-            {TLDS.map((t) => (
+            {tlds.map((t) => (
               <option key={t.ext} value={t.ext}>{t.ext}</option>
             ))}
           </select>
@@ -175,7 +201,7 @@ function HeroSection() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.65, duration: 0.6 }}
         >
-          {TLDS.map((t, i) => (
+          {tlds.map((t, i) => (
             <motion.button
               key={t.ext}
               type="button"
@@ -191,7 +217,7 @@ function HeroSection() {
                   : "bg-transparent text-white border-white/30 hover:border-white/70"
               }`}
             >
-              {t.ext}&nbsp;<span className="opacity-70">${t.reg}/yr</span>
+              {t.ext}{t.reg != null && <span className="opacity-70">&nbsp;${t.reg}/yr</span>}
             </motion.button>
           ))}
         </motion.div>
@@ -310,6 +336,7 @@ function TransferSection() {
 
 /* ─── Pricing Table ──────────────────────────────────────────────────────── */
 function PricingTable() {
+  const tlds = useTLDs();
   return (
     <section className="bg-white py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
@@ -345,7 +372,7 @@ function PricingTable() {
                 </tr>
               </thead>
               <tbody>
-                {TLDS.map((t, i) => (
+                {tlds.map((t, i) => (
                   <motion.tr
                     key={t.ext}
                     initial={{ opacity: 0, x: -20 }}
@@ -357,9 +384,9 @@ function PricingTable() {
                     }`}
                   >
                     <td className="px-6 py-4 font-bold text-[#6B21A8]">{t.ext}</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">${t.reg}/yr</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">${t.renewal}/yr</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">${t.transfer}/yr</td>
+                    <td className="px-6 py-4 text-gray-700 font-medium">{fmt(t.reg)}</td>
+                    <td className="px-6 py-4 text-gray-700 font-medium">{fmt(t.renewal)}</td>
+                    <td className="px-6 py-4 text-gray-700 font-medium">{fmt(t.transfer)}</td>
                   </motion.tr>
                 ))}
               </tbody>

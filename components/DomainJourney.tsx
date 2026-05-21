@@ -242,8 +242,8 @@ export function DomainJourney() {
 
         {/* Steps */}
         <div className="grid md:grid-cols-3 gap-8 relative">
-          {/* Connecting line */}
-          <div className="hidden md:block absolute top-10 left-1/6 right-1/6 h-0.5 bg-gradient-to-r from-[#6B21A8]/20 via-[#6B21A8] to-[#6B21A8]/20" />
+          {/* Connecting line — sits behind step numbers */}
+          <div className="hidden md:block absolute top-5 left-[calc(16%+20px)] right-[calc(16%+20px)] h-0.5 bg-gradient-to-r from-[#6B21A8]/30 via-[#6B21A8]/60 to-[#6B21A8]/30 -z-10" />
 
           {steps.map((step, i) => (
             <motion.div

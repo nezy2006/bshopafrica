@@ -96,6 +96,24 @@ async function getTLDPrice(tld: string): Promise<number | null> {
   } catch { return null; }
 }
 
+export interface TLDPriceEntry { register: number | null; renewal: number | null; transfer: number | null; }
+
+export async function getTLDPricing(): Promise<Record<string, TLDPriceEntry>> {
+  try {
+    const data = await callWhmcs("GetTLDPricing", { currencyid: 1 });
+    const pricing = data.pricing as Record<string, Record<string, Record<string, string>>>;
+    const result: Record<string, TLDPriceEntry> = {};
+    for (const [ext, prices] of Object.entries(pricing ?? {})) {
+      result[`.${ext}`] = {
+        register: prices?.register?.["1"] != null ? parseFloat(prices.register["1"]) : null,
+        renewal:  prices?.renew?.["1"]    != null ? parseFloat(prices.renew["1"])    : null,
+        transfer: prices?.transfer?.["1"] != null ? parseFloat(prices.transfer["1"]) : null,
+      };
+    }
+    return result;
+  } catch { return {}; }
+}
+
 /* ─── Client API ─────────────────────────────────────────────────────────── */
 export async function checkDomain(domain: string, tld: string): Promise<DomainCheckResult> {
   const full = `${domain.trim().toLowerCase()}${tld}`;

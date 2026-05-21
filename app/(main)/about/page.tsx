@@ -122,7 +122,7 @@ function StorySection() {
                   { label: "Founded",    value: "2020" },
                   { label: "Based in",   value: "Kigali, Rwanda" },
                   { label: "Mission",    value: "Building Africa's digital economy" },
-                  { label: "Email",      value: <a href="mailto:hello@bshopafrica.com" className="text-[#6B21A8] hover:underline">hello@bshopafrica.com</a> },
+                  { label: "Email",      value: <a href="mailto:admin@bshopafrica.com" className="text-[#6B21A8] hover:underline">admin@bshopafrica.com</a> },
                   { label: "Website",    value: "bshopafrica.com" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-start gap-4">

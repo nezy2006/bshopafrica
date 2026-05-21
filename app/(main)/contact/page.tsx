@@ -452,8 +452,8 @@ function ContactCards() {
         icon={<MailIcon />}
         title="Email Us"
         lines={[
-          <a key="email" href="mailto:hello@bshopafrica.com" className="text-[#6B21A8] font-semibold hover:underline">
-            hello@bshopafrica.com
+          <a key="email" href="mailto:admin@bshopafrica.com" className="text-[#6B21A8] font-semibold hover:underline">
+            admin@bshopafrica.com
           </a>,
           "For general inquiries",
         ]}

@@ -130,7 +130,7 @@ export default function Footer() {
               </p>
               <p className="flex items-center gap-2 text-sm text-gray-500">
                 <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <a href="mailto:hello@bshopafrica.com" className="hover:text-white transition-colors">hello@bshopafrica.com</a>
+                <a href="mailto:admin@bshopafrica.com" className="hover:text-white transition-colors">admin@bshopafrica.com</a>
               </p>
             </div>
 

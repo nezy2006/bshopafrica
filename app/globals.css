@@ -95,6 +95,13 @@ html {
   animation: shake 0.45s ease-in-out;
 }
 
+/* ── Button press feedback ── */
+button:active:not(:disabled),
+a.btn:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease-out;
+}
+
 .animate-blink {
   animation: blink 1s step-end infinite;
 }
