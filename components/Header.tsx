@@ -78,8 +78,9 @@ function NotifIcon({ type }: { type: AppNotification["type"] }) {
   return <span className={`${cls} ${colors[type]}`} />;
 }
 
-// Pages whose hero section has a dark/purple background — white nav text is readable there
-const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout", "/dashboard"];
+// Pages with dark/purple hero — white nav text is readable there
+// /dashboard excluded: it has a white/gray bg; sidebar owns the logo there
+const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout"];
 
 export default function Header() {
   const router   = useRouter();
@@ -152,13 +153,12 @@ export default function Header() {
     router.push("/");
   }
 
-  // White text only when: not scrolled AND current page has a dark hero
-  const onDarkHero = !scrolled && DARK_HERO_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
-  const navTextCls = (scrolled || !onDarkHero)
-    ? "text-gray-800 hover:text-[#6B21A8]"
-    : "text-white hover:text-white/80";
-  const underlineCls = (scrolled || !onDarkHero) ? "bg-[#6B21A8]" : "bg-white";
-  const iconBtnCls = `relative p-2 rounded-lg transition-colors ${(scrolled || !onDarkHero) ? "text-gray-700 hover:bg-gray-100" : "text-white hover:bg-white/20"}`;
+  const isDashboard = pathname.startsWith("/dashboard");
+  // White text only when: not scrolled AND on a dark-hero page AND not dashboard
+  const onDarkHero  = !scrolled && !isDashboard && DARK_HERO_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
+  const navTextCls  = onDarkHero ? "text-white hover:text-white/80" : "text-gray-800 hover:text-[#6B21A8]";
+  const underlineCls = onDarkHero ? "bg-white" : "bg-[#6B21A8]";
+  const iconBtnCls   = `relative p-2 rounded-lg transition-colors ${onDarkHero ? "text-white hover:bg-white/20" : "text-gray-700 hover:bg-gray-100"}`;
 
   return (
     <motion.header
@@ -174,16 +174,18 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
-          {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
-            <Image
-              src={(scrolled || !onDarkHero) ? "/logo.png" : "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"}
-              alt="The B.Shop"
-              width={160} height={50}
-              className="h-10 w-auto object-contain transition-opacity duration-300"
-              priority
-            />
-          </Link>
+          {/* Logo — hidden on /dashboard (sidebar owns it there) */}
+          {!isDashboard && (
+            <Link href="/" className="flex-shrink-0">
+              <Image
+                src={onDarkHero ? "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" : "/logo.png"}
+                alt="The B.Shop"
+                width={160} height={50}
+                className="h-10 w-auto object-contain transition-opacity duration-300"
+                priority
+              />
+            </Link>
+          )}
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
@@ -266,12 +268,12 @@ export default function Header() {
               <div ref={userRef} className="relative ml-1">
                 <button
                   onClick={() => { setUserDropOpen(o => !o); setNotifDropOpen(false); }}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded-full transition-colors ${(scrolled || !onDarkHero) ? "hover:bg-gray-100" : "hover:bg-white/20"}`}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-full transition-colors ${onDarkHero ? "hover:bg-white/20" : "hover:bg-gray-100"}`}
                 >
                   <span className="w-7 h-7 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
                     <User className="w-3.5 h-3.5 text-white" />
                   </span>
-                  <span className={`text-sm font-semibold hidden lg:block ${(scrolled || !onDarkHero) ? "text-gray-800" : "text-white"}`}>
+                  <span className={`text-sm font-semibold hidden lg:block ${onDarkHero ? "text-white" : "text-gray-800"}`}>
                     {clientFirst}
                   </span>
                   <ChevronDown />
@@ -288,8 +290,8 @@ export default function Header() {
                       className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50"
                     >
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{clientName || clientFirst}</p>
-                        <p className="text-xs text-gray-400 truncate">{clientEmail || "Client Account"}</p>
+                        <p className="font-bold text-gray-900 text-sm truncate">{clientName || clientFirst}</p>
+                        {clientEmail && <p className="text-xs text-gray-400 truncate mt-0.5">{clientEmail}</p>}
                       </div>
                       {([
                         { href: "/dashboard",              label: "Dashboard",        Icon: DashIcon },
@@ -318,11 +320,11 @@ export default function Header() {
             ) : (
               <>
                 <Link href="/login"
-                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${(scrolled || !onDarkHero) ? "text-gray-700 hover:text-[#6B21A8]" : "text-white hover:text-white/80"}`}>
+                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${onDarkHero ? "text-white hover:text-white/80" : "text-gray-700 hover:text-[#6B21A8]"}`}>
                   Login
                 </Link>
                 <Link href="/signup"
-                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${(scrolled || !onDarkHero) ? "text-gray-700 hover:text-[#6B21A8]" : "text-white hover:text-white/80"}`}>
+                  className={`text-sm font-medium transition-colors px-4 py-2 rounded-lg ${onDarkHero ? "text-white hover:text-white/80" : "text-gray-700 hover:text-[#6B21A8]"}`}>
                   Signup
                 </Link>
               </>
@@ -331,9 +333,9 @@ export default function Header() {
             {/* Get Started — inverted when over dark hero, normal when scrolled */}
             <Link href="/get-started"
               className={`relative overflow-hidden ml-1 inline-flex items-center px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
-                (scrolled || !onDarkHero)
-                  ? "bg-[#6B21A8] text-white hover:shadow-[0_0_25px_rgba(107,33,168,0.55)]"
-                  : "bg-white text-[#6B21A8] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
+                onDarkHero
+                  ? "bg-white text-[#6B21A8] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]"
+                  : "bg-[#6B21A8] text-white hover:shadow-[0_0_25px_rgba(107,33,168,0.55)]"
               }`}>
               <span className="relative z-10">Get Started</span>
               <motion.span
@@ -346,12 +348,12 @@ export default function Header() {
 
           {/* Mobile hamburger */}
           <button
-            className={`md:hidden relative p-2 flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors ${(scrolled || !onDarkHero) ? "hover:bg-gray-100" : "hover:bg-white/20"}`}
+            className={`md:hidden relative p-2 flex flex-col justify-center items-center w-10 h-10 rounded-lg transition-colors ${onDarkHero ? "hover:bg-white/20" : "hover:bg-gray-100"}`}
             onClick={() => setMenuOpen(o => !o)} aria-label="Toggle menu"
           >
             {(["top", "mid", "bot"] as const).map((pos, i) => (
               <motion.span key={pos}
-                className={`block w-6 h-0.5 origin-center transition-colors duration-300 ${i > 0 ? "mt-1.5" : ""} ${(scrolled || !onDarkHero) ? "bg-gray-800" : "bg-white"}`}
+                className={`block w-6 h-0.5 origin-center transition-colors duration-300 ${i > 0 ? "mt-1.5" : ""} ${onDarkHero ? "bg-white" : "bg-gray-800"}`}
                 animate={
                   pos === "top" ? (menuOpen ? { rotate: 45,  y: 6 }  : { rotate: 0, y: 0 }) :
                   pos === "mid" ? (menuOpen ? { opacity: 0, scaleX: 0 } : { opacity: 1, scaleX: 1 }) :

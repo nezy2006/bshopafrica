@@ -982,7 +982,7 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
             className={`w-full flex items-center gap-3 px-4 py-2.5 transition-all duration-150 text-sm font-medium ${
               active === item.id
                 ? "bg-[#6B21A8] text-white"
-                : "text-white/60 hover:text-white hover:bg-white/10"
+                : "text-white/80 hover:text-white hover:bg-white/10"
             } ${collapsed ? "justify-center" : ""}`}>
             <span className="flex-shrink-0">{item.icon}</span>
             {!collapsed && <span>{item.label}</span>}
@@ -993,7 +993,7 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
       {/* Logout */}
       <div className="border-t border-white/10 p-2">
         <button onClick={onLogout}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors text-sm ${collapsed ? "justify-center" : ""}`}>
+          className={`w-full flex items-center gap-3 px-3 py-2.5 text-white/70 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors text-sm ${collapsed ? "justify-center" : ""}`}>
           <I.LogOut />{!collapsed && "Logout"}
         </button>
       </div>
