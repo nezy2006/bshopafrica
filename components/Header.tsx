@@ -10,10 +10,14 @@ import { getCartCount } from "@/lib/cart";
 import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
 
 const NAV_LINKS = [
-  { label: "Home",             href: "/" },
-  { label: "About Us",         href: "/about" },
+  { label: "Home",             href: "/"                 },
+  { label: "Hosting",          href: "/hosting"          },
+  { label: "Domains",          href: "/domains"          },
+  { label: "Transfer",         href: "/transfer"         },
+  { label: "Website Builder",  href: "/website-builder", badge: "Soon" },
+  { label: "About Us",         href: "/about"            },
   { label: "Digital Campfire", href: "/digital-campfire" },
-  { label: "Contact Us",       href: "/contact" },
+  { label: "Contact Us",       href: "/contact"          },
 ];
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -80,7 +84,7 @@ function NotifIcon({ type }: { type: AppNotification["type"] }) {
 
 // Pages with dark/purple hero — white nav text is readable there
 // /dashboard excluded: it has a white/gray bg; sidebar owns the logo there
-const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout", "/transfer"];
+const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout", "/transfer", "/website-builder"];
 
 export default function Header() {
   const router   = useRouter();
@@ -193,8 +197,13 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((link) => (
               <Link key={link.label} href={link.href}
-                className={`relative group text-sm font-medium transition-colors duration-200 ${navTextCls}`}>
+                className={`relative group flex items-center gap-1.5 text-sm font-medium transition-colors duration-200 ${navTextCls}`}>
                 {link.label}
+                {"badge" in link && link.badge && (
+                  <span className="px-1.5 py-0.5 bg-[#6B21A8] text-white text-[9px] font-bold rounded-full leading-none">
+                    {link.badge}
+                  </span>
+                )}
                 <span className={`absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full transition-all duration-300 ease-out group-hover:w-full ${underlineCls}`} />
               </Link>
             ))}
@@ -386,8 +395,13 @@ export default function Header() {
                 <motion.div key={link.label} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: i * 0.07 + 0.05, duration: 0.3 }}>
                   <Link href={link.href} onClick={() => setMenuOpen(false)}
-                    className="block px-3 py-2.5 text-gray-800 font-medium rounded-lg hover:bg-purple-50 hover:text-[#6B21A8] transition-colors">
+                    className="flex items-center gap-2 px-3 py-2.5 text-gray-800 font-medium rounded-lg hover:bg-purple-50 hover:text-[#6B21A8] transition-colors">
                     {link.label}
+                    {"badge" in link && link.badge && (
+                      <span className="px-1.5 py-0.5 bg-[#6B21A8] text-white text-[9px] font-bold rounded-full leading-none">
+                        {link.badge}
+                      </span>
+                    )}
                   </Link>
                 </motion.div>
               ))}

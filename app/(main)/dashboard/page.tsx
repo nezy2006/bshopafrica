@@ -924,10 +924,12 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
 
 /* ─── DASHBOARD TOP BAR ──────────────────────────────────────────────────── */
 const TOP_NAV = [
-  { label: "Home",             href: "/" },
-  { label: "Hosting",          href: "/hosting" },
-  { label: "Domains",          href: "/domains" },
-  { label: "Contact",          href: "/contact" },
+  { label: "Home",             href: "/"                 },
+  { label: "Hosting",          href: "/hosting"          },
+  { label: "Domains",          href: "/domains"          },
+  { label: "Transfer",         href: "/transfer"         },
+  { label: "About Us",         href: "/about"            },
+  { label: "Contact",          href: "/contact"          },
   { label: "Digital Campfire", href: "/digital-campfire" },
 ];
 
