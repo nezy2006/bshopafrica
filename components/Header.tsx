@@ -21,7 +21,7 @@ const PRIMARY_NAV = [
 const SECONDARY_NAV = [
   { label: "Builder",  href: "/website-builder"  },
   { label: "About",    href: "/about"             },
-  { label: "Campfire", href: "/digital-campfire"  },
+  { label: "Digital Campfire", href: "/digital-campfire"  },
   { label: "Contact",  href: "/contact"           },
 ];
 
