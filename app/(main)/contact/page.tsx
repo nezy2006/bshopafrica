@@ -112,7 +112,7 @@ function TikTokIcon() {
 /* ─── Hero ───────────────────────────────────────────────────────────────── */
 function HeroSection() {
   return (
-    <section className="relative bg-gradient-to-br from-[#3b0764] via-[#6B21A8] to-[#4c1d95] pt-24 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <section className="relative bg-gradient-to-br from-[#3b0764] via-[#6B21A8] to-[#4c1d95] pt-36 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
