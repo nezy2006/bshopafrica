@@ -70,6 +70,53 @@ html {
   animation: border-pulse-glow 2.5s ease-in-out infinite;
 }
 
+/* ── Shake (empty input) ── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+/* ── Ripple (button click) ── */
+@keyframes ripple-out {
+  0%   { transform: scale(0); opacity: 0.4; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+/* ── Blink cursor ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.animate-shake {
+  animation: shake 0.45s ease-in-out;
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* ── Ripple button ── */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.btn-ripple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(0);
+  opacity: 0;
+}
+.btn-ripple:active::after {
+  animation: ripple-out 0.55s ease-out forwards;
+}
+
 /* ── Announcement-bar shimmer text ── */
 .shimmer-text {
   background: linear-gradient(

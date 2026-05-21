@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { addToCart, type CartTransfer } from "@/lib/cart";
 import { ArrowRight, Check, Shield, Zap, Mail, Globe, Info, Lock } from "lucide-react";
+import TransferDemo from "@/components/TransferDemo";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 const NS = ["ns1.mysecurecloudhost.com", "ns2.mysecurecloudhost.com", "ns3.mysecurecloudhost.com", "ns4.mysecurecloudhost.com"] as [string, string, string, string];
@@ -294,12 +295,15 @@ function TransferInner() {
 
 export default function TransferPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
-      <TransferInner />
-    </Suspense>
+    <>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }>
+        <TransferInner />
+      </Suspense>
+      <TransferDemo />
+    </>
   );
 }

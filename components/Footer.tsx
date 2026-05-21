@@ -63,6 +63,7 @@ const FOOTER_LINKS = {
   "Company": [
     { label: "About Us",         href: "/about" },
     { label: "Digital Campfire", href: "/digital-campfire" },
+    { label: "Website Builder",  href: "/website-builder" },
     { label: "Contact Us",       href: "/contact" },
     { label: "Privacy Policy",   href: "#" },
   ],

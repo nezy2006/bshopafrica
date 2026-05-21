@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import ScrollProgress from "@/components/ScrollProgress";
 
 function isDashboard(pathname: string) {
   return pathname.startsWith("/dashboard");
@@ -36,6 +37,7 @@ export function SiteExtras() {
   if (isDashboard(pathname)) return null;
   return (
     <>
+      <ScrollProgress />
       <CookieBanner />
       <WhatsAppButton />
     </>

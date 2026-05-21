@@ -4,14 +4,19 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer } from "@/lib/cart";
+import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
 
 // Legacy shape for checkout summary compat
-interface Cart { domain?: CartDomain; hosting?: CartHosting; }
+interface Cart {
+  domain?:         CartDomain;
+  hosting?:        CartHosting;
+  websiteBuilder?: CartWebsiteBuilder;
+}
 function itemsToCart(items: CartItem[]): Cart {
   return {
-    domain:  items.find(i => i.type === "domain")  as CartDomain  | undefined,
-    hosting: items.find(i => i.type === "hosting") as CartHosting | undefined,
+    domain:         items.find(i => i.type === "domain")          as CartDomain          | undefined,
+    hosting:        items.find(i => i.type === "hosting")         as CartHosting         | undefined,
+    websiteBuilder: items.find(i => i.type === "website_builder") as CartWebsiteBuilder  | undefined,
   };
 }
 
@@ -93,8 +98,9 @@ function CartSummary({ cart }: { cart: Cart }) {
   const hasBundle     = !!(cart.domain && cart.hosting);
   const domainPrice   = cart.domain?.price ?? 0;
   const hostingYearly = cart.hosting?.yearly ?? 0;
+  const wbPrice       = cart.websiteBuilder?.price ?? 0;
   const discount      = hasBundle ? domainPrice : 0;
-  const total         = domainPrice + hostingYearly - discount;
+  const total         = domainPrice + hostingYearly + wbPrice - discount;
 
   return (
     <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
@@ -114,6 +120,12 @@ function CartSummary({ cart }: { cart: Cart }) {
             <span className="font-semibold flex-shrink-0">${cart.hosting.yearly}/yr</span>
           </div>
         )}
+        {cart.websiteBuilder && (
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">AI Website Builder</span>
+            <span className="font-semibold">${cart.websiteBuilder.price}</span>
+          </div>
+        )}
         {discount > 0 && (
           <div className="flex justify-between text-xs text-green-600 font-medium">
             <span>Free domain saving</span><span>−${discount}</span>
@@ -121,7 +133,7 @@ function CartSummary({ cart }: { cart: Cart }) {
         )}
       </div>
       <div className="border-t border-gray-200 pt-3 flex justify-between font-black text-black">
-        <span>Total</span><span>${total}/yr</span>
+        <span>Total</span><span>${total}{cart.hosting || cart.domain ? "/yr" : ""}</span>
       </div>
     </div>
   );
@@ -308,7 +320,7 @@ function StepAccount({ onDone }: { onDone: () => void }) {
 }
 
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
-function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string) => void }) {
+function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, hasWB: boolean) => void }) {
   const [method,  setMethod]  = useState<PayMethod>("paypal");
   const [phone,   setPhone]   = useState("");
   const [agreed,  setAgreed]  = useState(false);
@@ -320,27 +332,52 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string) 
     if (method === "pawapay" && !phone.trim()) { setError("Please enter your mobile money number."); return; }
     setLoading(true); setError(null);
     await new Promise(r => setTimeout(r, 2200)); // simulate payment processing
+
+    const items    = getCart();
+    const clientId = localStorage.getItem("bshop_client_id");
+
     // Initiate transfer via WHMCS if cart has a transfer item
     try {
-      const items = getCart();
       const transferItem = items.find(i => i.type === "transfer");
-      if (transferItem && "authCode" in transferItem) {
-        const clientId = localStorage.getItem("bshop_client_id");
-        if (clientId) {
-          await fetch("/api/whmcs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "initiateTransfer",
-              params: { clientId: Number(clientId), domain: transferItem.domain, authCode: transferItem.authCode },
-            }),
-          });
-        }
+      if (transferItem && "authCode" in transferItem && clientId) {
+        await fetch("/api/whmcs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "initiateTransfer",
+            params: { clientId: Number(clientId), domain: transferItem.domain, authCode: transferItem.authCode },
+          }),
+        });
       }
-    } catch { /* non-fatal — order created, support can follow up */ }
+    } catch { /* non-fatal */ }
+
+    // Deploy website builder if present
+    let wbDeployed = false;
+    try {
+      const wbItem = items.find(i => i.type === "website_builder") as CartWebsiteBuilder | undefined;
+      if (wbItem) {
+        // Retrieve domain from cart or localStorage
+        const domainItem = items.find(i => i.type === "domain");
+        const domain = domainItem && "domain" in domainItem ? (domainItem as CartDomain).domain : "";
+        const deployRes = await fetch("/api/website-builder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action:   "deploy",
+            clientId: clientId ? Number(clientId) : 0,
+            domain,
+            siteData: wbItem.siteData,
+          }),
+        });
+        const deployJson = (await deployRes.json()) as { success: boolean };
+        wbDeployed = deployJson.success;
+      }
+    } catch { /* non-fatal */ }
+
     const orderNum = `BSH-${Date.now().toString(36).toUpperCase().slice(-8)}`;
+    const hasWB    = items.some(i => i.type === "website_builder");
     clearCart();
-    onDone(orderNum);
+    onDone(orderNum, hasWB);
   };
 
   return (
@@ -438,6 +475,93 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string) 
   );
 }
 
+/* ─── Step 4: Complete (website builder) ────────────────────────────────── */
+function StepCompleteBuilder({ orderNum }: { orderNum: string }) {
+  const [deployStep, setDeployStep] = useState(0);
+  const steps = [
+    { label: "Payment confirmed",          done: true  },
+    { label: "Website files generated",    done: true  },
+    { label: "Uploading to your hosting",  done: false },
+    { label: "Connecting your domain",     done: false },
+    { label: "SSL certificate activating", done: false },
+  ];
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setDeployStep(1), 1200),
+      setTimeout(() => setDeployStep(2), 2600),
+      setTimeout(() => setDeployStep(3), 4200),
+      setTimeout(() => setDeployStep(4), 5800),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: EASE }}
+      className="text-center py-6"
+    >
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.1, type: "spring", stiffness: 220, damping: 18 }}
+        className="w-24 h-24 rounded-full bg-[#6B21A8] flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(107,33,168,0.4)] text-4xl"
+      >
+        🚀
+      </motion.div>
+
+      <h2 className="text-3xl font-black text-black mb-2">Your AI Website is Going Live!</h2>
+      <p className="text-gray-500 mb-2">Order: <span className="font-bold text-[#6B21A8]">{orderNum}</span></p>
+      <p className="text-gray-400 text-sm mb-8">Check your email for updates at every step.</p>
+
+      {/* Deployment steps */}
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5 mb-8 text-left space-y-3">
+        {steps.map((step, i) => (
+          <motion.div key={step.label}
+            initial={{ opacity: 0.3 }}
+            animate={deployStep >= i ? { opacity: 1 } : { opacity: 0.3 }}
+            className="flex items-center gap-3 text-sm"
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${
+              deployStep > i || (step.done && deployStep >= i)
+                ? "bg-green-500 text-white"
+                : deployStep === i
+                ? "bg-[#6B21A8] text-white"
+                : "bg-gray-200 text-gray-400"
+            }`}>
+              {deployStep > i || (step.done && deployStep >= i) ? "✓" :
+               deployStep === i ? (
+                 <span className="w-2.5 h-2.5 border-2 border-white/40 border-t-white rounded-full animate-spin block" />
+               ) : "○"}
+            </span>
+            <span className={deployStep >= i ? "text-gray-800 font-medium" : "text-gray-400"}>{step.label}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      <AnimatePresence>
+        {deployStep >= 4 && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+            <p className="text-green-600 font-bold text-sm">✓ Your site is being set up! Usually ready within 5 minutes.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link href="/dashboard"
+                className="px-8 py-3.5 bg-[#6B21A8] text-white font-bold rounded-full text-sm hover:bg-[#581c87] transition-colors">
+                Go to Dashboard
+              </Link>
+              <Link href="/"
+                className="px-8 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-full text-sm hover:border-gray-300 transition-colors">
+                Back to Home
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 /* ─── Step 4: Complete ───────────────────────────────────────────────────── */
 function StepComplete({ orderNum }: { orderNum: string }) {
   return (
@@ -514,17 +638,18 @@ export default function CheckoutPage() {
   const [cart,     setCart]     = useState<Cart>({});
   const [ready,    setReady]    = useState(false);
   const [orderNum, setOrderNum] = useState("");
+  const [hasWB,    setHasWB]    = useState(false);
 
   useEffect(() => {
     const items = getCart();
+    if (items.length === 0) { router.replace("/cart"); return; }
     const c = itemsToCart(items);
-    if (!c.domain && !c.hosting) { router.replace("/cart"); return; }
     setCart(c);
     setReady(true);
   }, [router]);
 
   const handleAccountDone = useCallback(() => setStep(3), []);
-  const handleOrderDone   = useCallback((num: string) => { setOrderNum(num); setStep(4); }, []);
+  const handleOrderDone   = useCallback((num: string, wb: boolean) => { setOrderNum(num); setHasWB(wb); setStep(4); }, []);
 
   if (!ready) return null;
 
@@ -552,7 +677,8 @@ export default function CheckoutPage() {
           <AnimatePresence mode="wait">
             {step === 2 && <div key="step2"><StepAccount onDone={handleAccountDone} /></div>}
             {step === 3 && <div key="step3"><StepPayment cart={cart} onDone={handleOrderDone} /></div>}
-            {step === 4 && <div key="step4"><StepComplete orderNum={orderNum} /></div>}
+            {step === 4 && hasWB  && <div key="step4wb"><StepCompleteBuilder orderNum={orderNum} /></div>}
+            {step === 4 && !hasWB && <div key="step4"><StepComplete orderNum={orderNum} /></div>}
           </AnimatePresence>
         </motion.div>
       </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { DomainJourney, ExtensionShowcase } from "@/components/DomainJourney";
 
 const TLDS = [
   { ext: ".com",    reg: 12, renewal: 14, transfer: 12 },
@@ -405,6 +406,8 @@ export default function DomainsPage() {
       <WhySection />
       <TransferSection />
       <PricingTable />
+      <DomainJourney />
+      <ExtensionShowcase />
     </>
   );
 }

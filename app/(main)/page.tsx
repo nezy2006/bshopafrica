@@ -3,6 +3,7 @@ import DomainSearch from "@/components/DomainSearch";
 import TrustBadges from "@/components/TrustBadges";
 import PricingCards from "@/components/PricingCards";
 import Features from "@/components/Features";
+import DemoSection from "@/components/DemoSection";
 import FAQ from "@/components/FAQ";
 import AIBuilderTeaser from "@/components/AIBuilderTeaser";
 import TawkChat from "@/components/TawkChat";
@@ -17,6 +18,7 @@ export default function Home() {
       <DomainSearch />
       <PricingCards />
       <Features />
+      <DemoSection />
       <AIBuilderTeaser />
       <FAQ />
       <TawkChat />

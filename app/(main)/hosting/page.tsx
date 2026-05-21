@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
+import Link from "next/link";
+import { HostingTimeline, IncludedCards } from "@/components/HostingTimeline";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
@@ -216,10 +218,30 @@ function HeroSection() {
   );
 }
 
+/* ─── Count-up hook ──────────────────────────────────────────────────────── */
+function useCountUp(target: number, duration = 1200) {
+  const ref    = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true });
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!inView) return;
+    const start = Date.now();
+    const tick = () => {
+      const progress = Math.min((Date.now() - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [inView, target, duration]);
+  return { ref, count };
+}
+
 /* ─── 3-D Tilt Plan Card ─────────────────────────────────────────────────── */
 function PlanCard({ plan, index }: { plan: Plan; index: number }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [mob, setMob] = useState(false);
+  const { ref: priceRef, count: priceCount } = useCountUp(plan.monthly);
 
   useEffect(() => {
     const chk = () => setMob(window.innerWidth < 768);
@@ -273,8 +295,8 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
 
         <div className="mt-4 mb-6">
           <div className="flex items-end gap-1">
-            <span className={`text-5xl font-black leading-none ${plan.best ? "text-white" : "text-[#6B21A8]"}`}>
-              ${plan.monthly}
+            <span ref={priceRef} className={`text-5xl font-black leading-none ${plan.best ? "text-white" : "text-[#6B21A8]"}`}>
+              ${priceCount}
             </span>
             <span className={`mb-1 text-sm font-medium ${plan.best ? "text-purple-300" : "text-gray-400"}`}>
               /month
@@ -626,6 +648,38 @@ function CTASection() {
   );
 }
 
+/* ─── Website Builder Teaser ─────────────────────────────────────────────── */
+function BuilderTeaser() {
+  return (
+    <section className="bg-[#0d0118] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
+          className="flex flex-col sm:flex-row items-center gap-6 bg-[#6B21A8]/20 border border-[#6B21A8]/40 rounded-3xl p-8"
+        >
+          <div className="text-5xl">✨</div>
+          <div className="flex-1 text-center sm:text-left">
+            <p className="text-purple-300 text-sm font-semibold mb-1">Coming Soon</p>
+            <h3 className="text-xl font-black text-white mb-2">
+              Want us to build your site too?
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Our AI Website Builder is launching soon. Describe your business and we&apos;ll create your entire website automatically.
+            </p>
+          </div>
+          <Link href="/website-builder"
+            className="flex-shrink-0 px-6 py-3 bg-[#6B21A8] hover:bg-[#7c3aed] text-white font-bold rounded-2xl transition-colors text-sm whitespace-nowrap">
+            Learn More →
+          </Link>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 export default function HostingPage() {
   return (
@@ -633,7 +687,10 @@ export default function HostingPage() {
       <HeroSection />
       <PlansSection />
       <ComparisonTable />
+      <HostingTimeline />
+      <IncludedCards />
       <WhySection />
+      <BuilderTeaser />
       <FAQSection />
       <CTASection />
     </>

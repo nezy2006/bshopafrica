@@ -41,7 +41,17 @@ export interface CartTransfer {
   nameservers: [string, string, string, string];
 }
 
-export type CartItem = CartDomain | CartHosting | CartSSL | CartEmail | CartTransfer;
+export interface CartWebsiteBuilder {
+  id: string;
+  type: "website_builder";
+  name: string;
+  productId: number;
+  price: number;
+  siteData: string; // JSON-stringified generated site content
+  businessName: string;
+}
+
+export type CartItem = CartDomain | CartHosting | CartSSL | CartEmail | CartTransfer | CartWebsiteBuilder;
 
 // Legacy shape kept for checkout compat
 export interface Cart { domain?: CartDomain; hosting?: CartHosting; }
@@ -107,19 +117,21 @@ export interface CartTotals {
 }
 
 export function calculateTotal(items?: CartItem[]): CartTotals {
-  const cart     = items ?? getCart();
-  const domain   = cart.find(i => i.type === "domain")   as CartDomain   | undefined;
-  const hosting  = cart.find(i => i.type === "hosting")  as CartHosting  | undefined;
-  const ssl      = cart.find(i => i.type === "ssl")      as CartSSL      | undefined;
-  const email    = cart.find(i => i.type === "email")    as CartEmail    | undefined;
-  const transfer = cart.find(i => i.type === "transfer") as CartTransfer | undefined;
+  const cart           = items ?? getCart();
+  const domain         = cart.find(i => i.type === "domain")           as CartDomain          | undefined;
+  const hosting        = cart.find(i => i.type === "hosting")          as CartHosting         | undefined;
+  const ssl            = cart.find(i => i.type === "ssl")              as CartSSL             | undefined;
+  const email          = cart.find(i => i.type === "email")            as CartEmail           | undefined;
+  const transfer       = cart.find(i => i.type === "transfer")         as CartTransfer        | undefined;
+  const websiteBuilder = cart.find(i => i.type === "website_builder")  as CartWebsiteBuilder  | undefined;
 
   let subtotal = 0;
-  if (domain)   subtotal += domain.price;
-  if (hosting)  subtotal += hosting.cycle === "monthly" ? hosting.monthly * 12 : hosting.yearly;
-  if (ssl)      subtotal += ssl.price;
-  if (email)    subtotal += email.price;
-  if (transfer) subtotal += transfer.transferPrice;
+  if (domain)         subtotal += domain.price;
+  if (hosting)        subtotal += hosting.cycle === "monthly" ? hosting.monthly * 12 : hosting.yearly;
+  if (ssl)            subtotal += ssl.price;
+  if (email)          subtotal += email.price;
+  if (transfer)       subtotal += transfer.transferPrice;
+  if (websiteBuilder) subtotal += websiteBuilder.price;
 
   const hasBundleDiscount = !!(domain && hosting);
   const discount = hasBundleDiscount ? domain!.price : 0;
