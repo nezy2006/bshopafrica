@@ -19,10 +19,10 @@ const PRIMARY_NAV = [
 
 // Secondary links — shown inline on xl+, in "More" dropdown on md–lg
 const SECONDARY_NAV = [
-  { label: "Builder",  href: "/website-builder"  },
-  { label: "About",    href: "/about"             },
-  { label: "Campfire", href: "/digital-campfire"  },
-  { label: "Contact",  href: "/contact"           },
+  { label: "Website Builder",  href: "/website-builder"  },
+  { label: "About",            href: "/about"             },
+  { label: "Digital Campfire", href: "/digital-campfire"  },
+  { label: "Contact",          href: "/contact"           },
 ];
 
 // All links combined — used for mobile drawer
@@ -189,7 +189,7 @@ export default function Header() {
       <Link
         href={href}
         onClick={onClick}
-        className={`relative group whitespace-nowrap text-xs lg:text-sm font-medium transition-colors duration-200 ${navTextCls}`}
+        className={`relative group whitespace-nowrap text-xs font-medium transition-colors duration-200 ${navTextCls}`}
       >
         {label}
         <span className={`absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full transition-all duration-300 ease-out group-hover:w-full ${underlineCls}`} />
@@ -227,7 +227,7 @@ export default function Header() {
           )}
 
           {/* Desktop nav — primary links always visible (md+) */}
-          <nav className="hidden md:flex items-center gap-3 lg:gap-5 flex-nowrap min-w-0">
+          <nav className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-5 flex-nowrap min-w-0">
 
             {/* Primary: always shown */}
             {PRIMARY_NAV.map(link => (
