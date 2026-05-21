@@ -287,6 +287,43 @@ export default function CartPage() {
                 {websiteBuilder  && <WebsiteBuilderCard   key={websiteBuilder.id} item={websiteBuilder} onRemove={() => handleRemove(websiteBuilder.id)} />}
               </AnimatePresence>
 
+              {/* Website Builder badge when hosting is in cart */}
+              {hosting && (
+                <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: EASE }}
+                  className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl flex-shrink-0">🌐</span>
+                      <div>
+                        <p className="font-bold text-green-800 text-sm flex items-center gap-2">
+                          Free Website Builder Included
+                          <span className="px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full uppercase">Free</span>
+                        </p>
+                        <p className="text-xs text-green-700 mt-0.5">
+                          Drag &amp; drop builder, 500+ templates, SSL — included with your hosting plan.
+                        </p>
+                      </div>
+                    </div>
+                    <Link href="/website-builder#pricing"
+                      className="flex-shrink-0 text-xs px-3 py-1.5 border border-green-400 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition-colors whitespace-nowrap">
+                      Upgrade →
+                    </Link>
+                  </div>
+                  {/* Upgrade upsell */}
+                  <div className="mt-3 pt-3 border-t border-green-200 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">+ Starter Builder</p>
+                      <p className="text-xs text-gray-500">Custom domain, remove ads, $100 Google Ads credit</p>
+                    </div>
+                    <a href="https://bshopafrica.com/billing/cart.php?a=add&pid=35" target="_blank" rel="noopener noreferrer"
+                      className="flex-shrink-0 ml-4 text-xs px-3 py-1.5 bg-[#6B21A8] text-white font-bold rounded-lg hover:bg-[#581c87] transition-colors whitespace-nowrap">
+                      + Add $8.99/mo
+                    </a>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Upsells */}
               {(items.length > 0) && (
                 <div className="space-y-3 mt-2">

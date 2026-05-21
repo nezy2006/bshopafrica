@@ -1,474 +1,299 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { addToCart } from "@/lib/cart";
-import type { CartWebsiteBuilder } from "@/lib/cart";
-import WebsitePreview, { type SiteData } from "@/components/WebsitePreview";
-import { Wand2 } from "lucide-react";
 import Link from "next/link";
+import {
+  Palette, Smartphone, Search, Globe, Headphones, ShoppingCart,
+  MousePointer2, Check,
+} from "lucide-react";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
-const INPUT =
-  "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm font-medium text-black placeholder-gray-400 outline-none transition-all duration-200 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_3px_rgba(107,33,168,0.1)]";
+// WHMCS cart base — update PIDs once Weebly products are created in WHMCS
+const WHMCS = "https://bshopafrica.com/billing/cart.php?a=add&pid=";
+const WEEBLY_PIDS = { starter: "35", pro: "36", business: "37" };
 
-const BUSINESS_TYPES = [
-  "Restaurant/Cafe",
-  "Hair Salon/Beauty",
-  "Clothing/Fashion Store",
-  "Professional Services",
-  "Healthcare/Medical",
-  "Education/Training",
-  "NGO/Non-profit",
-  "Technology",
-  "Construction/Real Estate",
-  "Other",
+/* ─── Features ───────────────────────────────────────────────────────────── */
+const FEATURES = [
+  { icon: MousePointer2, title: "Drag & Drop Editor",    desc: "Build pages visually — no coding needed. Move any element anywhere." },
+  { icon: Palette,       title: "500+ Templates",        desc: "Professional templates for every industry, fully customisable." },
+  { icon: Smartphone,    title: "Mobile Ready",          desc: "Every site automatically looks great on phones and tablets." },
+  { icon: Search,        title: "SEO Built-in",          desc: "Built-in SEO tools to help your site rank on Google from day one." },
+  { icon: ShoppingCart,  title: "eCommerce Ready",       desc: "Sell products, take payments, manage orders — all in one place." },
+  { icon: Headphones,    title: "24/7 Support",          desc: "Our team is here around the clock to help you build and grow." },
 ];
 
-const COLOR_OPTIONS = [
-  { label: "Purple",      value: "purple",      hex: "#6B21A8" },
-  { label: "Blue",        value: "blue",        hex: "#1d4ed8" },
-  { label: "Green",       value: "green",       hex: "#15803d" },
-  { label: "Red/Orange",  value: "red/orange",  hex: "#ea580c" },
-  { label: "Black/Dark",  value: "black/dark",  hex: "#111827" },
-  { label: "Gold/Yellow", value: "gold/yellow", hex: "#b45309" },
+/* ─── Templates ──────────────────────────────────────────────────────────── */
+type Template = {
+  name: string; category: string;
+  navBg: string; heroBg: string; accentBg: string;
+  cardBg: string; pageBg: string; textColor: string;
+};
+const TEMPLATES: Template[] = [
+  { name: "Elegant",   category: "Salons & Boutiques",   navBg: "bg-gray-900",     heroBg: "bg-gray-800",       accentBg: "bg-yellow-400", cardBg: "bg-gray-800",              pageBg: "bg-gray-900",   textColor: "text-white"     },
+  { name: "Bold",      category: "Restaurants & Food",   navBg: "bg-orange-900",   heroBg: "bg-orange-800",     accentBg: "bg-orange-400", cardBg: "bg-orange-800/60",         pageBg: "bg-orange-950", textColor: "text-orange-50"  },
+  { name: "Corporate", category: "Businesses & Offices", navBg: "bg-[#1e3a5f]",   heroBg: "bg-[#1e3a5f]",     accentBg: "bg-[#1e3a5f]", cardBg: "bg-gray-50",               pageBg: "bg-white",      textColor: "text-gray-900"  },
+  { name: "Creative",  category: "Portfolios & Agencies",navBg: "bg-[#0d0118]",   heroBg: "bg-[#0d0118]",     accentBg: "bg-[#6B21A8]", cardBg: "bg-[#1a0a2e]",            pageBg: "bg-[#0d0118]",  textColor: "text-white"     },
+  { name: "Shop",      category: "E-Commerce",           navBg: "bg-white border-b border-gray-200", heroBg: "bg-green-50", accentBg: "bg-green-600", cardBg: "bg-white border border-gray-100 shadow-sm", pageBg: "bg-gray-50", textColor: "text-gray-900" },
+  { name: "Impact",    category: "NGOs & Causes",        navBg: "bg-white border-b border-gray-200", heroBg: "bg-red-600",  accentBg: "bg-red-600",   cardBg: "bg-white border border-gray-100",            pageBg: "bg-white",   textColor: "text-gray-900" },
 ];
 
-const PAGE_OPTIONS = [
-  { value: "About Us",          label: "About Us"          },
-  { value: "Services/Menu",     label: "Services / Menu"   },
-  { value: "Gallery/Portfolio", label: "Gallery / Portfolio" },
-  { value: "Contact",           label: "Contact"           },
-  { value: "Book Appointment",  label: "Book Appointment"  },
-  { value: "Online Shop",       label: "Online Shop"       },
-];
-
-const GENERATE_STEPS = [
-  "Analyzing your business...",
-  "Writing homepage content...",
-  "Creating service descriptions...",
-  "Designing your layout...",
-  "Almost ready...",
-];
-
-/* ─── Step indicator ─────────────────────────────────────────────────────── */
-function StepDots({ current }: { current: number }) {
+function TemplateMockup({ t }: { t: Template }) {
+  const isLight = t.textColor === "text-gray-900";
+  const barColor = isLight ? "bg-gray-700/50" : "bg-white/60";
+  const subColor = isLight ? "bg-gray-500/40" : "bg-white/40";
+  const cardBar  = isLight ? "bg-gray-400/40" : "bg-white/30";
   return (
-    <div className="flex items-center justify-center gap-2 mb-8">
-      {[1, 2, 3, 4].map(n => (
-        <div key={n} className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-            n < current  ? "bg-green-500 text-white" :
-            n === current ? "bg-[#6B21A8] text-white shadow-[0_0_0_4px_rgba(107,33,168,0.2)]" :
-                            "bg-gray-100 text-gray-400"
-          }`}>
-            {n < current ? "✓" : n}
+    <div className={`${t.pageBg} rounded-b-xl overflow-hidden h-36`}>
+      <div className={`${t.navBg} px-3 py-2 flex items-center justify-between`}>
+        <div className="w-10 h-2 bg-white/40 rounded-full" />
+        <div className="flex gap-1.5">{[1,2,3].map(i=><div key={i} className="w-5 h-1 bg-white/30 rounded-full"/>)}</div>
+      </div>
+      <div className={`${t.heroBg} px-3 py-3`}>
+        <div className={`h-2.5 ${barColor} rounded-full w-3/4 mb-1.5`}/>
+        <div className={`h-1.5 ${subColor} rounded-full w-1/2 mb-2.5`}/>
+        <div className={`w-14 h-5 ${t.accentBg} rounded-full`}/>
+      </div>
+      <div className="px-3 py-2 grid grid-cols-3 gap-1.5">
+        {[1,2,3].map(i=>(
+          <div key={i} className={`${t.cardBg} rounded-lg p-1.5`}>
+            <div className={`h-1.5 ${cardBar} rounded-full mb-1`}/>
+            <div className={`h-1 ${isLight?"bg-gray-300/40":"bg-white/20"} rounded-full w-3/4`}/>
           </div>
-          {n < 4 && <div className={`w-8 h-0.5 rounded-full transition-colors duration-300 ${n < current ? "bg-green-500" : "bg-gray-200"}`} />}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
 
-/* ─── Step 1 — Business Info ─────────────────────────────────────────────── */
-interface FormData {
-  businessName: string;
-  businessType: string;
-  location:     string;
-  phone:        string;
-  email:        string;
-  tagline:      string;
-  colorScheme:  string;
-  pages:        string[];
-  specialRequests: string;
+/* ─── Pricing ─────────────────────────────────────────────────────────────── */
+type Cycle = "monthly" | "annually";
+
+interface Plan {
+  name:       string;
+  badge?:     string;
+  best?:      boolean;
+  monthly:    number;
+  yearly:     number;
+  note:       string;
+  features:   string[];
+  btnLabel:   string;
+  btnHref:    string;
+  outlined?:  boolean;
 }
 
-function Step1({ data, onChange, onNext }: {
-  data: FormData;
-  onChange: (d: Partial<FormData>) => void;
-  onNext: () => void;
-}) {
-  const canContinue = data.businessName.trim() && data.businessType && data.location.trim();
+const PLANS: Plan[] = [
+  {
+    name:     "Free",
+    monthly:  0,
+    yearly:   0,
+    note:     "Included with every hosting plan",
+    features: [
+      "Drag & drop editor",
+      "500MB storage",
+      "Basic templates",
+      "Weebly subdomain",
+      "SSL certificate",
+    ],
+    btnLabel:  "Get Hosting",
+    btnHref:   "/hosting",
+    outlined:  true,
+  },
+  {
+    name:     "Starter",
+    badge:    "POPULAR",
+    best:     true,
+    monthly:  8.99,
+    yearly:   89.99,
+    note:     "Billed annually",
+    features: [
+      "Everything in Free",
+      "Connect custom domain",
+      "Remove Weebly ads",
+      "$100 Google Ads credit",
+      "Chat & email support",
+    ],
+    btnLabel: "Get Starter",
+    btnHref:  `${WHMCS}${WEEBLY_PIDS.starter}`,
+  },
+  {
+    name:     "Pro",
+    monthly:  13.99,
+    yearly:   138.99,
+    note:     "Billed annually",
+    features: [
+      "Everything in Starter",
+      "HD video & audio",
+      "Password protected pages",
+      "Site search",
+      "Notification bar",
+    ],
+    btnLabel: "Get Pro",
+    btnHref:  `${WHMCS}${WEEBLY_PIDS.pro}`,
+  },
+  {
+    name:     "Business",
+    monthly:  29.99,
+    yearly:   299.99,
+    note:     "Billed annually",
+    features: [
+      "Everything in Pro",
+      "Online store",
+      "No transaction fees",
+      "Unlimited products",
+      "Real-time shipping",
+      "Abandoned cart emails",
+    ],
+    btnLabel: "Get Business",
+    btnHref:  `${WHMCS}${WEEBLY_PIDS.business}`,
+  },
+];
+
+function PricingCard({ plan, cycle, index }: { plan: Plan; cycle: Cycle; index: number }) {
+  const price  = cycle === "monthly" ? plan.monthly : (plan.yearly / 12);
+  const isHref = plan.btnHref.startsWith("http");
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3, ease: EASE }}>
-      <div className="mb-6">
-        <h2 className="text-2xl font-black text-gray-900">Your Business</h2>
-        <p className="text-gray-500 text-sm mt-1">Tell us about your business so AI can write the right content.</p>
-      </div>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Business Name <span className="text-red-500">*</span></label>
-          <input value={data.businessName} onChange={e => onChange({ businessName: e.target.value })}
-            placeholder="e.g. Bella's Hair Salon" className={INPUT} />
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.1, duration: 0.55, ease: EASE }}
+      className="relative h-full"
+    >
+      {plan.badge && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+          <span className="bg-white text-[#6B21A8] text-xs font-black tracking-widest px-5 py-1.5 rounded-full shadow-lg border-2 border-[#6B21A8] uppercase whitespace-nowrap">
+            ⭐ {plan.badge}
+          </span>
         </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Business Type <span className="text-red-500">*</span></label>
-          <select value={data.businessType} onChange={e => onChange({ businessType: e.target.value })} className={INPUT}>
-            <option value="">Select type...</option>
-            {BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Location (City, Country) <span className="text-red-500">*</span></label>
-          <input value={data.location} onChange={e => onChange({ location: e.target.value })}
-            placeholder="e.g. Kigali, Rwanda" className={INPUT} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
-            <input value={data.phone} onChange={e => onChange({ phone: e.target.value })}
-              placeholder="+250 700 000 000" className={INPUT} />
+      )}
+      <div className={`h-full rounded-2xl p-6 flex flex-col transition-shadow duration-300 hover:shadow-2xl ${
+        plan.best
+          ? "bg-[#6B21A8] text-white animate-border-pulse"
+          : "bg-white border border-gray-100 shadow-lg"
+      }`}>
+        <h3 className={`text-xl font-black mb-4 ${plan.best ? "text-white" : "text-gray-900"}`}>
+          {plan.name}
+        </h3>
+
+        <div className="mb-1">
+          <div className="flex items-end gap-1">
+            <span className={`text-4xl font-black leading-none ${plan.best ? "text-white" : "text-[#6B21A8]"}`}>
+              ${price === 0 ? "0" : price.toFixed(2)}
+            </span>
+            <span className={`mb-1 text-sm font-medium ${plan.best ? "text-purple-300" : "text-gray-400"}`}>
+              /mo
+            </span>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
-            <input type="email" value={data.email} onChange={e => onChange({ email: e.target.value })}
-              placeholder="hello@business.com" className={INPUT} />
-          </div>
-        </div>
-        <button onClick={onNext} disabled={!canContinue}
-          className="w-full mt-2 py-3.5 bg-[#6B21A8] text-white font-bold rounded-xl hover:bg-[#581c87] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          Next → Your Style
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ─── Step 2 — Style & Pages ─────────────────────────────────────────────── */
-function Step2({ data, onChange, onNext, onBack }: {
-  data: FormData;
-  onChange: (d: Partial<FormData>) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  function togglePage(val: string) {
-    const pages = data.pages.includes(val)
-      ? data.pages.filter(p => p !== val)
-      : [...data.pages, val];
-    onChange({ pages });
-  }
-
-  return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3, ease: EASE }}>
-      <div className="mb-6">
-        <h2 className="text-2xl font-black text-gray-900">Your Style</h2>
-        <p className="text-gray-500 text-sm mt-1">Choose colors and which pages to include.</p>
-      </div>
-      <div className="space-y-5">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Tagline / Slogan</label>
-          <input value={data.tagline} onChange={e => onChange({ tagline: e.target.value })}
-            placeholder="Quality you can trust" className={INPUT} />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Primary Color</label>
-          <div className="grid grid-cols-3 gap-2">
-            {COLOR_OPTIONS.map(c => (
-              <button key={c.value} onClick={() => onChange({ colorScheme: c.value })}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
-                  data.colorScheme === c.value ? "border-[#6B21A8] bg-purple-50" : "border-gray-200 hover:border-gray-300"
-                }`}>
-                <span className="w-5 h-5 rounded-full flex-shrink-0 border border-white shadow-sm" style={{ background: c.hex }} />
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Pages to Include</label>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 px-3 py-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium">
-              <span className="w-4 h-4 rounded bg-green-500 flex items-center justify-center text-white text-[10px]">✓</span>
-              Home (always included)
-            </div>
-            {PAGE_OPTIONS.map(p => (
-              <label key={p.value} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
-                <div onClick={() => togglePage(p.value)}
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${
-                    data.pages.includes(p.value) ? "bg-[#6B21A8] border-[#6B21A8]" : "border-gray-300"
-                  }`}>
-                  {data.pages.includes(p.value) && <span className="text-white text-[9px] font-bold">✓</span>}
-                </div>
-                <span className="text-sm text-gray-700">{p.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Special Requests</label>
-          <textarea value={data.specialRequests} onChange={e => onChange({ specialRequests: e.target.value })}
-            placeholder="Any specific features, tone, or style preferences..."
-            rows={3} className={`${INPUT} resize-none`} />
-        </div>
-
-        <div className="flex gap-3">
-          <button onClick={onBack} className="flex-1 py-3 border-2 border-gray-200 text-gray-600 font-semibold rounded-xl hover:border-gray-300 transition-colors">
-            ← Back
-          </button>
-          <button onClick={onNext} className="flex-1 py-3 bg-[#6B21A8] text-white font-bold rounded-xl hover:bg-[#581c87] transition-colors">
-            Next → Generate
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ─── Step 3 — Generate ──────────────────────────────────────────────────── */
-function Step3({ data, onDone, onBack }: {
-  data: FormData;
-  onDone: (siteData: SiteData) => void;
-  onBack: () => void;
-}) {
-  const [generating,    setGenerating]    = useState(false);
-  const [genStep,       setGenStep]       = useState(0);
-  const [error,         setError]         = useState("");
-
-  async function handleGenerate() {
-    setGenerating(true);
-    setError("");
-    setGenStep(0);
-
-    // Animate progress steps while API call runs
-    const stepInterval = setInterval(() => {
-      setGenStep(s => (s < GENERATE_STEPS.length - 1 ? s + 1 : s));
-    }, 1400);
-
-    try {
-      const res = await fetch("/api/website-builder", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action:          "generate",
-          businessName:    data.businessName,
-          businessType:    data.businessType,
-          location:        data.location,
-          phone:           data.phone,
-          email:           data.email,
-          tagline:         data.tagline,
-          colorScheme:     data.colorScheme,
-          pages:           ["Home", ...data.pages],
-          specialRequests: data.specialRequests,
-        }),
-      });
-
-      clearInterval(stepInterval);
-      setGenStep(GENERATE_STEPS.length - 1);
-
-      const json = (await res.json()) as { success: boolean; siteData?: SiteData; error?: string };
-
-      if (!json.success || !json.siteData) {
-        setError(json.error ?? "Generation failed. Please try again.");
-        setGenerating(false);
-        return;
-      }
-
-      // Short pause so user sees the last progress step
-      await new Promise(r => setTimeout(r, 600));
-      onDone(json.siteData);
-
-    } catch {
-      clearInterval(stepInterval);
-      setError("Network error. Please try again.");
-      setGenerating(false);
-    }
-  }
-
-  const pct = generating ? Math.round(((genStep + 1) / GENERATE_STEPS.length) * 100) : 0;
-
-  return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3, ease: EASE }}>
-      <div className="mb-6">
-        <h2 className="text-2xl font-black text-gray-900">Generate Your Site</h2>
-        <p className="text-gray-500 text-sm mt-1">Review your details then generate your website.</p>
-      </div>
-
-      {/* Summary */}
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6 space-y-2 text-sm">
-        {[
-          ["Business",  data.businessName],
-          ["Type",      data.businessType],
-          ["Location",  data.location],
-          ["Color",     data.colorScheme],
-          ["Pages",     ["Home", ...data.pages].join(", ")],
-        ].map(([label, value]) => value && (
-          <div key={label} className="flex items-center gap-3">
-            <span className="text-gray-400 w-20 flex-shrink-0">{label}</span>
-            <span className="font-semibold text-gray-800">{value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Generate area */}
-      {!generating ? (
-        <div className="space-y-3">
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>
-          )}
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={handleGenerate}
-            className="w-full py-5 bg-gradient-to-r from-[#6B21A8] to-[#4c1d95] text-white font-black text-lg rounded-2xl hover:shadow-[0_0_40px_rgba(107,33,168,0.5)] transition-shadow flex items-center justify-center gap-3"
-          >
-            <Wand2 className="w-6 h-6" />
-            Generate My Website
-          </motion.button>
-          <button onClick={onBack} className="w-full py-3 border-2 border-gray-200 text-gray-600 font-semibold rounded-xl hover:border-gray-300 transition-colors">
-            ← Edit Details
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Progress bar */}
-          <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-            <motion.div
-              animate={{ width: `${pct}%` }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="h-full bg-gradient-to-r from-[#6B21A8] to-purple-400 rounded-full"
-            />
-          </div>
-
-          {/* Steps */}
-          <div className="space-y-2">
-            {GENERATE_STEPS.map((step, i) => (
-              <motion.div key={step}
-                initial={{ opacity: 0, x: -12 }}
-                animate={genStep >= i ? { opacity: 1, x: 0 } : { opacity: 0.3, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className={`flex items-center gap-3 text-sm ${genStep >= i ? "text-gray-800" : "text-gray-300"}`}
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs ${
-                  genStep > i  ? "bg-green-500 text-white" :
-                  genStep === i ? "bg-[#6B21A8] text-white" :
-                                  "bg-gray-200 text-gray-400"
-                }`}>
-                  {genStep > i ? "✓" : genStep === i ? (
-                    <span className="w-2.5 h-2.5 border-2 border-white/50 border-t-white rounded-full animate-spin block" />
-                  ) : "○"}
-                </span>
-                {step}
-              </motion.div>
-            ))}
-          </div>
-
-          <p className="text-center text-xs text-gray-400 mt-4">
-            Powered by Claude AI · Usually takes 15–30 seconds
+          <p className={`text-xs mt-1 ${plan.best ? "text-purple-300" : "text-gray-400"}`}>
+            {plan.note}
           </p>
         </div>
-      )}
+
+        <div className={`h-px my-5 ${plan.best ? "bg-purple-500" : "bg-gray-100"}`} />
+
+        <ul className="space-y-2.5 flex-1">
+          {plan.features.map(f => (
+            <li key={f} className={`flex items-start gap-2.5 text-sm ${plan.best ? "text-purple-100" : "text-gray-600"}`}>
+              <Check className={`w-4 h-4 flex-shrink-0 mt-0.5 ${plan.best ? "text-purple-300" : "text-green-500"}`} />
+              {f}
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-6">
+          {isHref ? (
+            <a href={plan.btnHref} target="_blank" rel="noopener noreferrer"
+              className={`relative overflow-hidden group flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
+                plan.outlined
+                  ? plan.best
+                    ? "bg-white/20 text-white border-2 border-white/40 hover:bg-white/30"
+                    : "border-2 border-[#6B21A8] text-[#6B21A8] hover:bg-purple-50"
+                  : plan.best
+                    ? "bg-white text-[#6B21A8] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                    : "bg-[#6B21A8] text-white hover:shadow-[0_0_20px_rgba(107,33,168,0.5)]"
+              }`}>
+              {plan.btnLabel}
+            </a>
+          ) : (
+            <Link href={plan.btnHref}
+              className={`flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
+                plan.outlined
+                  ? "border-2 border-[#6B21A8] text-[#6B21A8] hover:bg-purple-50"
+                  : plan.best
+                    ? "bg-white text-[#6B21A8] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                    : "bg-[#6B21A8] text-white hover:shadow-[0_0_20px_rgba(107,33,168,0.5)]"
+              }`}>
+              {plan.btnLabel}
+            </Link>
+          )}
+        </div>
+      </div>
     </motion.div>
   );
 }
 
-/* ─── Step 4 — Preview & Purchase ────────────────────────────────────────── */
-function Step4({ siteData, onRegenerate, onEditDetails }: {
-  siteData: SiteData;
-  onRegenerate: () => void;
-  onEditDetails: () => void;
-}) {
-  const [added, setAdded] = useState(false);
-
-  function handleAddToCart() {
-    const item: CartWebsiteBuilder = {
-      id:           "website_builder",
-      type:         "website_builder",
-      name:         "AI Website Builder",
-      productId:    Number(process.env.NEXT_PUBLIC_WEBSITE_BUILDER_PRODUCT_ID ?? 34),
-      price:        29,
-      siteData:     JSON.stringify(siteData),
-      businessName: siteData.siteName,
-    };
-    // Store generated site in localStorage for checkout access
-    if (typeof window !== "undefined") {
-      localStorage.setItem("bshop_generated_site", JSON.stringify(siteData));
-    }
-    addToCart(item);
-    setAdded(true);
-  }
-
-  const INCLUDES = [
-    "Complete website (all selected pages)",
-    "Hosted on your B.Shop hosting",
-    "Connected to your domain",
-    "SSL certificate included",
-    "Mobile responsive design",
-  ];
+function PricingSection() {
+  const [cycle, setCycle] = useState<Cycle>("annually");
+  const saving = cycle === "annually" ? "Save up to 25%" : null;
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3, ease: EASE }}>
-      <div className="mb-6">
-        <h2 className="text-2xl font-black text-gray-900">Your Website is Ready!</h2>
-        <p className="text-gray-500 text-sm mt-1">Review the preview and get it live for $29.</p>
-      </div>
+    <section id="pricing" className="bg-gray-50 py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto">
+        <motion.div className="text-center mb-14"
+          initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          transition={{ duration: 0.65, ease: EASE }}>
+          <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-5">
+            Pricing
+          </span>
+          <h2 className="text-4xl sm:text-5xl font-black text-black leading-tight">
+            Choose Your Website Builder Plan
+          </h2>
+          <p className="mt-4 text-gray-500 text-lg">Free with hosting. Upgrade for more power.</p>
 
-      {/* Preview */}
-      <div className="mb-6">
-        <WebsitePreview siteData={siteData} />
-      </div>
-
-      {/* Purchase box */}
-      {!added ? (
-        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-6">
-          <div className="flex items-baseline justify-between mb-4">
-            <p className="font-black text-gray-900 text-lg">Love it? Get it live for</p>
-            <span className="text-3xl font-black text-[#6B21A8]">$29 <span className="text-base font-semibold text-gray-400">one-time</span></span>
+          {/* Cycle toggle */}
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <div className="flex rounded-xl bg-white border border-gray-200 shadow-sm p-1">
+              {(["monthly", "annually"] as Cycle[]).map(c => (
+                <button key={c} onClick={() => setCycle(c)}
+                  className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                    cycle === c ? "bg-[#6B21A8] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  }`}>
+                  {c === "monthly" ? "Monthly" : "Annually"}
+                </button>
+              ))}
+            </div>
+            {saving && (
+              <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                {saving}
+              </motion.span>
+            )}
           </div>
-          <ul className="space-y-1.5 mb-5">
-            {INCLUDES.map(item => (
-              <li key={item} className="flex items-center gap-2.5 text-sm text-gray-700">
-                <span className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-[9px] flex-shrink-0">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={handleAddToCart}
-            className="w-full py-4 bg-[#6B21A8] text-white font-black text-base rounded-2xl hover:shadow-[0_0_30px_rgba(107,33,168,0.45)] transition-shadow mb-3"
-          >
-            Add to Cart — $29
-          </motion.button>
-          <div className="flex gap-2">
-            <button onClick={onRegenerate} className="flex-1 py-2.5 border border-gray-300 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">
-              ↺ Regenerate
-            </button>
-            <button onClick={onEditDetails} className="flex-1 py-2.5 border border-gray-300 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">
-              ✏ Edit Details
-            </button>
-          </div>
-        </div>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center"
-        >
-          <div className="text-4xl mb-3">🎉</div>
-          <h3 className="font-black text-green-800 text-xl mb-2">Added to Cart!</h3>
-          <p className="text-green-700 text-sm mb-5">Your website builder package is in your cart.</p>
-          <Link href="/cart"
-            className="inline-block px-8 py-3 bg-[#6B21A8] text-white font-bold rounded-full hover:bg-[#581c87] transition-colors">
-            View Cart & Checkout →
-          </Link>
         </motion.div>
-      )}
-    </motion.div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+          {PLANS.map((plan, i) => (
+            <PricingCard key={plan.name} plan={plan} cycle={cycle} index={i} />
+          ))}
+        </div>
+
+        <motion.p className="text-center text-sm text-gray-400 mt-8"
+          initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+          transition={{ delay: 0.5 }}>
+          All plans include free SSL and mobile responsive design ·{" "}
+          <Link href="/hosting" className="text-[#6B21A8] hover:underline">Free with any hosting plan</Link>
+        </motion.p>
+      </div>
+    </section>
   );
 }
 
 /* ─── Hero ───────────────────────────────────────────────────────────────── */
-function Hero({ onStart }: { onStart: () => void }) {
+function Hero() {
   return (
     <section className="relative bg-[#0a0a0a] pt-36 pb-24 px-4 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -479,168 +304,183 @@ function Hero({ onStart }: { onStart: () => void }) {
         <motion.div
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: EASE }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 rounded-full text-white/80 text-sm font-medium mb-8"
+          className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-500/20 border border-green-500/40 rounded-full text-green-400 text-sm font-semibold mb-8"
         >
-          <Wand2 className="w-4 h-4 text-purple-400" />
-          Powered by Claude AI
+          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+          Free Builder Included with Every Hosting Plan
         </motion.div>
+
         <motion.h1
           initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.75, ease: EASE }}
           className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6"
         >
-          Build Your Professional<br />
+          Build Your Website<br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-            Website with AI
+            with Drag &amp; Drop
           </span>
         </motion.h1>
+
         <motion.p
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.65 }}
           className="text-lg sm:text-xl text-white/60 mb-10 max-w-2xl mx-auto"
         >
-          Answer a few questions. Our AI builds your complete website in 30 seconds.
+          Powered by Weebly. Start free with any hosting plan, upgrade anytime for more features.
         </motion.p>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.6 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+          className="flex flex-col sm:flex-row gap-4 justify-center"
         >
-          <motion.button
-            whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-            onClick={onStart}
-            className="px-10 py-4 bg-[#6B21A8] text-white font-black text-lg rounded-full hover:shadow-[0_0_40px_rgba(107,33,168,0.6)] transition-shadow"
-          >
-            Start Building — $29
-          </motion.button>
-          <div className="flex gap-4 text-sm text-white/40">
-            <span>✓ No coding</span>
-            <span>✓ 30 seconds</span>
-            <span>✓ Fully hosted</span>
-          </div>
+          <Link href="/hosting">
+            <motion.span
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+              className="inline-block px-10 py-4 bg-[#6B21A8] text-white font-black text-lg rounded-full hover:shadow-[0_0_40px_rgba(107,33,168,0.6)] transition-shadow cursor-pointer"
+            >
+              Start Free with Hosting
+            </motion.span>
+          </Link>
+          <a href="#pricing">
+            <motion.span
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+              className="inline-block px-10 py-4 border-2 border-white/25 text-white font-bold text-lg rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              See All Plans
+            </motion.span>
+          </a>
         </motion.div>
       </div>
     </section>
   );
 }
 
-/* ─── Page ───────────────────────────────────────────────────────────────── */
-const defaultForm: FormData = {
-  businessName:    "",
-  businessType:    "",
-  location:        "",
-  phone:           "",
-  email:           "",
-  tagline:         "",
-  colorScheme:     "purple",
-  pages:           ["About Us", "Services/Menu", "Contact"],
-  specialRequests: "",
-};
-
-export default function WebsiteBuilderPage() {
-  const [formStep,  setFormStep]  = useState<1 | 2 | 3 | 4>(1);
-  const [formData,  setFormData]  = useState<FormData>(defaultForm);
-  const [siteData,  setSiteData]  = useState<SiteData | null>(null);
-  const [showForm,  setShowForm]  = useState(false);
-  const formRef = typeof window !== "undefined" ? document.getElementById("builder-form") : null;
-
-  function scrollToForm() {
-    setShowForm(true);
-    setTimeout(() => {
-      document.getElementById("builder-form")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }
-
-  function update(partial: Partial<FormData>) {
-    setFormData(prev => ({ ...prev, ...partial }));
-  }
-
-  function handleGenDone(data: SiteData) {
-    setSiteData(data);
-    setFormStep(4);
-  }
-
+/* ─── Features ───────────────────────────────────────────────────────────── */
+function FeaturesSection() {
   return (
-    <>
-      <Hero onStart={scrollToForm} />
-
-      {/* Social proof strip */}
-      <div className="bg-white border-b border-gray-100 py-4 px-4">
-        <div className="max-w-4xl mx-auto flex flex-wrap gap-6 justify-center text-sm text-gray-500">
-          {["✓ AI-powered content", "✓ Mobile-ready design", "✓ SSL included", "✓ Connected to your domain", "✓ One-time $29 price"].map(f => (
-            <span key={f} className="font-medium">{f}</span>
+    <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
+        <motion.div className="text-center mb-14"
+          initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          transition={{ duration: 0.65, ease: EASE }}>
+          <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-5">
+            Features
+          </span>
+          <h2 className="text-4xl sm:text-5xl font-black text-black">Everything Built In</h2>
+        </motion.div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {FEATURES.map((f, i) => (
+            <motion.div key={f.title}
+              initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              transition={{ delay: i * 0.1, duration: 0.55, ease: EASE }}
+              whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.12)" }}
+              className="bg-white rounded-2xl p-7 border border-gray-100 shadow-md hover:border-purple-200 transition-all duration-300 group cursor-default"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center mb-4 group-hover:bg-[#6B21A8] transition-colors duration-300">
+                <f.icon className="w-6 h-6 text-[#6B21A8] group-hover:text-white transition-colors duration-300" />
+              </div>
+              <h3 className="font-bold text-gray-900 text-base mb-1.5">{f.title}</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
+            </motion.div>
           ))}
         </div>
       </div>
+    </section>
+  );
+}
 
-      {/* Builder form section */}
-      <section id="builder-form" className="bg-gray-50 min-h-screen py-16 px-4 sm:px-6">
-        <div className="max-w-xl mx-auto">
-          <AnimatePresence mode="wait">
-            {!showForm ? (
-              <motion.div key="cta" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }} className="text-center py-16">
-                <div className="text-6xl mb-6">🚀</div>
-                <h2 className="text-3xl font-black text-gray-900 mb-4">Ready to Build?</h2>
-                <p className="text-gray-500 mb-8">Fill out a short form and our AI will create your complete professional website.</p>
-                <motion.button
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => setShowForm(true)}
-                  className="px-10 py-4 bg-[#6B21A8] text-white font-black text-lg rounded-full hover:shadow-[0_0_30px_rgba(107,33,168,0.5)] transition-shadow"
-                >
-                  Start Building — $29
-                </motion.button>
+/* ─── How It Works ───────────────────────────────────────────────────────── */
+function HowItWorksSection() {
+  const steps = [
+    { num: "01", icon: "🎨", title: "Pick a Template",  desc: "Choose from 500+ professional designs built for your industry." },
+    { num: "02", icon: "🖱️",  title: "Drag & Drop",     desc: "Customise every element — text, images, colors — visually with no code." },
+    { num: "03", icon: "🚀", title: "Publish & Go Live", desc: "One click to publish. Your site is live instantly with a free SSL." },
+  ];
+  return (
+    <section className="bg-[#0d0118] py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        <motion.div className="text-center mb-14"
+          initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          transition={{ duration: 0.65, ease: EASE }}>
+          <span className="inline-block px-4 py-1.5 bg-[#6B21A8]/30 border border-[#6B21A8]/50 text-purple-300 text-xs font-semibold tracking-widest rounded-full uppercase mb-5">
+            How It Works
+          </span>
+          <h2 className="text-4xl sm:text-5xl font-black text-white">3 Steps to Online</h2>
+        </motion.div>
+        <div className="grid md:grid-cols-3 gap-8">
+          {steps.map((s, i) => (
+            <motion.div key={s.num}
+              initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              transition={{ delay: i * 0.15, duration: 0.6, ease: EASE }}
+              className="text-center">
+              <motion.div whileHover={{ scale: 1.1, rotate: [0,-5,5,0] }} transition={{ duration: 0.4 }}
+                className="w-20 h-20 rounded-3xl bg-[#6B21A8]/20 border border-[#6B21A8]/40 flex items-center justify-center text-4xl mx-auto mb-5">
+                {s.icon}
               </motion.div>
-            ) : (
-              <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                {/* Card */}
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest">
-                      Step {formStep} of 4
-                    </p>
-                    <span className="text-xs font-bold text-[#6B21A8]">$29 one-time</span>
-                  </div>
-                  <StepDots current={formStep} />
-
-                  <AnimatePresence mode="wait">
-                    {formStep === 1 && (
-                      <div key="s1">
-                        <Step1 data={formData} onChange={update} onNext={() => setFormStep(2)} />
-                      </div>
-                    )}
-                    {formStep === 2 && (
-                      <div key="s2">
-                        <Step2 data={formData} onChange={update}
-                          onNext={() => setFormStep(3)} onBack={() => setFormStep(1)} />
-                      </div>
-                    )}
-                    {formStep === 3 && (
-                      <div key="s3">
-                        <Step3 data={formData}
-                          onDone={handleGenDone}
-                          onBack={() => setFormStep(2)} />
-                      </div>
-                    )}
-                    {formStep === 4 && siteData && (
-                      <div key="s4">
-                        <Step4 siteData={siteData}
-                          onRegenerate={() => setFormStep(3)}
-                          onEditDetails={() => setFormStep(2)} />
-                      </div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Trust line */}
-                <p className="text-center text-xs text-gray-400 mt-4">
-                  🔒 Secure · Powered by Claude AI · 30-day money-back guarantee
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <div className="text-xs text-purple-400 font-bold tracking-widest mb-2">{s.num}</div>
+              <h3 className="text-xl font-black text-white mb-2">{s.title}</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">{s.desc}</p>
+            </motion.div>
+          ))}
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Templates Section ──────────────────────────────────────────────────── */
+function TemplatesSection() {
+  return (
+    <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto">
+        <motion.div className="text-center mb-14"
+          initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          transition={{ duration: 0.65, ease: EASE }}>
+          <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-5">
+            Templates
+          </span>
+          <h2 className="text-4xl sm:text-5xl font-black text-black leading-tight">
+            500+ Templates for<br />
+            <span className="text-[#6B21A8]">Every Business</span>
+          </h2>
+          <p className="mt-4 text-gray-500 text-lg">All mobile-ready. All fully customisable.</p>
+        </motion.div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {TEMPLATES.map((t, i) => (
+            <motion.div key={t.name}
+              initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              transition={{ delay: i * 0.1, duration: 0.55, ease: EASE }}
+              whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.15)" }}
+              className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-md hover:border-purple-300 transition-all duration-300 group cursor-pointer"
+            >
+              <TemplateMockup t={t} />
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="font-black text-gray-900 text-sm">{t.name}</p>
+                  <p className="text-xs text-gray-400">{t.category}</p>
+                </div>
+                <span className="text-xs px-3 py-1.5 bg-[#6B21A8] text-white font-semibold rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  Use Template
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Page ───────────────────────────────────────────────────────────────── */
+export default function WebsiteBuilderPage() {
+  return (
+    <>
+      <Hero />
+      <FeaturesSection />
+      <HowItWorksSection />
+      <TemplatesSection />
+      <PricingSection />
     </>
   );
 }

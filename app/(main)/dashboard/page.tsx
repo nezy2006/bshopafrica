@@ -417,6 +417,22 @@ function HostingSection({ clientId, clientEmail }: { clientId: number; clientEma
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors">
                   <I.ExternalLink />cPanel Login
                 </button>
+                {/* Website Builder button — opens WHMCS Weebly config */}
+                <button onClick={async () => {
+                    try {
+                      const res = await whmcs<string>("getAutoAuthUrl", { email: clientEmail, destination: "clientarea.php?action=productdetails&id=" + p.id });
+                      window.open(res, "_blank", "noopener");
+                    } catch {
+                      window.open("https://bshopafrica.com/billing/clientarea.php", "_blank", "noopener");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                  🌐 Website Builder
+                </button>
+                <Link href="/website-builder#pricing"
+                  className="text-xs px-3 py-1.5 border border-purple-300 text-[#6B21A8] rounded-lg hover:bg-purple-50 transition-colors font-semibold">
+                  Upgrade Builder
+                </Link>
                 <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
                 <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Renew</button>
               </div>
