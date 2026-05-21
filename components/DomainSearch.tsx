@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DomainCheckResult } from "@/lib/whmcs";
 import { addToCart } from "@/lib/cart";
@@ -211,6 +211,8 @@ function ErrorCard({ message, onReset }: { message: string; onReset: () => void 
 
 /* ─── Main component ─────────────────────────────────────────────────────── */
 export default function DomainSearch() {
+  const router = useRouter();
+  const [mode,     setMode]     = useState<"register" | "transfer">("register");
   const [query,    setQuery]    = useState("");
   const [selected, setSelected] = useState(".com");
   const [focused,  setFocused]  = useState(false);
@@ -269,6 +271,17 @@ export default function DomainSearch() {
     runSearch(query, tld);
   };
 
+  const handleTransfer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    router.push(`/transfer?domain=${encodeURIComponent(query.trim())}`);
+  };
+
+  const switchMode = (m: "register" | "transfer") => {
+    setMode(m);
+    reset();
+  };
+
   return (
     <section id="domain-search" className="bg-gray-50 py-14 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
@@ -299,8 +312,30 @@ export default function DomainSearch() {
             </p>
           </motion.div>
 
+          {/* Register / Transfer tabs */}
+          <motion.div className="flex justify-center mb-7"
+            initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            transition={{ delay: 0.2, duration: 0.4 }}>
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+              {(["register", "transfer"] as const).map(m => (
+                <button key={m} type="button" onClick={() => switchMode(m)}
+                  className={`relative px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${mode === m ? "bg-white text-[#6B21A8] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                  {m === "register" ? "Register" : "Transfer"}
+                  {mode === m && (
+                    <motion.span layoutId="tab-indicator"
+                      className="absolute inset-x-0 -bottom-[5px] h-0.5 bg-[#6B21A8] rounded-full"
+                      transition={{ duration: 0.2, ease: EASE }} />
+                  )}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+
           {/* search form */}
-          <form onSubmit={handleSearch}>
+          <AnimatePresence mode="wait">
+            <motion.form key={mode} onSubmit={mode === "register" ? handleSearch : handleTransfer}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: EASE }}>
             <motion.div
               className="flex flex-col sm:flex-row gap-3"
               initial={{ opacity: 0, y: 20 }}
@@ -322,31 +357,45 @@ export default function DomainSearch() {
                   onChange={(e) => { setQuery(e.target.value); reset(); }}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  placeholder="yourname"
+                  placeholder={mode === "register" ? "yourname" : "yourdomain.com"}
                   className="w-full px-5 py-4 text-base font-medium text-black bg-transparent rounded-xl outline-none"
                   style={{ color: "#000" }}
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm pointer-events-none">
-                  {selected}
-                </span>
+                {mode === "register" && (
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm pointer-events-none">
+                    {selected}
+                  </span>
+                )}
               </div>
 
               <button
                 type="submit"
                 disabled={loading || !query.trim()}
-                className="flex items-center justify-center gap-2 px-8 py-4 bg-[#6B21A8] text-white font-semibold rounded-xl transition-all duration-200 min-w-[140px] hover:bg-[#581c87] hover:shadow-[0_0_20px_rgba(107,33,168,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 px-8 py-4 bg-[#6B21A8] text-white font-semibold rounded-xl transition-all duration-200 min-w-[160px] hover:bg-[#581c87] hover:shadow-[0_0_20px_rgba(107,33,168,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <><Spinner /><span>Searching…</span></>
-                ) : (
+                ) : mode === "register" ? (
                   <><SearchIcon /><span>Search</span></>
+                ) : (
+                  <><SearchIcon /><span>Transfer Domain</span></>
                 )}
               </button>
             </motion.div>
-          </form>
+            </motion.form>
+          </AnimatePresence>
 
-          {/* TLD pills */}
-          <div className="mt-8 flex flex-wrap gap-2 justify-center">
+          {/* TLD pills — register mode only */}
+          <AnimatePresence>
+            {mode === "transfer" && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mt-5 text-center text-sm text-gray-400">
+                Enter a full domain (e.g. <span className="font-mono text-gray-500">yourbrand.com</span>) and we&apos;ll check eligibility and price instantly.
+              </motion.p>
+            )}
+          </AnimatePresence>
+          <div className={`mt-8 flex flex-wrap gap-2 justify-center transition-all duration-300 ${mode === "transfer" ? "opacity-0 pointer-events-none h-0 mt-0 overflow-hidden" : ""}`}>
             {TLDS.map((tld, i) => (
               <motion.button
                 key={tld}

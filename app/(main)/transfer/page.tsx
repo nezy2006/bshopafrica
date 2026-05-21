@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { addToCart, type CartTransfer } from "@/lib/cart";
 import { ArrowRight, Check, Shield, Zap, Mail, Globe, Info, Lock } from "lucide-react";
 
@@ -32,8 +33,10 @@ const BENEFITS = [
   { icon: Mail,   label: "Email Confirmation" },
 ];
 
-export default function TransferPage() {
-  const [domain,    setDomain]    = useState("");
+function TransferInner() {
+  const params = useSearchParams();
+  const prefill = params.get("domain") ?? "";
+  const [domain,    setDomain]    = useState(prefill);
   const [checking,  setChecking]  = useState(false);
   const [result,    setResult]    = useState<CheckResult | null>(null);
   const [checkErr,  setCheckErr]  = useState("");
@@ -286,5 +289,17 @@ export default function TransferPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function TransferPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <TransferInner />
+    </Suspense>
   );
 }

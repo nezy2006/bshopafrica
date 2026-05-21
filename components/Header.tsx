@@ -80,7 +80,7 @@ function NotifIcon({ type }: { type: AppNotification["type"] }) {
 
 // Pages with dark/purple hero — white nav text is readable there
 // /dashboard excluded: it has a white/gray bg; sidebar owns the logo there
-const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout"];
+const DARK_HERO_PATHS = ["/about", "/contact", "/domains", "/hosting", "/digital-campfire", "/login", "/signup", "/cart", "/checkout", "/transfer"];
 
 export default function Header() {
   const router   = useRouter();
