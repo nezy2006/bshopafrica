@@ -182,8 +182,8 @@ export default function Header() {
               <Image
                 src={onDarkHero ? "/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" : "/logo.png"}
                 alt="The B.Shop"
-                width={160} height={50}
-                className="h-10 w-auto object-contain transition-opacity duration-300"
+                width={220} height={60}
+                className="h-12 w-auto object-contain transition-opacity duration-300"
                 priority
               />
             </Link>
