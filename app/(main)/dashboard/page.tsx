@@ -1105,34 +1105,35 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
 }) {
   return (
     <aside className="flex flex-col bg-[#1e0a2e] w-full h-full overflow-hidden">
-      {/* Collapse toggle */}
-      <div className="flex items-center justify-end px-3 py-2 border-b border-white/10">
-        <button onClick={onToggle} className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-          <I.Menu />
-        </button>
-      </div>
 
-      {/* User info */}
-      {!collapsed && (
+      {/* User info — first thing in sidebar */}
+      {!collapsed ? (
         <div className="px-4 py-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
-              <User className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-white font-bold text-sm leading-tight truncate">
+                  {[client.firstname, client.lastname].filter(Boolean).join(" ")}
+                </p>
+                <p className="text-purple-300 text-xs leading-tight truncate mt-0.5">{client.email}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-white font-bold text-sm leading-tight truncate">
-                {[client.firstname, client.lastname].filter(Boolean).join(" ")}
-              </p>
-              <p className="text-purple-300 text-xs leading-tight truncate mt-0.5">{client.email}</p>
-            </div>
+            <button onClick={onToggle} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0">
+              <I.Menu />
+            </button>
           </div>
         </div>
-      )}
-      {collapsed && (
-        <div className="flex justify-center py-3 border-b border-white/10">
+      ) : (
+        <div className="flex flex-col items-center gap-2 py-3 border-b border-white/10">
           <div className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center">
             <User className="w-4 h-4 text-white" />
           </div>
+          <button onClick={onToggle} className="p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+            <I.Menu />
+          </button>
         </div>
       )}
 
