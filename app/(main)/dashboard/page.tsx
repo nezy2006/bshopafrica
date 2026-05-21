@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { User } from "lucide-react";
+import { User, ChevronDown, Bell, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import {
   getNotifications, markAllRead, markRead, startNotificationPolling, stopNotificationPolling,
-  type AppNotification,
+  getUnreadCount, type AppNotification,
 } from "@/lib/notifications";
 
 type Section = "overview" | "domains" | "hosting" | "emails" | "orders" | "invoices" | "support" | "notifications" | "settings";
@@ -922,6 +922,166 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
   );
 }
 
+/* ─── DASHBOARD TOP BAR ──────────────────────────────────────────────────── */
+const TOP_NAV = [
+  { label: "Home",             href: "/" },
+  { label: "Hosting",          href: "/hosting" },
+  { label: "Domains",          href: "/domains" },
+  { label: "Contact",          href: "/contact" },
+  { label: "Digital Campfire", href: "/digital-campfire" },
+];
+
+function DashboardTopBar({ onLogout, onSection }: { onLogout: () => void; onSection: (s: Section) => void }) {
+  const [firstName, setFirstName]  = useState("");
+  const [fullName,  setFullName]   = useState("");
+  const [email,     setEmail]      = useState("");
+  const [unread,    setUnread]     = useState(0);
+  const [notifs,    setNotifs]     = useState<AppNotification[]>([]);
+  const [dropOpen,  setDropOpen]   = useState(false);
+  const [notifOpen, setNotifOpen]  = useState(false);
+  const dropRef  = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function sync() {
+      const raw  = localStorage.getItem("bshop_client_firstname") ?? "";
+      const name = localStorage.getItem("bshop_client_name") ?? "";
+      const first = (raw && !raw.includes("@") && !raw.includes(".")) ? raw : name.trim().split(/\s+/)[0] ?? "";
+      setFirstName(first);
+      setFullName(name);
+      setEmail(localStorage.getItem("bshop_client_email") ?? "");
+      setUnread(getUnreadCount());
+      setNotifs(getNotifications().slice(0, 5));
+    }
+    sync();
+    window.addEventListener("bshop_notifications_update", sync);
+    return () => window.removeEventListener("bshop_notifications_update", sync);
+  }, []);
+
+  useEffect(() => {
+    function outside(e: MouseEvent) {
+      if (dropRef.current  && !dropRef.current.contains(e.target as Node))  setDropOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    }
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, []);
+
+  const USER_MENU = [
+    { id: "overview"  as Section, label: "Overview"         },
+    { id: "domains"   as Section, label: "My Domains"       },
+    { id: "hosting"   as Section, label: "My Hosting"       },
+    { id: "invoices"  as Section, label: "Invoices"         },
+    { id: "support"   as Section, label: "Support"          },
+    { id: "settings"  as Section, label: "Account Settings" },
+  ];
+
+  return (
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-40 flex items-center gap-4 px-5 shadow-sm">
+      {/* Logo */}
+      <Link href="/" className="flex-shrink-0 mr-2">
+        <Image src="/logo.png" alt="The B.Shop" width={140} height={44} className="h-9 w-auto object-contain" priority />
+      </Link>
+
+      {/* Center nav */}
+      <nav className="hidden lg:flex items-center gap-5 flex-1">
+        {TOP_NAV.map(({ label, href }) => (
+          <Link key={label} href={href}
+            className="text-sm font-medium text-gray-600 hover:text-[#6B21A8] transition-colors whitespace-nowrap">
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {/* Right side */}
+      <div className="flex items-center gap-1 ml-auto">
+        {/* Bell */}
+        <div ref={notifRef} className="relative">
+          <button onClick={() => { setNotifOpen(o => !o); setDropOpen(false); }}
+            className="relative p-2 text-gray-500 hover:text-[#6B21A8] hover:bg-gray-100 rounded-lg transition-colors">
+            <Bell className="w-5 h-5" />
+            {unread > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                {unread}
+              </span>
+            )}
+          </button>
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div key="notif" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.15, ease: EASE }}
+                className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <span className="font-semibold text-gray-900 text-sm">Notifications</span>
+                  {unread > 0 && (
+                    <button onClick={() => { markAllRead(); setUnread(0); setNotifs(notifs.map(n => ({ ...n, read: true }))); }}
+                      className="text-xs text-[#6B21A8] hover:underline">Mark all read</button>
+                  )}
+                </div>
+                {notifs.length === 0
+                  ? <div className="py-8 text-center text-gray-400 text-sm">No notifications</div>
+                  : notifs.map(n => (
+                    <div key={n.id} onClick={() => { markRead(n.id); setNotifs(getNotifications().slice(0, 5)); }}
+                      className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 ${!n.read ? "bg-purple-50/50" : ""}`}>
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${!n.read ? "bg-purple-500" : "bg-gray-300"}`} />
+                      <div>
+                        <p className={`text-sm ${!n.read ? "font-semibold text-gray-900" : "text-gray-600"}`}>{n.message}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{new Date(n.date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))
+                }
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* User dropdown */}
+        <div ref={dropRef} className="relative">
+          <button onClick={() => { setDropOpen(o => !o); setNotifOpen(false); }}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-full hover:bg-gray-100 transition-colors">
+            <span className="w-7 h-7 rounded-full bg-[#6B21A8] flex items-center justify-center flex-shrink-0">
+              <User className="w-3.5 h-3.5 text-white" />
+            </span>
+            <span className="text-sm font-semibold text-gray-800 hidden md:block">{firstName}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+          </button>
+          <AnimatePresence>
+            {dropOpen && (
+              <motion.div key="drop" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.15, ease: EASE }}
+                className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="font-bold text-gray-900 text-sm truncate">{fullName || firstName}</p>
+                  {email && <p className="text-xs text-gray-400 truncate mt-0.5">{email}</p>}
+                </div>
+                {USER_MENU.map(item => (
+                  <button key={item.id} onClick={() => { onSection(item.id); setDropOpen(false); }}
+                    className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#6B21A8] transition-colors">
+                    {item.label}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100">
+                  <button onClick={() => { setDropOpen(false); onLogout(); }}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                    <ArrowLeft className="w-4 h-4" />Logout
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Back to site */}
+        <Link href="/"
+          className="hidden md:flex items-center gap-1.5 ml-1 px-3 py-2 border border-[#6B21A8] text-[#6B21A8] text-sm font-semibold rounded-lg hover:bg-purple-50 transition-colors whitespace-nowrap">
+          <ArrowLeft className="w-3.5 h-3.5" />Back to Site
+        </Link>
+      </div>
+    </header>
+  );
+}
+
 /* ─── SIDEBAR ────────────────────────────────────────────────────────────── */
 const NAV: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "overview",       label: "Overview",          icon: <I.Home /> },
@@ -941,11 +1101,8 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
 }) {
   return (
     <aside className="flex flex-col bg-[#1e0a2e] w-full h-full overflow-hidden">
-      {/* Spacer — pushes content below announcement bar (h-8) + header (h-16) */}
-      <div className="h-24 flex-shrink-0" />
-
       {/* Logo + collapse toggle */}
-      <div className="flex items-center justify-between px-4 pb-4 border-b border-white/10">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         {!collapsed && (
           <Image src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" alt="B.Shop" width={120} height={36} className="h-8 w-auto" />
         )}
@@ -1064,7 +1221,7 @@ function DashboardInner() {
 
   if (authLoading || !client) {
     return (
-      <div className="min-h-screen pt-[96px] flex items-center justify-center">
+      <div className="min-h-screen pt-16 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
           <p className="text-gray-500 text-sm">Loading your dashboard…</p>
@@ -1078,17 +1235,20 @@ function DashboardInner() {
       {/* Mobile overlay */}
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
 
-      {/* Sidebar — fixed, full height from top-0, internal spacer pushes content below header */}
-      <div className={`fixed left-0 top-0 z-30 h-screen transition-transform duration-300 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
-        style={{ width: collapsed ? "64px" : "256px" }}>
+      {/* Dashboard-specific top bar (replaces main site header) */}
+      <DashboardTopBar onLogout={handleLogout} onSection={setSection} />
+
+      {/* Sidebar — starts below top bar (top-16 = 64px) */}
+      <div className={`fixed left-0 z-30 transition-transform duration-300 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ top: "64px", height: "calc(100vh - 64px)", width: collapsed ? "64px" : "256px" }}>
         <Sidebar client={client} active={section} onSelect={s => { setSection(s); setMobileOpen(false); }}
           onLogout={handleLogout} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
       </div>
 
-      {/* Main content — offset by sidebar width and header height */}
-      <main className={`bg-gray-50 min-h-screen pt-24 transition-all duration-300 ${collapsed ? "md:ml-16" : "md:ml-64"}`}>
-        {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-24 z-20">
+      {/* Main content */}
+      <main className={`bg-gray-50 min-h-screen pt-16 transition-all duration-300 ${collapsed ? "md:ml-16" : "md:ml-64"}`}>
+        {/* Mobile hamburger */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-16 z-20">
           <button onClick={() => setMobileOpen(true)} className="p-2 text-gray-500 hover:text-[#6B21A8]"><I.Menu /></button>
           <span className="font-semibold text-gray-900">{NAV.find(n => n.id === section)?.label}</span>
         </div>
@@ -1116,7 +1276,7 @@ function DashboardInner() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen pt-[96px] flex items-center justify-center">
+      <div className="min-h-screen pt-16 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
