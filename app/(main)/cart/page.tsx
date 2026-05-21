@@ -316,7 +316,7 @@ export default function CartPage() {
                       <p className="text-sm font-semibold text-gray-800">+ Starter Builder</p>
                       <p className="text-xs text-gray-500">Custom domain, remove ads, $100 Google Ads credit</p>
                     </div>
-                    <a href="https://bshopafrica.com/billing/cart.php?a=add&pid=35" target="_blank" rel="noopener noreferrer"
+                    <a href="https://bshopafrica.com/billing/cart.php?a=add&pid=31" target="_blank" rel="noopener noreferrer"
                       className="flex-shrink-0 ml-4 text-xs px-3 py-1.5 bg-[#6B21A8] text-white font-bold rounded-lg hover:bg-[#581c87] transition-colors whitespace-nowrap">
                       + Add $8.99/mo
                     </a>

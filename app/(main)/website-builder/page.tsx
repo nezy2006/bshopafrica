@@ -13,7 +13,7 @@ const EASE: Ease = [0.22, 1, 0.36, 1];
 
 // WHMCS cart base — update PIDs once Weebly products are created in WHMCS
 const WHMCS = "https://bshopafrica.com/billing/cart.php?a=add&pid=";
-const WEEBLY_PIDS = { starter: "35", pro: "36", business: "37" };
+const WEEBLY_PIDS = { free: "30", starter: "31", pro: "32", business: "33" };
 
 /* ─── Features ───────────────────────────────────────────────────────────── */
 const FEATURES = [
