@@ -56,7 +56,7 @@ const FOOTER_LINKS = {
   ],
   "Domains": [
     { label: "Domain Search",    href: "/domains" },
-    { label: "Domain Transfer",  href: "/domains" },
+    { label: "Domain Transfer",  href: "/transfer" },
     { label: "Domain Pricing",   href: "/domains" },
     { label: "WHOIS Lookup",     href: "#" },
   ],

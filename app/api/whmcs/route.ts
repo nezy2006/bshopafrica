@@ -6,7 +6,7 @@ import {
   closeTicket, updateClientDetails, getInvoicePDFUrl, getPaymentUrl,
   getAdminStats, getAdminClients, getAdminOrders, getAdminInvoices,
   getAdminDomains, getAdminHosting, getAdminTickets, acceptOrder,
-  cancelOrder, addAnnouncement, generateAutoAuthUrl,
+  cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       case "adminCancelOrder":      await cancelOrder(n("orderId")); data = { ok: true }; break;
       case "adminAddAnnouncement":  await addAnnouncement(s("subject"), s("message")); data = { ok: true }; break;
       case "getAutoAuthUrl":        data = generateAutoAuthUrl(s("email"), s("destination", "clientarea.php")); break;
+      case "initiateTransfer":      data = await initiateTransfer(n("clientId"), s("domain"), s("authCode")); break;
 
       default:
         return NextResponse.json({ success: false, error: `Unknown action: "${action}"` }, { status: 400 });

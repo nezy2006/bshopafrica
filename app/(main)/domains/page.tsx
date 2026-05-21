@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 const TLDS = [
   { ext: ".com",    reg: 12, renewal: 14, transfer: 12 },
@@ -380,9 +381,26 @@ function PricingTable() {
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
+function TransferBanner() {
+  return (
+    <div className="bg-gradient-to-r from-[#6B21A8] to-[#4c1d95] py-4 px-4">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-white font-medium text-sm">
+          Already have a domain? Transfer it to The B.Shop and we&apos;ll handle everything automatically.
+        </p>
+        <Link href="/transfer"
+          className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-white text-[#6B21A8] font-bold text-sm rounded-lg hover:shadow-lg transition-shadow whitespace-nowrap">
+          Transfer a Domain →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function DomainsPage() {
   return (
     <>
+      <TransferBanner />
       <HeroSection />
       <WhySection />
       <TransferSection />

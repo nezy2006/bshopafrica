@@ -31,7 +31,17 @@ export interface CartEmail {
   price: number;
 }
 
-export type CartItem = CartDomain | CartHosting | CartSSL | CartEmail;
+export interface CartTransfer {
+  id: string;
+  type: "transfer";
+  domain: string;
+  tld: string;
+  authCode: string;
+  transferPrice: number;
+  nameservers: [string, string, string, string];
+}
+
+export type CartItem = CartDomain | CartHosting | CartSSL | CartEmail | CartTransfer;
 
 // Legacy shape kept for checkout compat
 export interface Cart { domain?: CartDomain; hosting?: CartHosting; }
@@ -97,17 +107,19 @@ export interface CartTotals {
 }
 
 export function calculateTotal(items?: CartItem[]): CartTotals {
-  const cart    = items ?? getCart();
-  const domain  = cart.find(i => i.type === "domain")  as CartDomain  | undefined;
-  const hosting = cart.find(i => i.type === "hosting") as CartHosting | undefined;
-  const ssl     = cart.find(i => i.type === "ssl")     as CartSSL     | undefined;
-  const email   = cart.find(i => i.type === "email")   as CartEmail   | undefined;
+  const cart     = items ?? getCart();
+  const domain   = cart.find(i => i.type === "domain")   as CartDomain   | undefined;
+  const hosting  = cart.find(i => i.type === "hosting")  as CartHosting  | undefined;
+  const ssl      = cart.find(i => i.type === "ssl")      as CartSSL      | undefined;
+  const email    = cart.find(i => i.type === "email")    as CartEmail    | undefined;
+  const transfer = cart.find(i => i.type === "transfer") as CartTransfer | undefined;
 
   let subtotal = 0;
-  if (domain)  subtotal += domain.price;
-  if (hosting) subtotal += hosting.cycle === "monthly" ? hosting.monthly * 12 : hosting.yearly;
-  if (ssl)     subtotal += ssl.price;
-  if (email)   subtotal += email.price;
+  if (domain)   subtotal += domain.price;
+  if (hosting)  subtotal += hosting.cycle === "monthly" ? hosting.monthly * 12 : hosting.yearly;
+  if (ssl)      subtotal += ssl.price;
+  if (email)    subtotal += email.price;
+  if (transfer) subtotal += transfer.transferPrice;
 
   const hasBundleDiscount = !!(domain && hosting);
   const discount = hasBundleDiscount ? domain!.price : 0;

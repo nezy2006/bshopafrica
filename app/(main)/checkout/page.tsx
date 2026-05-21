@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting } from "@/lib/cart";
+import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer } from "@/lib/cart";
 
 // Legacy shape for checkout summary compat
 interface Cart { domain?: CartDomain; hosting?: CartHosting; }
@@ -319,7 +319,25 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string) 
     if (!agreed) { setError("Please agree to the Terms of Service to continue."); return; }
     if (method === "pawapay" && !phone.trim()) { setError("Please enter your mobile money number."); return; }
     setLoading(true); setError(null);
-    await new Promise(r => setTimeout(r, 2200)); // simulate API call
+    await new Promise(r => setTimeout(r, 2200)); // simulate payment processing
+    // Initiate transfer via WHMCS if cart has a transfer item
+    try {
+      const items = getCart();
+      const transferItem = items.find(i => i.type === "transfer");
+      if (transferItem && "authCode" in transferItem) {
+        const clientId = localStorage.getItem("bshop_client_id");
+        if (clientId) {
+          await fetch("/api/whmcs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "initiateTransfer",
+              params: { clientId: Number(clientId), domain: transferItem.domain, authCode: transferItem.authCode },
+            }),
+          });
+        }
+      }
+    } catch { /* non-fatal — order created, support can follow up */ }
     const orderNum = `BSH-${Date.now().toString(36).toUpperCase().slice(-8)}`;
     clearCart();
     onDone(orderNum);

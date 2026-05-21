@@ -2,6 +2,13 @@
 
 import crypto from "crypto";
 
+export const BSHOP_NAMESERVERS = {
+  ns1: "ns1.mysecurecloudhost.com",
+  ns2: "ns2.mysecurecloudhost.com",
+  ns3: "ns3.mysecurecloudhost.com",
+  ns4: "ns4.mysecurecloudhost.com",
+} as const;
+
 type WhmcsRaw = Record<string, unknown>;
 
 /* ─── Client-facing types ────────────────────────────────────────────────── */
@@ -308,6 +315,21 @@ export function getInvoicePDFUrl(invoiceId: number): string {
 
 export function getPaymentUrl(invoiceId: number): string {
   return `${process.env.WHMCS_URL ?? ""}/viewinvoice.php?id=${invoiceId}`;
+}
+
+export async function initiateTransfer(clientId: number, domain: string, authCode: string): Promise<OrderResult> {
+  const data = await callWhmcs("AddOrder", {
+    clientid:     clientId,
+    paymentmethod: "paypal",
+    type:          "transfer",
+    domain,
+    eppcode:       authCode,
+    nameserver1:   BSHOP_NAMESERVERS.ns1,
+    nameserver2:   BSHOP_NAMESERVERS.ns2,
+    nameserver3:   BSHOP_NAMESERVERS.ns3,
+    nameserver4:   BSHOP_NAMESERVERS.ns4,
+  });
+  return { orderId: Number(data.orderid ?? 0), invoiceId: Number(data.invoiceid ?? 0) };
 }
 
 export async function addAnnouncement(subject: string, message: string): Promise<void> {

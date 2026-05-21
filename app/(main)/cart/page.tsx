@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   getCart, removeFromCart, updateCartItem, calculateTotal, addToCart,
-  type CartItem, type CartDomain, type CartHosting, type CartSSL, type CartEmail,
+  type CartItem, type CartDomain, type CartHosting, type CartSSL, type CartEmail, type CartTransfer,
 } from "@/lib/cart";
 import { PaymentIconsRow } from "@/components/PaymentIcons";
 
@@ -108,6 +108,40 @@ function AddonCard({ item, onRemove }: { item: CartSSL | CartEmail; onRemove: ()
   );
 }
 
+/* ─── Transfer card ─────────────────────────────────────────────────────── */
+function TransferCard({ item, onRemove }: { item: CartTransfer; onRemove: () => void }) {
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="bg-white rounded-2xl border border-purple-200 p-5 space-y-3">
+      <div className="flex items-center gap-4">
+        <div className="w-11 h-11 bg-purple-100 rounded-xl flex items-center justify-center text-[#6B21A8] flex-shrink-0">
+          <GlobeIcon />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900">Transfer: {item.domain}</p>
+          <p className="text-sm text-gray-500">Domain transfer + 1 year renewal</p>
+        </div>
+        <p className="font-bold text-gray-900 flex-shrink-0">${item.transferPrice.toFixed(2)}<span className="text-xs text-gray-400 font-normal">/yr</span></p>
+        <button onClick={onRemove} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
+          <TrashIcon />
+        </button>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <LockIcon />
+        <span className="text-gray-500">Auth Code:</span>
+        <span className="font-mono text-gray-400">{"•".repeat(Math.min(item.authCode.length, 10))}</span>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+          <CheckIcon />Provided
+        </span>
+      </div>
+      <div className="bg-purple-50 rounded-xl px-4 py-2.5 text-xs text-purple-700">
+        Nameservers will be automatically set to <span className="font-semibold">ns1–ns4.mysecurecloudhost.com</span> after transfer.
+      </div>
+    </motion.div>
+  );
+}
+
 /* ─── Upsell card ────────────────────────────────────────────────────────── */
 function UpsellCard({ item, onAdd }: { item: CartSSL | CartEmail; onAdd: () => void }) {
   return (
@@ -168,11 +202,12 @@ export default function CartPage() {
     return () => window.removeEventListener("bshop_cart_update", sync);
   }, []);
 
-  const domain  = items.find(i => i.type === "domain")  as CartDomain  | undefined;
-  const hosting = items.find(i => i.type === "hosting") as CartHosting | undefined;
-  const ssl     = items.find(i => i.type === "ssl")     as CartSSL     | undefined;
-  const email   = items.find(i => i.type === "email")   as CartEmail   | undefined;
-  const totals  = calculateTotal(items);
+  const domain   = items.find(i => i.type === "domain")   as CartDomain   | undefined;
+  const hosting  = items.find(i => i.type === "hosting")  as CartHosting  | undefined;
+  const ssl      = items.find(i => i.type === "ssl")      as CartSSL      | undefined;
+  const email    = items.find(i => i.type === "email")    as CartEmail    | undefined;
+  const transfer = items.find(i => i.type === "transfer") as CartTransfer | undefined;
+  const totals   = calculateTotal(items);
 
   function handleRemove(id: string) {
     removeFromCart(id);
@@ -200,10 +235,11 @@ export default function CartPage() {
             {/* Items column */}
             <div className="lg:col-span-2 space-y-4">
               <AnimatePresence mode="popLayout">
-                {domain  && <DomainCard  key={domain.id}  item={domain}  onRemove={() => handleRemove(domain.id)} />}
-                {hosting && <HostingCard key={hosting.id} item={hosting} onRemove={() => handleRemove(hosting.id)} onCycleChange={c => handleCycleChange(hosting.id, c)} />}
-                {ssl     && <AddonCard   key={ssl.id}     item={ssl}     onRemove={() => handleRemove(ssl.id)} />}
-                {email   && <AddonCard   key={email.id}   item={email}   onRemove={() => handleRemove(email.id)} />}
+                {domain   && <DomainCard   key={domain.id}   item={domain}   onRemove={() => handleRemove(domain.id)} />}
+                {hosting  && <HostingCard  key={hosting.id}  item={hosting}  onRemove={() => handleRemove(hosting.id)} onCycleChange={c => handleCycleChange(hosting.id, c)} />}
+                {ssl      && <AddonCard    key={ssl.id}      item={ssl}      onRemove={() => handleRemove(ssl.id)} />}
+                {email    && <AddonCard    key={email.id}    item={email}    onRemove={() => handleRemove(email.id)} />}
+                {transfer && <TransferCard key={transfer.id} item={transfer} onRemove={() => handleRemove(transfer.id)} />}
               </AnimatePresence>
 
               {/* Upsells */}
@@ -245,6 +281,12 @@ export default function CartPage() {
                     <div className="flex justify-between text-gray-600">
                       <span>Professional Email</span>
                       <span>${email.price.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {transfer && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Transfer: {transfer.domain}</span>
+                      <span>${transfer.transferPrice.toFixed(2)}</span>
                     </div>
                   )}
                 </div>
