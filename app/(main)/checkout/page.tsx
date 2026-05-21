@@ -796,6 +796,7 @@ export default function CheckoutPage() {
     if (items.length === 0) { router.replace("/cart"); return; }
     const c = itemsToCart(items);
     setCart(c);
+    if (localStorage.getItem("bshop_client_id")) setStep(3);
     setReady(true);
   }, [router]);
 
