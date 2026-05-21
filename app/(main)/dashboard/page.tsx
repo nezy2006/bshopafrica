@@ -977,14 +977,16 @@ function DashboardTopBar({ onLogout, onSection }: { onLogout: () => void; onSect
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-40 flex items-center gap-4 px-5 shadow-sm">
-      {/* Logo */}
-      <Link href="/" className="flex-shrink-0 mr-2">
-        <Image src="/logo.png" alt="The B.Shop" width={140} height={44} className="h-9 w-auto object-contain" priority />
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-40 shadow-sm">
+      <div className="relative flex items-center h-full px-5">
+
+      {/* Logo — left */}
+      <Link href="/" className="flex-shrink-0 z-10">
+        <Image src="/logo.png" alt="The B.Shop" width={160} height={50} className="h-12 w-auto object-contain" priority />
       </Link>
 
-      {/* Center nav */}
-      <nav className="hidden lg:flex items-center gap-5 flex-1">
+      {/* Nav — absolutely centered */}
+      <nav className="hidden lg:flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
         {TOP_NAV.map(({ label, href }) => (
           <Link key={label} href={href}
             className="text-sm font-medium text-gray-600 hover:text-[#6B21A8] transition-colors whitespace-nowrap">
@@ -994,7 +996,7 @@ function DashboardTopBar({ onLogout, onSection }: { onLogout: () => void; onSect
       </nav>
 
       {/* Right side */}
-      <div className="flex items-center gap-1 ml-auto">
+      <div className="flex items-center gap-1 ml-auto z-10">
         {/* Bell */}
         <div ref={notifRef} className="relative">
           <button onClick={() => { setNotifOpen(o => !o); setDropOpen(false); }}
@@ -1078,6 +1080,8 @@ function DashboardTopBar({ onLogout, onSection }: { onLogout: () => void; onSect
           <ArrowLeft className="w-3.5 h-3.5" />Back to Site
         </Link>
       </div>
+
+      </div>
     </header>
   );
 }
@@ -1101,12 +1105,9 @@ function Sidebar({ client, active, onSelect, onLogout, collapsed, onToggle }: {
 }) {
   return (
     <aside className="flex flex-col bg-[#1e0a2e] w-full h-full overflow-hidden">
-      {/* Logo + collapse toggle */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        {!collapsed && (
-          <Image src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" alt="B.Shop" width={120} height={36} className="h-8 w-auto" />
-        )}
-        <button onClick={onToggle} className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0">
+      {/* Collapse toggle */}
+      <div className="flex items-center justify-end px-3 py-2 border-b border-white/10">
+        <button onClick={onToggle} className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
           <I.Menu />
         </button>
       </div>
