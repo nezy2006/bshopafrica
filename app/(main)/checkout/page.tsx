@@ -206,6 +206,7 @@ function StepAccount({ onDone }: { onDone: () => void }) {
   const [phone,     setPhone]     = useState("");
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
+  const [success,   setSuccess]   = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,10 +257,29 @@ function StepAccount({ onDone }: { onDone: () => void }) {
       localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
       localStorage.setItem("bshop_client_email",     email);
       window.dispatchEvent(new Event("bshop_cart_update"));
-      onDone();
+      setSuccess(true);
+      setTimeout(() => onDone(), 1500);
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   };
+
+  if (success) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center py-10"
+      >
+        <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(34,197,94,0.35)]">
+          <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7">
+            <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <p className="font-bold text-lg text-green-600">Account created!</p>
+        <p className="text-gray-400 text-sm mt-1">Proceeding to payment…</p>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}>
@@ -765,10 +785,15 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
           {/* ── Terms ── */}
           {!inMmFlow && (
             <label className="flex items-start gap-3 cursor-pointer group">
-              <div onClick={() => setAgreed(v => !v)}
-                className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
-                  agreed ? "bg-[#6B21A8] border-[#6B21A8]" : "border-gray-300 group-hover:border-[#6B21A8]"
-                }`}>
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={agreed}
+                onChange={() => setAgreed(v => !v)}
+              />
+              <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
+                agreed ? "bg-[#6B21A8] border-[#6B21A8]" : "border-gray-300 group-hover:border-[#6B21A8]"
+              }`}>
                 {agreed && (
                   <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
                     <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

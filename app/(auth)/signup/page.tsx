@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -187,6 +188,8 @@ function LeftPanel() {
 
 /* ─── Signup Page ────────────────────────────────────────────────────────── */
 export default function SignupPage() {
+  const router = useRouter();
+
   const [firstName,       setFirstName]       = useState("");
   const [lastName,        setLastName]        = useState("");
   const [email,           setEmail]           = useState("");
@@ -219,8 +222,56 @@ export default function SignupPage() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setLoading(false);
+    setErrors({});
+
+    const controller = new AbortController();
+    const timeout    = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const res = await fetch("/api/whmcs", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          action: "registerClient",
+          params: {
+            firstname:   firstName,
+            lastname:    lastName,
+            email,
+            phonenumber: phone,
+            password2:   password,
+            address1:    "Not provided",
+            city:        "Not provided",
+            state:       "N/A",
+            postcode:    "00000",
+            country:     "RW",
+          },
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
+      if (!json.success || !json.data?.clientId) {
+        setErrors({ api: json.error ?? "Registration failed. Please try again." });
+        return;
+      }
+
+      localStorage.setItem("bshop_client_id",        String(json.data.clientId));
+      localStorage.setItem("bshop_client_firstname", firstName);
+      localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
+      localStorage.setItem("bshop_client_email",     email);
+      window.dispatchEvent(new Event("bshop_cart_update"));
+      router.push("/dashboard");
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err instanceof Error && err.name === "AbortError") {
+        setErrors({ api: "Request timed out. Please try again." });
+      } else {
+        setErrors({ api: "Something went wrong. Please try again." });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -363,7 +414,6 @@ export default function SignupPage() {
                     className="sr-only"
                   />
                   <div
-                    onClick={() => setAgreed((v) => !v)}
                     className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 cursor-pointer ${
                       agreed
                         ? "bg-[#6B21A8] border-[#6B21A8]"
@@ -392,6 +442,15 @@ export default function SignupPage() {
                 <p className="mt-1 text-xs text-red-500 font-medium">{errors.agreed}</p>
               )}
             </motion.div>
+
+            {/* API error */}
+            {errors.api && (
+              <motion.div variants={fadeUp}>
+                <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  {errors.api}
+                </p>
+              </motion.div>
+            )}
 
             {/* Submit */}
             <motion.div variants={fadeUp}>
