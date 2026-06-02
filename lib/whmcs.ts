@@ -391,13 +391,122 @@ export async function initiateTransfer(clientId: number, domain: string, authCod
   return { orderId: Number(data.orderid ?? 0), invoiceId: Number(data.invoiceid ?? 0) };
 }
 
-export async function addPaymentToInvoice(invoiceId: number, amount: number, transactionId: string): Promise<void> {
+export async function addPaymentToInvoice(
+  invoiceId:     number,
+  amount:        number,
+  transactionId: string,
+  gateway?:      string,
+): Promise<void> {
   await callWhmcs("AddInvoicePayment", {
     invoiceid: invoiceId,
     transid:   transactionId,
+    gateway:   gateway ?? "banktransfer",
     amount:    amount.toFixed(2),
     date:      new Date().toISOString().split("T")[0],
   });
+}
+
+/* ─── PawaPay automated order creation ───────────────────────────────────── */
+// PawaPay gateway setup in WHMCS:
+//   Admin → Setup → Payment Gateways → Manage Existing Gateways
+//   Add "Bank Transfer" or a custom "pawapay" module.
+//   Set WHMCS_PAWAPAY_GATEWAY env var to match the gateway module name (default: "banktransfer").
+
+interface CartItemLike { type: string; [key: string]: unknown; }
+
+export interface PawapayOrderResult {
+  orderId:     number;
+  invoiceId:   number;
+  allOrderIds: number[]; // includes secondary orders (WB, transfer)
+}
+
+export async function createPawapayOrder(
+  clientId:  number,
+  cartItems: CartItemLike[],
+): Promise<PawapayOrderResult> {
+  const gateway    = process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer";
+  const baseParams = { clientid: clientId, paymentmethod: gateway };
+
+  const domain   = cartItems.find(i => i.type === "domain");
+  const hosting  = cartItems.find(i => i.type === "hosting");
+  const transfer = cartItems.find(i => i.type === "transfer");
+  const wb       = cartItems.find(i => i.type === "website_builder");
+
+  // ── Build main order params ──────────────────────────────────────────────
+  const mainParams: Record<string, string | number | boolean> = { ...baseParams };
+
+  if (hosting) {
+    // Hosting product (+ optional domain registration bundled)
+    mainParams.pid          = (hosting.planId as number | undefined) ?? 1;
+    mainParams.billingcycle = (hosting.cycle as string) === "monthly" ? "monthly" : "annually";
+    if (domain) {
+      mainParams.domain      = domain.domain as string;
+      mainParams.domaintype  = "register";
+      mainParams.regperiod   = 1;
+      mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
+      mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
+      mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
+      mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
+    }
+  } else if (domain) {
+    // Domain-only registration
+    mainParams.domain      = domain.domain as string;
+    mainParams.domaintype  = "register";
+    mainParams.regperiod   = 1;
+    mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
+    mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
+    mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
+    mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
+  } else if (wb) {
+    // Website builder product only
+    mainParams.pid          = wb.productId as number;
+    mainParams.billingcycle = "monthly";
+  } else if (transfer) {
+    // Transfer only (no other items)
+    mainParams.domain      = transfer.domain as string;
+    mainParams.domaintype  = "transfer";
+    mainParams.eppcode     = transfer.authCode as string;
+    mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
+    mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
+    mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
+    mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
+  }
+
+  const mainData  = await callWhmcs("AddOrder", mainParams);
+  const orderId   = Number(mainData.orderid   ?? 0);
+  const invoiceId = Number(mainData.invoiceid ?? 0);
+  const allOrderIds: number[] = [orderId];
+
+  // ── Secondary: website builder (if main order was hosting/domain) ────────
+  if (wb && (hosting || domain)) {
+    try {
+      const d = await callWhmcs("AddOrder", {
+        ...baseParams,
+        pid:          wb.productId as number,
+        billingcycle: "monthly",
+      });
+      allOrderIds.push(Number(d.orderid ?? 0));
+    } catch (e) { console.error("[createPawapayOrder] WB order failed:", e); }
+  }
+
+  // ── Secondary: transfer (if main order was something else) ───────────────
+  if (transfer && (hosting || domain || wb)) {
+    try {
+      const d = await callWhmcs("AddOrder", {
+        ...baseParams,
+        domain:      transfer.domain as string,
+        domaintype:  "transfer",
+        eppcode:     transfer.authCode as string,
+        nameserver1: BSHOP_NAMESERVERS.ns1,
+        nameserver2: BSHOP_NAMESERVERS.ns2,
+        nameserver3: BSHOP_NAMESERVERS.ns3,
+        nameserver4: BSHOP_NAMESERVERS.ns4,
+      });
+      allOrderIds.push(Number(d.orderid ?? 0));
+    } catch (e) { console.error("[createPawapayOrder] transfer order failed:", e); }
+  }
+
+  return { orderId, invoiceId, allOrderIds };
 }
 
 export async function addAnnouncement(subject: string, message: string): Promise<void> {

@@ -527,17 +527,24 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   async function handleMobileMoneyPay() {
     setMmStep("sending"); setMmError("");
     try {
-      const operator = method === "mtn" ? "MTN_MOMO_RWF" : "AIRTEL_MONEY_RWF";
-      const res  = await fetch("/api/pawapay/initiate", {
+      const operator    = method === "mtn" ? "MTN_MOMO_RWF" : "AIRTEL_MONEY_RWF";
+      const cartItems   = getCart();
+      const clientId    = typeof window !== "undefined" ? localStorage.getItem("bshop_client_id")    : null;
+      const clientEmail = typeof window !== "undefined" ? localStorage.getItem("bshop_client_email") : null;
+
+      const res = await fetch("/api/pawapay/initiate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          amount:   rwfTotal,
-          currency: "RWF",
-          phone:    cleanPhone,
+          amount:      rwfTotal,
+          currency:    "RWF",
+          phone:       cleanPhone,
           operator,
-          orderId:  0,
-          clientId: typeof window !== "undefined" ? localStorage.getItem("bshop_client_id") : null,
+          clientId,
+          clientEmail,
+          cartItems,   // full cart — used by callback to create WHMCS order
+          totalUSD:    usdTotal,
+          totalRWF:    rwfTotal,
         }),
       });
       const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
