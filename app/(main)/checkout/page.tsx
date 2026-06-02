@@ -197,16 +197,25 @@ function CartSummary({ cart, couponDiscount = 0 }: { cart: Cart; couponDiscount?
 
 /* ─── Step 2: Account ────────────────────────────────────────────────────── */
 function StepAccount({ onDone }: { onDone: () => void }) {
-  const [tab,       setTab]       = useState<"login" | "register">("login");
-  const [email,     setEmail]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [showPw,    setShowPw]    = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName,  setLastName]  = useState("");
-  const [phone,     setPhone]     = useState("");
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
-  const [success,   setSuccess]   = useState(false);
+  const [tab,         setTab]         = useState<"login" | "register">("login");
+  const [email,       setEmail]       = useState("");
+  const [password,    setPassword]    = useState("");
+  const [showPw,      setShowPw]      = useState(false);
+  const [firstName,   setFirstName]   = useState("");
+  const [lastName,    setLastName]    = useState("");
+  const [phone,       setPhone]       = useState("");
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+  const [emailExists, setEmailExists] = useState(false);
+  const [success,     setSuccess]     = useState(false);
+
+  // If already logged in, skip this step immediately
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("bshop_client_id")) {
+      onDone();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,7 +227,10 @@ function StepAccount({ onDone }: { onDone: () => void }) {
         body:    JSON.stringify({ action: "loginClient", params: { email, password } }),
       });
       const json = (await res.json()) as { success: boolean; data?: { clientId: number; firstname: string; lastname: string; email: string }; error?: string };
-      if (!json.success || !json.data?.clientId) { setError("Invalid email or password."); return; }
+      if (!json.success || !json.data?.clientId) {
+        setError(json.error ?? "Invalid email or password.");
+        return;
+      }
       const { clientId, firstname, lastname, email: clientEmail } = json.data;
       localStorage.setItem("bshop_client_id",        String(clientId));
       localStorage.setItem("bshop_client_firstname", firstname ?? "");
@@ -235,8 +247,20 @@ function StepAccount({ onDone }: { onDone: () => void }) {
     if (!firstName || !lastName || !email || !password || !phone) {
       setError("All fields are required."); return;
     }
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setEmailExists(false);
     try {
+      // Check if email is already registered
+      const checkRes  = await fetch("/api/whmcs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checkEmailExists", params: { email } }),
+      });
+      const checkJson = (await checkRes.json()) as { success: boolean; data?: { exists: boolean } };
+      if (checkJson.data?.exists) {
+        setEmailExists(true);
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/whmcs", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -251,7 +275,10 @@ function StepAccount({ onDone }: { onDone: () => void }) {
         }),
       });
       const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
-      if (!json.success || !json.data?.clientId) { setError(json.error ?? "Registration failed."); return; }
+      if (!json.success || !json.data?.clientId) {
+        setError(json.error ?? "Registration failed. Please try again.");
+        return;
+      }
       localStorage.setItem("bshop_client_id",        String(json.data.clientId));
       localStorage.setItem("bshop_client_firstname", firstName);
       localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
@@ -366,6 +393,17 @@ function StepAccount({ onDone }: { onDone: () => void }) {
                 </button>
               </div>
             </div>
+            {emailExists && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1">
+                <p className="text-sm text-amber-800 font-semibold">This email is already registered.</p>
+                <p className="text-xs text-amber-700">
+                  <button type="button" onClick={() => setTab("login")} className="font-bold underline">
+                    Log in instead
+                  </button>
+                  {" "}or use a different email.
+                </p>
+              </div>
+            )}
             {error && <p className="text-sm text-red-500 font-medium bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>}
             <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#6B21A8] text-white font-bold rounded-xl hover:bg-[#581c87] transition-colors disabled:opacity-70">
               {loading ? <><Spinner sm /><span>Creating account…</span></> : "Create Account & Continue"}
@@ -555,9 +593,24 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
     onDone(orderNum, hasWB);
   };
 
+  const clientName  = typeof window !== "undefined" ? (localStorage.getItem("bshop_client_name") || localStorage.getItem("bshop_client_firstname")) : null;
+  const clientEmail = typeof window !== "undefined" ? localStorage.getItem("bshop_client_email") : null;
+
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}>
       <h2 className="text-2xl font-black text-black mb-6">Payment</h2>
+
+      {clientName && (
+        <div className="flex items-center gap-2.5 mb-5 px-4 py-2.5 bg-green-50 border border-green-200 rounded-xl text-sm">
+          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-green-600 flex-shrink-0">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-green-800 font-medium">
+            Signed in as <span className="font-bold">{clientName}</span>
+            {clientEmail && <span className="text-green-600 font-normal"> ({clientEmail})</span>}
+          </span>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-[1fr_280px] gap-8">
         <div className="space-y-6">

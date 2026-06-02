@@ -159,7 +159,7 @@ export default function LoginPage() {
         error?:  string;
       };
       if (!json.success || !json.data?.clientId) {
-        setError("Invalid email or password. Please try again.");
+        setError(json.error ?? "Invalid email or password. Please try again.");
         return;
       }
       const { clientId, firstname, lastname, email: clientEmail } = json.data;
@@ -223,12 +223,14 @@ export default function LoginPage() {
             <motion.div variants={fadeUp}>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-semibold text-gray-700">Password</label>
-                <Link
-                  href="/forgot-password"
+                <a
+                  href="https://bshopafrica.com/billing/pwreset.php"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-xs font-semibold text-[#6B21A8] hover:underline"
                 >
                   Forgot Password?
-                </Link>
+                </a>
               </div>
               <div className="relative">
                 <input

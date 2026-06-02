@@ -228,6 +228,22 @@ export default function SignupPage() {
     const timeout    = setTimeout(() => controller.abort(), 15000);
 
     try {
+      // Check if email already exists before attempting registration
+      const checkRes  = await fetch("/api/whmcs", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ action: "checkEmailExists", params: { email } }),
+        signal:  controller.signal,
+      });
+      const checkJson = (await checkRes.json()) as { success: boolean; data?: { exists: boolean } };
+      if (checkJson.data?.exists) {
+        setErrors({ emailExists: email });
+        setLoading(false);
+        clearTimeout(timeout);
+        return;
+      }
+
+      // Proceed with registration
       const res = await fetch("/api/whmcs", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -252,7 +268,11 @@ export default function SignupPage() {
 
       const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
       if (!json.success || !json.data?.clientId) {
-        setErrors({ api: json.error ?? "Registration failed. Please try again." });
+        const raw = json.error ?? "";
+        const msg = raw.includes("403") || raw.includes("whitelist")
+          ? "Registration failed. Please contact support if this persists."
+          : raw || "Registration failed. Please try again.";
+        setErrors({ api: msg });
         return;
       }
 
@@ -442,6 +462,22 @@ export default function SignupPage() {
                 <p className="mt-1 text-xs text-red-500 font-medium">{errors.agreed}</p>
               )}
             </motion.div>
+
+            {/* Email already exists */}
+            {errors.emailExists && (
+              <motion.div variants={fadeUp} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1">
+                <p className="text-sm text-amber-800 font-semibold">
+                  An account with this email already exists.
+                </p>
+                <p className="text-xs text-amber-700">
+                  Please{" "}
+                  <Link href="/login" className="font-bold underline">
+                    log in
+                  </Link>
+                  {" "}or use a different email address.
+                </p>
+              </motion.div>
+            )}
 
             {/* API error */}
             {errors.api && (

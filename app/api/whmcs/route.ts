@@ -7,9 +7,7 @@ import {
   getAdminStats, getAdminClients, getAdminOrders, getAdminInvoices,
   getAdminDomains, getAdminHosting, getAdminTickets, acceptOrder,
   cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
-  getTLDPricing,
-  validateCoupon,
-  addPaymentToInvoice,
+  getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -34,11 +32,26 @@ export async function POST(req: NextRequest) {
       case "getProducts":    data = await getProducts(); break;
 
       case "loginClient": {
-        try { data = await loginClient(s("email"), s("password")); }
-        catch { return NextResponse.json({ success: false, error: "Invalid email or password." }); }
+        try {
+          data = await loginClient(s("email"), s("password"));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Invalid email or password.";
+          console.error("[loginClient]", msg);
+          return NextResponse.json({ success: false, error: msg });
+        }
         break;
       }
-      case "registerClient": data = await registerClient(params as Record<string, string>); break;
+      case "checkEmailExists": data = { exists: await checkEmailExists(s("email")) }; break;
+      case "registerClient": {
+        try {
+          data = await registerClient(params as Record<string, string>);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Registration failed.";
+          console.error("[registerClient]", msg);
+          return NextResponse.json({ success: false, error: msg }, { status: 500 });
+        }
+        break;
+      }
       case "addOrder":       data = await addOrder(n("clientId"), (params.items as Record<string, string | number>) ?? {}); break;
 
       case "getClientDetails":  data = await getClientDetails(n("clientId")); break;

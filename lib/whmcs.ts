@@ -1,4 +1,7 @@
 // Server-only — never import this from client components.
+// IMPORTANT: Your server's public IP must be whitelisted in WHMCS:
+//   Admin → Setup → General Settings → Security → API IP Access Restriction
+// A missing whitelist entry causes all API calls to return HTTP 403.
 
 import crypto from "crypto";
 
@@ -162,7 +165,7 @@ export async function getProducts(): Promise<WhmcsProduct[]> {
 export async function loginClient(email: string, password: string): Promise<LoginResult> {
   const data = await callWhmcs("ValidateLogin", { email, password2: password });
   const clientId = Number(data.userid ?? 0);
-  if (!clientId) throw new Error("Authentication failed");
+  if (!clientId) throw new Error("Invalid email or password.");
   return {
     clientId,
     passwordHash: String(data.passwordhash ?? ""),
@@ -170,6 +173,13 @@ export async function loginClient(email: string, password: string): Promise<Logi
     lastname:     String(data.lastname    ?? ""),
     email:        String(data.email       ?? email),
   };
+}
+
+export async function checkEmailExists(email: string): Promise<boolean> {
+  try {
+    const data = await callWhmcs("GetClients", { search: email.trim().toLowerCase(), limitnum: 1 });
+    return Number(data.totalresults ?? 0) > 0;
+  } catch { return false; }
 }
 
 export async function registerClient(clientData: Record<string, string>): Promise<RegisterResult> {
