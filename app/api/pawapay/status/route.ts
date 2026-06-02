@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (!depositId)
     return NextResponse.json({ success: false, error: "Missing depositId" }, { status: 400 });
 
-  const res = await fetch(`${BASE_URL}/deposits/${depositId}`, {
+  const res = await fetch(`${BASE_URL}/v2/deposits/${depositId}`, {
     headers: { Authorization: `Bearer ${process.env.PAWAPAY_API_KEY}` },
     cache: "no-store",
   });
@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: "Failed to fetch status" }, { status: 502 });
 
   const data = (await res.json()) as unknown;
-  const deposit = Array.isArray(data) ? (data as Record<string, unknown>[])[0] : (data as Record<string, unknown>);
+  const deposit = Array.isArray(data)
+    ? (data as Record<string, unknown>[])[0]
+    : (data as Record<string, unknown>);
 
   return NextResponse.json({
     success: true,

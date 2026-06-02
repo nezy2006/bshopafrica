@@ -7,6 +7,14 @@ const BASE_URL =
     ? "https://api.pawapay.io"
     : "https://api.sandbox.pawapay.cloud";
 
+/** Convert local Rwanda number to international format (250XXXXXXXXX). */
+function toInternational(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("250")) return digits;      // already international
+  if (digits.startsWith("0"))   return "250" + digits.slice(1); // 07X → 2507X
+  return "250" + digits;
+}
+
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
     amount:       number;
@@ -28,11 +36,12 @@ export async function POST(req: NextRequest) {
     totalUSD    = 0,
     totalRWF    = amount,
   } = body;
-  const currency  = body.currency ?? "RWF";
-  const depositId = randomUUID();
+  const currency      = body.currency ?? "RWF";
+  const depositId     = randomUUID();
+  const orderId       = randomUUID();
+  const phoneIntl     = toInternational(phone);
 
-  // Send deposit request to PawaPay
-  const res = await fetch(`${BASE_URL}/deposits`, {
+  const res = await fetch(`${BASE_URL}/v2/deposits`, {
     method:  "POST",
     headers: {
       Authorization:  `Bearer ${process.env.PAWAPAY_API_KEY}`,
@@ -40,12 +49,21 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       depositId,
-      amount:               String(amount),
+      payer: {
+        type: "MMO",
+        accountDetails: {
+          phoneNumber: phoneIntl,
+          provider:    operator,
+        },
+      },
+      amount:            String(amount),
       currency,
-      correspondent:        operator,
-      payer:                { type: "MSISDN", address: { value: phone } },
-      customerTimestamp:    new Date().toISOString(),
-      statementDescription: "BShop Africa Payment",
+      clientReferenceId: orderId,
+      customerMessage:   "BShop Africa Payment",
+      metadata: [
+        { orderId  },
+        { clientId: String(clientId ?? "") },
+      ],
     }),
   });
 
@@ -57,7 +75,6 @@ export async function POST(req: NextRequest) {
 
   const data = (await res.json()) as { status?: string };
 
-  // Persist full order context for the callback handler
   cleanupDeposits();
   depositStore.set(depositId, {
     clientId:    String(clientId ?? ""),
@@ -68,7 +85,7 @@ export async function POST(req: NextRequest) {
     createdAt:   Date.now(),
   });
 
-  console.log("[pawapay/initiate] deposit created", { depositId, clientId, totalUSD, totalRWF, items: cartItems.length });
+  console.log("[pawapay/initiate] deposit created", { depositId, phoneIntl, operator, totalUSD, totalRWF });
 
   return NextResponse.json({ success: true, depositId, status: data.status ?? "ACCEPTED" });
 }
