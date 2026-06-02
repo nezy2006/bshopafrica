@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
+import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 
 // Legacy shape for checkout summary compat
 interface Cart {
@@ -23,7 +24,7 @@ function itemsToCart(items: CartItem[]): Cart {
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 type Step = 2 | 3 | 4;
-type PayMethod = "card" | "paypal";
+type PayMethod = "card" | "paypal" | "mtn" | "airtel";
 type CardBrand = "visa" | "mastercard" | "amex" | "discover" | null;
 
 interface CouponState {
@@ -184,7 +185,11 @@ function CartSummary({ cart, couponDiscount = 0 }: { cart: Cart; couponDiscount?
         )}
       </div>
       <div className="border-t border-gray-200 pt-3 flex justify-between font-black text-black">
-        <span>Total</span><span>${total.toFixed(2)}{cart.hosting || cart.domain ? "/yr" : ""}</span>
+        <span>Total</span>
+        <div className="text-right">
+          <div>${total.toFixed(2)}{cart.hosting || cart.domain ? "/yr" : ""}</div>
+          <div className="text-[11px] font-medium text-gray-400 mt-0.5">≈ RWF {Math.round(total * 1400).toLocaleString()}</div>
+        </div>
       </div>
     </div>
   );
@@ -353,8 +358,10 @@ function StepAccount({ onDone }: { onDone: () => void }) {
 }
 
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
+type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
+
 function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, hasWB: boolean) => void }) {
-  const [method,  setMethod]  = useState<PayMethod>("card");
+  const [method,  setMethod]  = useState<PayMethod>("paypal");
   const [agreed,  setAgreed]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -364,8 +371,14 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   const [expiry,   setExpiry]   = useState("");
   const [cvv,      setCvv]      = useState("");
   const [cardName, setCardName] = useState("");
-
   const brand = detectBrand(cardNum);
+
+  // Mobile money
+  const [mmPhone,     setMmPhone]     = useState("");
+  const [mmStep,      setMmStep]      = useState<MmStep>("input");
+  const [mmDepositId, setMmDepositId] = useState("");
+  const [mmCountdown, setMmCountdown] = useState(120);
+  const [mmError,     setMmError]     = useState("");
 
   // Coupon
   const [coupon, setCoupon] = useState<CouponState>({
@@ -373,8 +386,62 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
     type: "percentage", value: 0, discount: 0, message: "", error: "",
   });
 
-  // Compute cart subtotal for coupon discount calculation
-  const subtotal = (cart.domain?.price ?? 0) + (cart.hosting?.yearly ?? 0) + (cart.websiteBuilder?.price ?? 0);
+  // Totals
+  const hasBundle  = !!(cart.domain && cart.hosting);
+  const bundleDisc = hasBundle ? (cart.domain?.price ?? 0) : 0;
+  const subtotal   = (cart.domain?.price ?? 0) + (cart.hosting?.yearly ?? 0) + (cart.websiteBuilder?.price ?? 0);
+  const usdTotal   = Math.max(0, subtotal - bundleDisc - (coupon.applied ? coupon.discount : 0));
+  const rwfTotal   = Math.round(usdTotal * 1400);
+
+  // Phone validation
+  const cleanPhone    = mmPhone.replace(/\D/g, "");
+  const isMtnPhone    = (cleanPhone.startsWith("078") || cleanPhone.startsWith("079")) && cleanPhone.length === 10;
+  const isAirtelPhone = (cleanPhone.startsWith("072") || cleanPhone.startsWith("073")) && cleanPhone.length === 10;
+  const isMmValid     = method === "mtn" ? isMtnPhone : isAirtelPhone;
+
+  const isMobileMethod = method === "mtn" || method === "airtel";
+  const inMmFlow       = isMobileMethod && mmStep !== "input";
+
+  // Polling
+  useEffect(() => {
+    if (mmStep !== "waiting" || !mmDepositId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const res  = await fetch(`/api/pawapay/status?depositId=${mmDepositId}`);
+        const json = (await res.json()) as { success: boolean; status: string };
+        if (!active) return;
+        if (json.status === "COMPLETED") {
+          setMmStep("success");
+          setTimeout(() => {
+            const items    = getCart();
+            const orderNum = `BSH-${Date.now().toString(36).toUpperCase().slice(-8)}`;
+            const hasWB    = items.some(i => i.type === "website_builder");
+            clearCart();
+            onDone(orderNum, hasWB);
+          }, 1500);
+        } else if (["FAILED", "REJECTED", "TIMED_OUT"].includes(json.status)) {
+          setMmStep("failed");
+          setMmError("Payment was declined. Please try again.");
+        }
+      } catch { /* retry on next tick */ }
+    };
+    const interval = setInterval(poll, 5000);
+    poll();
+    return () => { active = false; clearInterval(interval); };
+  }, [mmStep, mmDepositId, onDone]);
+
+  // Countdown
+  useEffect(() => {
+    if (mmStep !== "waiting") return;
+    if (mmCountdown <= 0) { setMmStep("failed"); setMmError("Payment timed out. Please try again."); return; }
+    const t = setTimeout(() => setMmCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [mmStep, mmCountdown]);
+
+  function resetMm() {
+    setMmStep("input"); setMmDepositId(""); setMmCountdown(120); setMmError("");
+  }
 
   async function applyCoupon() {
     if (!coupon.code.trim()) return;
@@ -396,6 +463,33 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
       setCoupon(c => ({ ...c, loading: false, applied: true, type: d.type, value: d.value, discount, message: d.message, error: "" }));
     } catch {
       setCoupon(c => ({ ...c, loading: false, error: "Could not validate coupon" }));
+    }
+  }
+
+  async function handleMobileMoneyPay() {
+    setMmStep("sending"); setMmError("");
+    try {
+      const operator = method === "mtn" ? "MTN_MOMO_RWF" : "AIRTEL_MONEY_RWF";
+      const res  = await fetch("/api/pawapay/initiate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          amount:   rwfTotal,
+          currency: "RWF",
+          phone:    cleanPhone,
+          operator,
+          orderId:  0,
+          clientId: typeof window !== "undefined" ? localStorage.getItem("bshop_client_id") : null,
+        }),
+      });
+      const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
+      if (!json.success || !json.depositId) throw new Error(json.error ?? "Failed to initiate payment");
+      setMmDepositId(json.depositId);
+      setMmStep("waiting");
+      setMmCountdown(120);
+    } catch (e) {
+      setMmStep("failed");
+      setMmError(e instanceof Error ? e.message : "Payment initiation failed");
     }
   }
 
@@ -423,18 +517,15 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
       }
     } catch { /* non-fatal */ }
 
-    let wbDeployed = false;
     try {
       const wbItem = items.find(i => i.type === "website_builder") as CartWebsiteBuilder | undefined;
       if (wbItem) {
         const domainItem = items.find(i => i.type === "domain");
         const domain = domainItem && "domain" in domainItem ? (domainItem as CartDomain).domain : "";
-        const deployRes = await fetch("/api/website-builder", {
+        await fetch("/api/website-builder", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "deploy", clientId: clientId ? Number(clientId) : 0, domain, siteData: wbItem.siteData }),
         });
-        const deployJson = (await deployRes.json()) as { success: boolean };
-        wbDeployed = deployJson.success;
       }
     } catch { /* non-fatal */ }
 
@@ -451,155 +542,274 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
       <div className="grid lg:grid-cols-[1fr_280px] gap-8">
         <div className="space-y-6">
 
-          {/* Method tabs */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
-            <div className="grid grid-cols-2 gap-3">
-              {(["card", "paypal"] as PayMethod[]).map(m => (
-                <button key={m} onClick={() => { setMethod(m); setError(null); }}
-                  className={`flex items-center justify-center gap-2 py-3.5 rounded-xl border-2 font-bold text-sm transition-all duration-200 ${
-                    method === m
-                      ? "border-[#6B21A8] bg-purple-50 text-[#6B21A8] shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
-                      : "border-gray-200 text-gray-600 hover:border-gray-300"
-                  }`}>
-                  {m === "card" ? "💳 Credit / Debit Card" : "🅿 PayPal"}
-                </button>
-              ))}
+          {/* ── Method cards ── */}
+          {!inMmFlow && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
+              <div className="grid grid-cols-2 gap-3">
+                <PaymentOptionCard
+                  id="paypal" selected={method === "paypal"}
+                  onSelect={() => { setMethod("paypal"); setError(null); resetMm(); }}
+                  logo={<PayPalWordmark />}
+                  title="PayPal"
+                  subtitle="Pay securely with your PayPal account or card"
+                />
+                <PaymentOptionCard
+                  id="card" selected={method === "card"}
+                  onSelect={() => { setMethod("card"); setError(null); resetMm(); }}
+                  logo={<CardLogo />}
+                  title="Pay with Card"
+                  subtitle="Visa, Mastercard via PayPal"
+                />
+                <PaymentOptionCard
+                  id="mtn" selected={method === "mtn"}
+                  onSelect={() => { setMethod("mtn"); setError(null); resetMm(); }}
+                  logo={<MtnLogo />}
+                  title="MTN Mobile Money"
+                  subtitle="Pay with MTN MoMo Rwanda"
+                />
+                <PaymentOptionCard
+                  id="airtel" selected={method === "airtel"}
+                  onSelect={() => { setMethod("airtel"); setError(null); resetMm(); }}
+                  logo={<AirtelLogo />}
+                  title="Airtel Money"
+                  subtitle="Pay with Airtel Money Rwanda"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Payment panel */}
+          {/* ── Payment panel ── */}
           <AnimatePresence mode="wait">
-            {method === "card" ? (
+
+            {method === "card" && (
               <motion.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
                 className="space-y-4">
-                {/* Card number */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Card Number</label>
                   <div className="relative">
-                    <input
-                      type="text" inputMode="numeric" autoComplete="cc-number"
-                      value={cardNum}
-                      onChange={e => setCardNum(fmtCard(e.target.value))}
-                      placeholder="0000 0000 0000 0000"
-                      maxLength={19}
-                      className={`${INPUT} pr-24`}
-                    />
+                    <input type="text" inputMode="numeric" autoComplete="cc-number"
+                      value={cardNum} onChange={e => setCardNum(fmtCard(e.target.value))}
+                      placeholder="0000 0000 0000 0000" maxLength={19} className={`${INPUT} pr-24`} />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                       <BrandBadge brand={brand} />
                     </div>
                   </div>
                 </div>
-                {/* Expiry + CVV */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiry Date</label>
-                    <input
-                      type="text" inputMode="numeric" autoComplete="cc-exp"
-                      value={expiry}
-                      onChange={e => setExpiry(fmtExpiry(e.target.value))}
-                      placeholder="MM/YY" maxLength={5}
-                      className={INPUT}
-                    />
+                    <input type="text" inputMode="numeric" autoComplete="cc-exp"
+                      value={expiry} onChange={e => setExpiry(fmtExpiry(e.target.value))}
+                      placeholder="MM/YY" maxLength={5} className={INPUT} />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      CVV {brand === "amex" ? "(4 digits)" : "(3 digits)"}
-                    </label>
-                    <input
-                      type="text" inputMode="numeric" autoComplete="cc-csc"
-                      value={cvv}
-                      onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, brand === "amex" ? 4 : 3))}
-                      placeholder={brand === "amex" ? "0000" : "000"}
-                      className={INPUT}
-                    />
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">CVV {brand === "amex" ? "(4 digits)" : "(3 digits)"}</label>
+                    <input type="text" inputMode="numeric" autoComplete="cc-csc"
+                      value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, brand === "amex" ? 4 : 3))}
+                      placeholder={brand === "amex" ? "0000" : "000"} className={INPUT} />
                   </div>
                 </div>
-                {/* Cardholder name */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cardholder Name</label>
-                  <input
-                    type="text" autoComplete="cc-name"
+                  <input type="text" autoComplete="cc-name"
                     value={cardName} onChange={e => setCardName(e.target.value)}
-                    placeholder="Name on card"
-                    className={INPUT}
-                  />
+                    placeholder="Name on card" className={INPUT} />
                 </div>
                 <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                  <LockIcon />
-                  Payments are processed securely via PayPal. We never store your card details.
+                  <LockIcon /> Payments processed securely via PayPal. We never store your card details.
                 </p>
               </motion.div>
-            ) : (
+            )}
+
+            {method === "paypal" && (
               <motion.div key="paypal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
                 className="bg-[#FFC439] rounded-2xl p-6 text-center">
-                <p className="font-black text-[#003087] text-base mb-1">Pay with PayPal</p>
-                <p className="text-[#003087]/70 text-sm">
+                <p className="font-black text-[#003087] text-2xl mb-1">
+                  <span className="text-[#003087]">Pay</span><span className="text-[#009CDE]">Pal</span>
+                </p>
+                <p className="text-[#003087]/80 text-sm mt-1">
                   You&apos;ll be redirected to PayPal to complete your payment securely.
                 </p>
               </motion.div>
             )}
+
+            {(method === "mtn" || method === "airtel") && (
+              <motion.div key={method} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+
+                {mmStep === "input" && (
+                  <div className={`rounded-2xl p-5 space-y-4 border-2 ${
+                    method === "mtn" ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-100"
+                  }`}>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Enter {method === "mtn" ? "MTN" : "Airtel"} number
+                      </label>
+                      <input
+                        type="tel" value={mmPhone}
+                        onChange={e => setMmPhone(e.target.value.replace(/[^\d\s]/g, ""))}
+                        placeholder={method === "mtn" ? "078XXXXXXX" : "073XXXXXXX"}
+                        className={INPUT}
+                      />
+                      <p className="mt-1 text-xs text-gray-400">
+                        {method === "mtn" ? "Must start with 078 or 079" : "Must start with 072 or 073"} — 10 digits
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between text-sm bg-white/70 rounded-xl px-4 py-2.5">
+                      <span className="text-gray-500">Amount</span>
+                      <span className="font-bold text-gray-800">
+                        ${usdTotal.toFixed(2)} <span className="text-gray-400 font-normal">≈</span> RWF {rwfTotal.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {mmStep === "sending" && (
+                  <div className="flex flex-col items-center py-12 gap-4">
+                    <Spinner />
+                    <p className="font-semibold text-gray-700">Sending payment request to your phone…</p>
+                  </div>
+                )}
+
+                {mmStep === "waiting" && (
+                  <div className="text-center py-8 space-y-4">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl ${
+                      method === "mtn" ? "bg-amber-100" : "bg-red-100"
+                    }`}>📱</div>
+                    <div>
+                      <p className="font-bold text-lg text-gray-800">Check your phone and approve the payment</p>
+                      <p className="text-gray-500 text-sm mt-1">
+                        RWF {rwfTotal.toLocaleString()} request sent to {mmPhone}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
+                      <Spinner sm />
+                      <span>Waiting for approval…</span>
+                      <span className="font-mono font-bold text-[#6B21A8]">
+                        {Math.floor(mmCountdown / 60)}:{String(mmCountdown % 60).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <button onClick={resetMm}
+                      className="text-sm text-gray-400 hover:text-gray-600 underline transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {mmStep === "success" && (
+                  <div className="text-center py-8 space-y-3">
+                    <motion.div
+                      initial={{ scale: 0 }} animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 220, damping: 18 }}
+                      className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_24px_rgba(34,197,94,0.4)]"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8">
+                        <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </motion.div>
+                    <p className="font-bold text-lg text-green-600">Payment confirmed!</p>
+                    <p className="text-gray-400 text-sm">Processing your order…</p>
+                  </div>
+                )}
+
+                {mmStep === "failed" && (
+                  <div className="text-center py-8 space-y-4">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                      <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8">
+                        <path d="M6 18L18 6M6 6l12 12" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-red-600">Payment failed or timed out</p>
+                      {mmError && <p className="text-gray-500 text-sm mt-1">{mmError}</p>}
+                    </div>
+                    <button onClick={resetMm}
+                      className="px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">
+                      Try again
+                    </button>
+                  </div>
+                )}
+
+              </motion.div>
+            )}
+
           </AnimatePresence>
 
-          {/* Coupon code */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">Coupon Code</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={coupon.code}
-                onChange={e => setCoupon(c => ({ ...c, code: e.target.value.toUpperCase(), applied: false, error: "", message: "" }))}
-                placeholder="Enter coupon code"
-                disabled={coupon.applied}
-                className={`${INPUT} flex-1 text-sm uppercase tracking-widest`}
-                onKeyDown={e => e.key === "Enter" && applyCoupon()}
-              />
-              <button
-                onClick={coupon.applied ? () => setCoupon(c => ({ ...c, applied: false, code: "", discount: 0, message: "", error: "" })) : applyCoupon}
-                disabled={coupon.loading || (!coupon.applied && !coupon.code.trim())}
-                className={`px-4 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 whitespace-nowrap ${
-                  coupon.applied
-                    ? "bg-red-100 text-red-600 hover:bg-red-200"
-                    : "bg-[#6B21A8] text-white hover:bg-[#581c87]"
-                }`}
-              >
-                {coupon.loading ? <Spinner sm /> : coupon.applied ? "Remove" : "Apply"}
-              </button>
+          {/* ── Coupon ── */}
+          {!inMmFlow && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">Coupon Code</p>
+              <div className="flex gap-2">
+                <input
+                  type="text" value={coupon.code}
+                  onChange={e => setCoupon(c => ({ ...c, code: e.target.value.toUpperCase(), applied: false, error: "", message: "" }))}
+                  placeholder="Enter coupon code" disabled={coupon.applied}
+                  className={`${INPUT} flex-1 text-sm uppercase tracking-widest`}
+                  onKeyDown={e => e.key === "Enter" && applyCoupon()}
+                />
+                <button
+                  onClick={coupon.applied ? () => setCoupon(c => ({ ...c, applied: false, code: "", discount: 0, message: "", error: "" })) : applyCoupon}
+                  disabled={coupon.loading || (!coupon.applied && !coupon.code.trim())}
+                  className={`px-4 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 whitespace-nowrap ${
+                    coupon.applied ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-[#6B21A8] text-white hover:bg-[#581c87]"
+                  }`}
+                >
+                  {coupon.loading ? <Spinner sm /> : coupon.applied ? "Remove" : "Apply"}
+                </button>
+              </div>
+              {coupon.message && <p className="mt-1.5 text-xs text-green-600 font-semibold flex items-center gap-1">✓ {coupon.message}</p>}
+              {coupon.error   && <p className="mt-1.5 text-xs text-red-500 font-medium">{coupon.error}</p>}
             </div>
-            {coupon.message && (
-              <p className="mt-1.5 text-xs text-green-600 font-semibold flex items-center gap-1">✓ {coupon.message}</p>
-            )}
-            {coupon.error && (
-              <p className="mt-1.5 text-xs text-red-500 font-medium">{coupon.error}</p>
-            )}
-          </div>
+          )}
 
-          {/* Terms */}
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <div onClick={() => setAgreed(v => !v)}
-              className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
-                agreed ? "bg-[#6B21A8] border-[#6B21A8]" : "border-gray-300 group-hover:border-[#6B21A8]"
-              }`}>
-              {agreed && (
-                <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
-                  <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </div>
-            <span className="text-sm text-gray-600 leading-snug">
-              I agree to the{" "}
-              <Link href="#" className="text-[#6B21A8] font-semibold hover:underline">Terms of Service</Link>
-              {" "}and{" "}
-              <Link href="#" className="text-[#6B21A8] font-semibold hover:underline">Privacy Policy</Link>
-            </span>
-          </label>
+          {/* ── Terms ── */}
+          {!inMmFlow && (
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <div onClick={() => setAgreed(v => !v)}
+                className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
+                  agreed ? "bg-[#6B21A8] border-[#6B21A8]" : "border-gray-300 group-hover:border-[#6B21A8]"
+                }`}>
+                {agreed && (
+                  <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
+                    <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-gray-600 leading-snug">
+                I agree to the{" "}
+                <Link href="#" className="text-[#6B21A8] font-semibold hover:underline">Terms of Service</Link>
+                {" "}and{" "}
+                <Link href="#" className="text-[#6B21A8] font-semibold hover:underline">Privacy Policy</Link>
+              </span>
+            </label>
+          )}
 
-          {error && <p className="text-sm text-red-500 font-medium bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>}
+          {error && !inMmFlow && (
+            <p className="text-sm text-red-500 font-medium bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>
+          )}
 
-          <button onClick={handleComplete} disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70">
-            {loading ? <><Spinner /><span>Processing…</span></> : <><LockIcon /><span>Complete Order</span></>}
-          </button>
+          {/* ── CTA buttons ── */}
+          {!inMmFlow && (method === "card" || method === "paypal") && (
+            <button onClick={handleComplete} disabled={loading}
+              className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70">
+              {loading ? <><Spinner /><span>Processing…</span></> : <><LockIcon /><span>Complete Order</span></>}
+            </button>
+          )}
+
+          {!inMmFlow && isMobileMethod && mmStep === "input" && (
+            <button
+              onClick={handleMobileMoneyPay}
+              disabled={!isMmValid || !agreed}
+              className={`w-full flex items-center justify-center gap-2 py-4 font-black rounded-xl text-base transition-all disabled:opacity-40 ${
+                method === "mtn"
+                  ? "bg-[#FFC107] text-black hover:bg-[#f0b400]"
+                  : "bg-red-600 text-white hover:bg-red-700"
+              }`}
+            >
+              Pay RWF {rwfTotal.toLocaleString()}
+            </button>
+          )}
+
         </div>
 
         <CartSummary cart={cart} couponDiscount={coupon.applied ? coupon.discount : 0} />

@@ -381,6 +381,15 @@ export async function initiateTransfer(clientId: number, domain: string, authCod
   return { orderId: Number(data.orderid ?? 0), invoiceId: Number(data.invoiceid ?? 0) };
 }
 
+export async function addPaymentToInvoice(invoiceId: number, amount: number, transactionId: string): Promise<void> {
+  await callWhmcs("AddInvoicePayment", {
+    invoiceid: invoiceId,
+    transid:   transactionId,
+    amount:    amount.toFixed(2),
+    date:      new Date().toISOString().split("T")[0],
+  });
+}
+
 export async function addAnnouncement(subject: string, message: string): Promise<void> {
   await callWhmcs("AddAnnouncement", { subject, message, published: 1 });
 }

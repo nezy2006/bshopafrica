@@ -56,6 +56,11 @@ export type CartItem = CartDomain | CartHosting | CartSSL | CartEmail | CartTran
 // Legacy shape kept for checkout compat
 export interface Cart { domain?: CartDomain; hosting?: CartHosting; }
 
+export const USD_TO_RWF = 1400;
+export function usdToRwf(usd: number): number {
+  return Math.round(usd * USD_TO_RWF);
+}
+
 const KEY = "bshop_cart";
 
 function dispatch(): void {

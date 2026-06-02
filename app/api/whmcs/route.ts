@@ -9,6 +9,7 @@ import {
   cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
   getTLDPricing,
   validateCoupon,
+  addPaymentToInvoice,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
       case "initiateTransfer":      data = await initiateTransfer(n("clientId"), s("domain"), s("authCode")); break;
       case "getTLDPricing":         data = await getTLDPricing(); break;
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
+      case "addPayment":            await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId")); data = { ok: true }; break;
 
       default:
         return NextResponse.json({ success: false, error: `Unknown action: "${action}"` }, { status: 400 });
