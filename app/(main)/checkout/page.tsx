@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
-import { PaymentOptionCard, PayPalWordmark, CardLogo, MobileMoneyLogo } from "@/components/PaymentOptions";
+import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 
 // Legacy shape for checkout summary compat
 interface Cart {
@@ -24,7 +24,7 @@ function itemsToCart(items: CartItem[]): Cart {
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 type Step = 2 | 3 | 4;
-type PayMethod = "card" | "paypal" | "mobile_money";
+type PayMethod = "card" | "paypal" | "mtn" | "airtel";
 type CardBrand = "visa" | "mastercard" | "amex" | "discover" | null;
 
 interface CouponState {
@@ -454,10 +454,15 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   const usdTotal   = Math.max(0, subtotal - bundleDisc - (coupon.applied ? coupon.discount : 0));
   const rwfTotal   = Math.round(usdTotal * 1400);
 
-  const cleanPhone     = mmPhone.replace(/\D/g, "");
-  const isMmValid      = predictedProvider !== null;
-  const isMobileMethod = method === "mobile_money";
-  const inMmFlow       = isMobileMethod && mmStep !== "input";
+  const cleanPhone  = mmPhone.replace(/\D/g, "");
+  // Check detected operator matches the selected card
+  const providerMatchesMtn    = !!predictedProvider?.provider.includes("MTN");
+  const providerMatchesAirtel = !!predictedProvider?.provider.includes("AIRTEL");
+  const providerMatches = method === "mtn" ? providerMatchesMtn : providerMatchesAirtel;
+  const mmMismatch  = predictedProvider !== null && !providerMatches;
+  const isMmValid   = predictedProvider !== null && providerMatches;
+  const isMobileMethod = method === "mtn" || method === "airtel";
+  const inMmFlow    = isMobileMethod && mmStep !== "input";
 
   // Polling
   useEffect(() => {
@@ -655,27 +660,34 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
           {!inMmFlow && (
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <PaymentOptionCard
                   id="paypal" selected={method === "paypal"}
                   onSelect={() => { setMethod("paypal"); setError(null); resetMm(); }}
                   logo={<PayPalWordmark />}
                   title="PayPal"
-                  subtitle="PayPal account or card"
+                  subtitle="Pay securely with your PayPal account or card"
                 />
                 <PaymentOptionCard
                   id="card" selected={method === "card"}
                   onSelect={() => { setMethod("card"); setError(null); resetMm(); }}
                   logo={<CardLogo />}
                   title="Pay with Card"
-                  subtitle="Visa, Mastercard"
+                  subtitle="Visa, Mastercard via PayPal"
                 />
                 <PaymentOptionCard
-                  id="mobile_money" selected={method === "mobile_money"}
-                  onSelect={() => { setMethod("mobile_money"); setError(null); resetMm(); }}
-                  logo={<MobileMoneyLogo />}
-                  title="Mobile Money"
-                  subtitle="MTN MoMo · Airtel Money"
+                  id="mtn" selected={method === "mtn"}
+                  onSelect={() => { setMethod("mtn"); setError(null); resetMm(); setMmPhone(""); setPredictedProvider(null); setPredictError(""); }}
+                  logo={<MtnLogo />}
+                  title="MTN Mobile Money"
+                  subtitle="Pay with MTN MoMo Rwanda"
+                />
+                <PaymentOptionCard
+                  id="airtel" selected={method === "airtel"}
+                  onSelect={() => { setMethod("airtel"); setError(null); resetMm(); setMmPhone(""); setPredictedProvider(null); setPredictError(""); }}
+                  logo={<AirtelLogo />}
+                  title="Airtel Money"
+                  subtitle="Pay with Airtel Money Rwanda"
                 />
               </div>
             </div>
@@ -736,14 +748,16 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
               </motion.div>
             )}
 
-            {method === "mobile_money" && (
-              <motion.div key="mobile_money" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+            {(method === "mtn" || method === "airtel") && (
+              <motion.div key={method} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
 
                 {mmStep === "input" && (
-                  <div className="rounded-2xl p-5 space-y-4 border-2 bg-purple-50 border-purple-100">
+                  <div className={`rounded-2xl p-5 space-y-4 border-2 ${
+                    method === "mtn" ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-100"
+                  }`}>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Mobile Money number
+                        Enter {method === "mtn" ? "MTN" : "Airtel"} number
                       </label>
                       <input
                         type="tel" value={mmPhone}
@@ -759,20 +773,24 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
                             Detecting operator…
                           </p>
                         )}
-                        {!predictLoading && predictedProvider && (
+                        {!predictLoading && isMmValid && (
                           <p className="text-xs text-green-700 font-semibold flex items-center gap-1.5">
                             <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
                               <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.35-8.65a.75.75 0 00-1.06-1.06L7 8.585 5.71 7.295a.75.75 0 10-1.06 1.06l1.75 1.75a.75.75 0 001.06 0l3.89-3.89z" clipRule="evenodd" />
                             </svg>
-                            {predictedProvider.provider.replace(/_/g, " ")}
-                            {predictedProvider.country ? ` · ${predictedProvider.country}` : ""}
+                            {predictedProvider!.provider.replace(/_/g, " ")} confirmed
+                          </p>
+                        )}
+                        {!predictLoading && mmMismatch && (
+                          <p className="text-xs text-amber-700 font-medium">
+                            This looks like {providerMatchesMtn ? "an MTN" : "an Airtel"} number — please select {providerMatchesMtn ? "MTN Mobile Money" : "Airtel Money"} above.
                           </p>
                         )}
                         {!predictLoading && !predictedProvider && predictError && (
                           <p className="text-xs text-red-500">{predictError}</p>
                         )}
                         {!predictLoading && !predictedProvider && !predictError && cleanPhone.length > 0 && cleanPhone.length < 9 && (
-                          <p className="text-xs text-gray-400">Enter full number to detect operator</p>
+                          <p className="text-xs text-gray-400">Enter your full number</p>
                         )}
                       </div>
                     </div>
@@ -794,15 +812,14 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
 
                 {mmStep === "waiting" && (
                   <div className="text-center py-8 space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto text-3xl">📱</div>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl ${
+                      method === "mtn" ? "bg-amber-100" : "bg-red-100"
+                    }`}>📱</div>
                     <div>
                       <p className="font-bold text-lg text-gray-800">Check your phone and approve the payment</p>
                       <p className="text-gray-500 text-sm mt-1">
                         RWF {rwfTotal.toLocaleString()} request sent to {mmPhone}
                       </p>
-                      {predictedProvider && (
-                        <p className="text-xs text-gray-400 mt-0.5">{predictedProvider.provider.replace(/_/g, " ")}</p>
-                      )}
                     </div>
                     <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
                       <Spinner sm />
@@ -927,7 +944,11 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
             <button
               onClick={handleMobileMoneyPay}
               disabled={!isMmValid || !agreed}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-40"
+              className={`w-full flex items-center justify-center gap-2 py-4 font-black rounded-xl text-base transition-all disabled:opacity-40 ${
+                method === "mtn"
+                  ? "bg-[#FFC107] text-black hover:bg-[#f0b400]"
+                  : "bg-red-600 text-white hover:bg-red-700"
+              }`}
             >
               {predictLoading ? <><Spinner sm /><span>Detecting operator…</span></> : `Pay RWF ${rwfTotal.toLocaleString()}`}
             </button>
