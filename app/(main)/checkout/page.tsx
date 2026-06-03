@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
+// CartTransfer and CartWebsiteBuilder used in type guards within StepPayment
 import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 
 // Legacy shape for checkout summary compat
@@ -23,10 +24,8 @@ function itemsToCart(items: CartItem[]): Cart {
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
-type Step = 2 | 3 | 4;
+type Step = 2 | 3;
 type PayMethod = "card" | "paypal" | "mtn" | "airtel";
-type CardBrand = "visa" | "mastercard" | "amex" | "discover" | null;
-
 interface CouponState {
   code:     string;
   applied:  boolean;
@@ -38,38 +37,6 @@ interface CouponState {
   error:    string;
 }
 
-/* ─── Card helpers ───────────────────────────────────────────────────────── */
-function detectBrand(num: string): CardBrand {
-  const n = num.replace(/\s/g, "");
-  if (/^4/.test(n)) return "visa";
-  if (/^(5[1-5]|2[2-7])/.test(n)) return "mastercard";
-  if (/^3[47]/.test(n)) return "amex";
-  if (/^(6011|622|64[4-9]|65)/.test(n)) return "discover";
-  return null;
-}
-function fmtCard(num: string): string {
-  const n = num.replace(/\D/g, "").slice(0, /^3[47]/.test(num.replace(/\D/g, "")) ? 15 : 16);
-  if (/^3[47]/.test(n)) return n.replace(/(\d{4})(\d{0,6})(\d{0,5})/, (_, a, b, c) => [a, b, c].filter(Boolean).join(" "));
-  return n.replace(/(\d{4})(?=\d)/g, "$1 ");
-}
-function fmtExpiry(val: string): string {
-  const n = val.replace(/\D/g, "").slice(0, 4);
-  return n.length > 2 ? n.slice(0, 2) + "/" + n.slice(2) : n;
-}
-
-function BrandBadge({ brand }: { brand: CardBrand }) {
-  if (!brand) return null;
-  const map: Record<NonNullable<CardBrand>, { label: string; bg: string; text: string }> = {
-    visa:       { label: "VISA",       bg: "bg-blue-700",   text: "text-white"  },
-    mastercard: { label: "Mastercard", bg: "bg-red-600",    text: "text-white"  },
-    amex:       { label: "AMEX",       bg: "bg-blue-500",   text: "text-white"  },
-    discover:   { label: "Discover",   bg: "bg-orange-400", text: "text-white"  },
-  };
-  const { label, bg, text } = map[brand];
-  return (
-    <span className={`${bg} ${text} text-[10px] font-black px-2 py-0.5 rounded tracking-widest`}>{label}</span>
-  );
-}
 
 const INPUT =
   "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black placeholder-gray-400 outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]";
@@ -105,10 +72,9 @@ function LockIcon() {
 
 /* ─── Step indicator ─────────────────────────────────────────────────────── */
 const STEPS = [
-  { num: 1, label: "Cart"     },
-  { num: 2, label: "Account"  },
-  { num: 3, label: "Payment"  },
-  { num: 4, label: "Complete" },
+  { num: 1, label: "Cart"    },
+  { num: 2, label: "Account" },
+  { num: 3, label: "Payment" },
 ];
 
 function StepIndicator({ current }: { current: Step }) {
@@ -444,18 +410,12 @@ const AIRTEL_PROVIDERS = new Set([
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
 type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
 
-function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, hasWB: boolean) => void }) {
+function StepPayment({ cart }: { cart: Cart }) {
+  const router = useRouter();
   const [method,  setMethod]  = useState<PayMethod>("paypal");
   const [agreed,  setAgreed]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
-
-  // Card fields
-  const [cardNum,  setCardNum]  = useState("");
-  const [expiry,   setExpiry]   = useState("");
-  const [cvv,      setCvv]      = useState("");
-  const [cardName, setCardName] = useState("");
-  const brand = detectBrand(cardNum);
 
   // Mobile money
   const [mmPhone,           setMmPhone]           = useState("");
@@ -517,11 +477,8 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
         if (json.status === "COMPLETED") {
           setMmStep("success");
           setTimeout(() => {
-            const items    = getCart();
-            const orderNum = `BSH-${Date.now().toString(36).toUpperCase().slice(-8)}`;
-            const hasWB    = items.some(i => i.type === "website_builder");
             clearCart();
-            onDone(orderNum, hasWB);
+            router.push("/checkout/complete?method=pawapay");
           }, 1500);
         } else if (["FAILED", "REJECTED", "TIMED_OUT"].includes(json.status)) {
           setMmStep("failed");
@@ -532,7 +489,7 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
     const interval = setInterval(poll, 5000);
     poll();
     return () => { active = false; clearInterval(interval); };
-  }, [mmStep, mmDepositId, onDone]);
+  }, [mmStep, mmDepositId, router]);
 
   // Countdown
   useEffect(() => {
@@ -633,46 +590,35 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
     }
   }
 
-  const handleComplete = async () => {
+  const handlePaypalCardPay = async () => {
     if (!agreed) { setError("Please agree to the Terms of Service to continue."); return; }
-    if (method === "card") {
-      if (!cardNum.replace(/\s/g, "")) { setError("Please enter your card number."); return; }
-      if (!expiry || expiry.length < 5)  { setError("Please enter a valid expiry date."); return; }
-      if (!cvv)                           { setError("Please enter your CVV."); return; }
-      if (!cardName.trim())               { setError("Please enter the cardholder name."); return; }
-    }
     setLoading(true); setError(null);
-    await new Promise(r => setTimeout(r, 2200));
-
-    const items    = getCart();
-    const clientId = localStorage.getItem("bshop_client_id");
-
     try {
-      const transferItem = items.find(i => i.type === "transfer");
-      if (transferItem && "authCode" in transferItem && clientId) {
-        await fetch("/api/whmcs", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "initiateTransfer", params: { clientId: Number(clientId), domain: transferItem.domain, authCode: transferItem.authCode } }),
-        });
-      }
-    } catch { /* non-fatal */ }
+      const cartItems = getCart();
+      const clientId  = localStorage.getItem("bshop_client_id");
+      if (!clientId) { setError("Please log in to continue."); setLoading(false); return; }
 
-    try {
-      const wbItem = items.find(i => i.type === "website_builder") as CartWebsiteBuilder | undefined;
-      if (wbItem) {
-        const domainItem = items.find(i => i.type === "domain");
-        const domain = domainItem && "domain" in domainItem ? (domainItem as CartDomain).domain : "";
-        await fetch("/api/website-builder", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "deploy", clientId: clientId ? Number(clientId) : 0, domain, siteData: wbItem.siteData }),
-        });
-      }
-    } catch { /* non-fatal */ }
+      const res  = await fetch("/api/checkout/create-order", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ clientId: Number(clientId), cartItems }),
+      });
+      const json = await res.json() as { success: boolean; invoiceId?: number; paymentUrl?: string; error?: string };
 
-    const orderNum = `BSH-${Date.now().toString(36).toUpperCase().slice(-8)}`;
-    const hasWB    = items.some(i => i.type === "website_builder");
-    clearCart();
-    onDone(orderNum, hasWB);
+      if (!json.success || !json.paymentUrl) {
+        setError(json.error ?? "Failed to create order. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Store invoiceId so /checkout/complete can read it if WHMCS doesn't pass it back in the URL
+      localStorage.setItem("bshop_pending_invoice", String(json.invoiceId));
+      clearCart();
+      window.location.href = json.paymentUrl;
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
   };
 
   const clientName  = typeof window !== "undefined" ? (localStorage.getItem("bshop_client_name") || localStorage.getItem("bshop_client_firstname")) : null;
@@ -739,40 +685,15 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
 
             {method === "card" && (
               <motion.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-                className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Card Number</label>
-                  <div className="relative">
-                    <input type="text" inputMode="numeric" autoComplete="cc-number"
-                      value={cardNum} onChange={e => setCardNum(fmtCard(e.target.value))}
-                      placeholder="0000 0000 0000 0000" maxLength={19} className={`${INPUT} pr-24`} />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                      <BrandBadge brand={brand} />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiry Date</label>
-                    <input type="text" inputMode="numeric" autoComplete="cc-exp"
-                      value={expiry} onChange={e => setExpiry(fmtExpiry(e.target.value))}
-                      placeholder="MM/YY" maxLength={5} className={INPUT} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">CVV {brand === "amex" ? "(4 digits)" : "(3 digits)"}</label>
-                    <input type="text" inputMode="numeric" autoComplete="cc-csc"
-                      value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, brand === "amex" ? 4 : 3))}
-                      placeholder={brand === "amex" ? "0000" : "000"} className={INPUT} />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cardholder Name</label>
-                  <input type="text" autoComplete="cc-name"
-                    value={cardName} onChange={e => setCardName(e.target.value)}
-                    placeholder="Name on card" className={INPUT} />
-                </div>
-                <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                  <LockIcon /> Payments processed securely via PayPal. We never store your card details.
+                className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center space-y-2">
+                <div className="text-3xl">💳</div>
+                <p className="font-bold text-blue-900">Pay with Card via PayPal</p>
+                <p className="text-blue-700 text-sm">
+                  You&apos;ll be securely redirected to WHMCS / PayPal Checkout to enter your card details.
+                  We never handle or store card numbers directly.
+                </p>
+                <p className="text-xs text-blue-500 flex items-center justify-center gap-1.5">
+                  <LockIcon /> 256-bit SSL encrypted
                 </p>
               </motion.div>
             )}
@@ -977,9 +898,11 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
 
           {/* ── CTA buttons ── */}
           {!inMmFlow && (method === "card" || method === "paypal") && (
-            <button onClick={handleComplete} disabled={loading}
+            <button onClick={handlePaypalCardPay} disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70">
-              {loading ? <><Spinner /><span>Processing…</span></> : <><LockIcon /><span>Complete Order</span></>}
+              {loading
+                ? <><Spinner /><span>Creating order…</span></>
+                : <><LockIcon /><span>Proceed to Payment →</span></>}
             </button>
           )}
 
@@ -1005,189 +928,29 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   );
 }
 
-/* ─── Step 4: Complete (website builder) ────────────────────────────────── */
-function StepCompleteBuilder({ orderNum }: { orderNum: string }) {
-  const [deployStep, setDeployStep] = useState(0);
-  const steps = [
-    { label: "Payment confirmed",          done: true  },
-    { label: "Website files generated",    done: true  },
-    { label: "Uploading to your hosting",  done: false },
-    { label: "Connecting your domain",     done: false },
-    { label: "SSL certificate activating", done: false },
-  ];
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setDeployStep(1), 1200),
-      setTimeout(() => setDeployStep(2), 2600),
-      setTimeout(() => setDeployStep(3), 4200),
-      setTimeout(() => setDeployStep(4), 5800),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5, ease: EASE }}
-      className="text-center py-6"
-    >
-      <motion.div
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.1, type: "spring", stiffness: 220, damping: 18 }}
-        className="w-24 h-24 rounded-full bg-[#6B21A8] flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(107,33,168,0.4)] text-4xl"
-      >
-        🚀
-      </motion.div>
-
-      <h2 className="text-3xl font-black text-black mb-2">Your AI Website is Going Live!</h2>
-      <p className="text-gray-500 mb-2">Order: <span className="font-bold text-[#6B21A8]">{orderNum}</span></p>
-      <p className="text-gray-400 text-sm mb-8">Check your email for updates at every step.</p>
-
-      {/* Deployment steps */}
-      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5 mb-8 text-left space-y-3">
-        {steps.map((step, i) => (
-          <motion.div key={step.label}
-            initial={{ opacity: 0.3 }}
-            animate={deployStep >= i ? { opacity: 1 } : { opacity: 0.3 }}
-            className="flex items-center gap-3 text-sm"
-          >
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${
-              deployStep > i || (step.done && deployStep >= i)
-                ? "bg-green-500 text-white"
-                : deployStep === i
-                ? "bg-[#6B21A8] text-white"
-                : "bg-gray-200 text-gray-400"
-            }`}>
-              {deployStep > i || (step.done && deployStep >= i) ? "✓" :
-               deployStep === i ? (
-                 <span className="w-2.5 h-2.5 border-2 border-white/40 border-t-white rounded-full animate-spin block" />
-               ) : "○"}
-            </span>
-            <span className={deployStep >= i ? "text-gray-800 font-medium" : "text-gray-400"}>{step.label}</span>
-          </motion.div>
-        ))}
-      </div>
-
-      <AnimatePresence>
-        {deployStep >= 4 && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-            <p className="text-green-600 font-bold text-sm">✓ Your site is being set up! Usually ready within 5 minutes.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/dashboard"
-                className="px-8 py-3.5 bg-[#6B21A8] text-white font-bold rounded-full text-sm hover:bg-[#581c87] transition-colors">
-                Go to Dashboard
-              </Link>
-              <Link href="/"
-                className="px-8 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-full text-sm hover:border-gray-300 transition-colors">
-                Back to Home
-              </Link>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-/* ─── Step 4: Complete ───────────────────────────────────────────────────── */
-function StepComplete({ orderNum }: { orderNum: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1    }}
-      transition={{ duration: 0.5, ease: EASE }}
-      className="text-center py-8"
-    >
-      {/* Animated checkmark */}
-      <motion.div
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.1, type: "spring", stiffness: 220, damping: 18 }}
-        className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(34,197,94,0.4)]"
-      >
-        <motion.svg
-          viewBox="0 0 52 52"
-          fill="none"
-          className="w-12 h-12"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
-        >
-          <motion.path
-            d="M14 27l9 9 16-18"
-            stroke="white"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
-          />
-        </motion.svg>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0  }}
-        transition={{ delay: 0.5, duration: 0.5 }}
-      >
-        <h2 className="text-3xl font-black text-black mb-3">Your order is being processed!</h2>
-        <p className="text-gray-500 mb-2">
-          Order number: <span className="font-bold text-[#6B21A8]">{orderNum}</span>
-        </p>
-        <p className="text-gray-400 text-sm mb-10">
-          Check your email for confirmation and next steps.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/dashboard"
-            className="px-8 py-3.5 bg-[#6B21A8] text-white font-bold rounded-full text-sm hover:bg-[#581c87] transition-colors"
-          >
-            Go to Dashboard
-          </Link>
-          <Link
-            href="/"
-            className="px-8 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-full text-sm hover:border-gray-300 transition-colors"
-          >
-            Back to Home
-          </Link>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 /* ─── Checkout page ──────────────────────────────────────────────────────── */
 export default function CheckoutPage() {
-  const router   = useRouter();
-  const [step,     setStep]     = useState<Step>(2);
-  const [cart,     setCart]     = useState<Cart>({});
-  const [ready,    setReady]    = useState(false);
-  const [orderNum, setOrderNum] = useState("");
-  const [hasWB,    setHasWB]    = useState(false);
+  const router  = useRouter();
+  const [step,  setStep]  = useState<Step>(2);
+  const [cart,  setCart]  = useState<Cart>({});
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const items = getCart();
     if (items.length === 0) { router.replace("/cart"); return; }
-    const c = itemsToCart(items);
-    setCart(c);
+    setCart(itemsToCart(items));
     if (localStorage.getItem("bshop_client_id")) setStep(3);
     setReady(true);
   }, [router]);
 
   const handleAccountDone = useCallback(() => setStep(3), []);
-  const handleOrderDone   = useCallback((num: string, wb: boolean) => { setOrderNum(num); setHasWB(wb); setStep(4); }, []);
 
   if (!ready) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0  }}
@@ -1198,7 +961,6 @@ export default function CheckoutPage() {
 
         <StepIndicator current={step} />
 
-        {/* Step content */}
         <motion.div
           className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8"
           initial={{ opacity: 0, y: 20 }}
@@ -1207,9 +969,7 @@ export default function CheckoutPage() {
         >
           <AnimatePresence mode="wait">
             {step === 2 && <div key="step2"><StepAccount onDone={handleAccountDone} /></div>}
-            {step === 3 && <div key="step3"><StepPayment cart={cart} onDone={handleOrderDone} /></div>}
-            {step === 4 && hasWB  && <div key="step4wb"><StepCompleteBuilder orderNum={orderNum} /></div>}
-            {step === 4 && !hasWB && <div key="step4"><StepComplete orderNum={orderNum} /></div>}
+            {step === 3 && <div key="step3"><StepPayment cart={cart} /></div>}
           </AnimatePresence>
         </motion.div>
       </div>

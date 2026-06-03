@@ -509,6 +509,102 @@ export async function createPawapayOrder(
   return { orderId, invoiceId, allOrderIds };
 }
 
+/* ─── PayPal order creation ──────────────────────────────────────────────── */
+export async function createPaypalOrder(
+  clientId:  number,
+  cartItems: CartItemLike[],
+): Promise<PawapayOrderResult> {
+  const baseParams = { clientid: clientId, paymentmethod: "paypal" };
+
+  const domain   = cartItems.find(i => i.type === "domain");
+  const hosting  = cartItems.find(i => i.type === "hosting");
+  const transfer = cartItems.find(i => i.type === "transfer");
+  const wb       = cartItems.find(i => i.type === "website_builder");
+
+  const mainParams: Record<string, string | number | boolean> = { ...baseParams };
+
+  if (hosting) {
+    mainParams.pid          = (hosting.planId as number | undefined) ?? 1;
+    mainParams.billingcycle = (hosting.cycle as string) === "monthly" ? "monthly" : "annually";
+    if (domain) {
+      mainParams.domain      = domain.domain as string;
+      mainParams.domaintype  = "register";
+      mainParams.regperiod   = 1;
+      mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
+      mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
+      mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
+      mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
+    }
+  } else if (domain) {
+    mainParams.domain      = domain.domain as string;
+    mainParams.domaintype  = "register";
+    mainParams.regperiod   = 1;
+    mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
+    mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
+    mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
+    mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
+  } else if (wb) {
+    mainParams.pid          = wb.productId as number;
+    mainParams.billingcycle = "monthly";
+  } else if (transfer) {
+    mainParams.domain      = transfer.domain as string;
+    mainParams.domaintype  = "transfer";
+    mainParams.eppcode     = transfer.authCode as string;
+    mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
+    mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
+    mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
+    mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
+  }
+
+  const mainData  = await callWhmcs("AddOrder", mainParams);
+  const orderId   = Number(mainData.orderid   ?? 0);
+  const invoiceId = Number(mainData.invoiceid ?? 0);
+  const allOrderIds: number[] = [orderId];
+
+  if (wb && (hosting || domain)) {
+    try {
+      const d = await callWhmcs("AddOrder", { ...baseParams, pid: wb.productId as number, billingcycle: "monthly" });
+      allOrderIds.push(Number(d.orderid ?? 0));
+    } catch (e) { console.error("[createPaypalOrder] WB order failed:", e); }
+  }
+  if (transfer && (hosting || domain || wb)) {
+    try {
+      const d = await callWhmcs("AddOrder", {
+        ...baseParams,
+        domain: transfer.domain as string, domaintype: "transfer",
+        eppcode: transfer.authCode as string,
+        nameserver1: BSHOP_NAMESERVERS.ns1, nameserver2: BSHOP_NAMESERVERS.ns2,
+        nameserver3: BSHOP_NAMESERVERS.ns3, nameserver4: BSHOP_NAMESERVERS.ns4,
+      });
+      allOrderIds.push(Number(d.orderid ?? 0));
+    } catch (e) { console.error("[createPaypalOrder] transfer order failed:", e); }
+  }
+
+  return { orderId, invoiceId, allOrderIds };
+}
+
+/* ─── Invoice lookup ─────────────────────────────────────────────────────── */
+export interface InvoiceItem    { description: string; amount: string; }
+export interface InvoiceDetails {
+  id: number; status: string; date: string; duedate: string;
+  total: string; subtotal: string; items: InvoiceItem[];
+}
+
+export async function getInvoice(invoiceId: number): Promise<InvoiceDetails> {
+  const data  = await callWhmcs("GetInvoice", { invoiceid: invoiceId });
+  const raw   = (data.items as { item: Record<string, unknown>[] } | undefined)?.item ?? [];
+  const items = raw.map(i => ({ description: String(i.description ?? ""), amount: String(i.amount ?? "0.00") }));
+  return {
+    id:       Number(data.invoiceid ?? 0),
+    status:   String(data.status   ?? ""),
+    date:     String(data.date     ?? ""),
+    duedate:  String(data.duedate  ?? ""),
+    total:    String(data.total    ?? "0.00"),
+    subtotal: String(data.subtotal ?? "0.00"),
+    items,
+  };
+}
+
 export async function addAnnouncement(subject: string, message: string): Promise<void> {
   await callWhmcs("AddAnnouncement", { subject, message, published: 1 });
 }
