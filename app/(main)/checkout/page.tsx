@@ -415,6 +415,32 @@ function StepAccount({ onDone }: { onDone: () => void }) {
   );
 }
 
+/* ─── PawaPay country / currency / provider maps ─────────────────────────── */
+const currencyByCountry: Record<string, string> = {
+  RWA: "RWF", ZMB: "ZMW", UGA: "UGX", KEN: "KES", BEN: "XOF",
+  CMR: "XAF", CIV: "XOF", SEN: "XOF", GAB: "XAF", COD: "CDF",
+  COG: "XAF", SLE: "SLE", TGO: "XOF", BFA: "XOF", GIN: "GNF",
+  MDG: "MGA", MOZ: "MZN", TZA: "TZS", GHA: "GHS", ETH: "ETB",
+};
+
+const countryNames: Record<string, string> = {
+  RWA: "Rwanda",  ZMB: "Zambia",       UGA: "Uganda",     KEN: "Kenya",
+  BEN: "Benin",   CMR: "Cameroon",     CIV: "Côte d'Ivoire", SEN: "Senegal",
+  GAB: "Gabon",   COD: "DR Congo",     COG: "Republic of Congo", SLE: "Sierra Leone",
+  TGO: "Togo",    BFA: "Burkina Faso", GIN: "Guinea",     MDG: "Madagascar",
+  MOZ: "Mozambique", TZA: "Tanzania",  GHA: "Ghana",      ETH: "Ethiopia",
+};
+
+const MTN_PROVIDERS = new Set([
+  "MTN_MOMO_RWA", "MTN_MOMO_ZMB", "MTN_MOMO_UGA", "MTN_MOMO_BEN",
+  "MTN_MOMO_CMR", "MTN_MOMO_CIV", "MTN_MOMO_COG", "MTN_MOMO_GHA",
+]);
+
+const AIRTEL_PROVIDERS = new Set([
+  "AIRTEL_RWA", "AIRTEL_ZMB", "AIRTEL_UGA", "AIRTEL_GAB", "AIRTEL_COD",
+  "AIRTEL_KEN", "AIRTEL_MOZ", "AIRTEL_TZA", "AIRTEL_MDG", "AIRTEL_NGA",
+]);
+
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
 type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
 
@@ -455,14 +481,29 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   const rwfTotal   = Math.round(usdTotal * 1400);
 
   const cleanPhone  = mmPhone.replace(/\D/g, "");
-  // Check detected operator matches the selected card
-  const providerMatchesMtn    = !!predictedProvider?.provider.includes("MTN");
-  const providerMatchesAirtel = !!predictedProvider?.provider.includes("AIRTEL");
-  const providerMatches = method === "mtn" ? providerMatchesMtn : providerMatchesAirtel;
-  const mmMismatch  = predictedProvider !== null && !providerMatches;
-  const isMmValid   = predictedProvider !== null && providerMatches;
-  const isMobileMethod = method === "mtn" || method === "airtel";
-  const inMmFlow    = isMobileMethod && mmStep !== "input";
+
+  // Provider classification using known provider sets
+  const providerMatchesMtn    = predictedProvider ? MTN_PROVIDERS.has(predictedProvider.provider)    : false;
+  const providerMatchesAirtel = predictedProvider ? AIRTEL_PROVIDERS.has(predictedProvider.provider) : false;
+  const isUnsupportedProvider = predictedProvider !== null && !providerMatchesMtn && !providerMatchesAirtel;
+  const providerMatches       = method === "mtn" ? providerMatchesMtn : providerMatchesAirtel;
+  const mmMismatch            = predictedProvider !== null && !isUnsupportedProvider && !providerMatches;
+  const isMmValid             = predictedProvider !== null && providerMatches;
+  const isMobileMethod        = method === "mtn" || method === "airtel";
+  const inMmFlow              = isMobileMethod && mmStep !== "input";
+
+  // Local currency from detected country (falls back to RWF for Rwanda)
+  const detectedCountry  = predictedProvider?.country ?? "RWA";
+  const localCurrency    = currencyByCountry[detectedCountry] ?? "RWF";
+  const detectedCountryName = countryNames[detectedCountry] ?? detectedCountry;
+
+  // Pay button label — only show RWF amount for Rwanda, others show operator name
+  function payButtonLabel(): string {
+    if (!predictedProvider) return `Pay RWF ${rwfTotal.toLocaleString()}`;
+    if (localCurrency === "RWF") return `Pay RWF ${rwfTotal.toLocaleString()}`;
+    const net = method === "mtn" ? "MTN" : "Airtel";
+    return `Pay with ${net} ${detectedCountryName}`;
+  }
 
   // Polling
   useEffect(() => {
@@ -571,9 +612,9 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
           amount:      rwfTotal,
-          currency:    "RWF",
-          phone:       predictedProvider.phoneNumber, // canonical intl number
-          operator:    predictedProvider.provider,    // canonical provider code
+          currency:    localCurrency,
+          phone:       predictedProvider.phoneNumber,
+          operator:    predictedProvider.provider,
           clientId,
           clientEmail,
           cartItems,
@@ -762,7 +803,7 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
                       <input
                         type="tel" value={mmPhone}
                         onChange={e => { setMmPhone(e.target.value.replace(/[^\d\s+]/g, "")); setPredictedProvider(null); }}
-                        placeholder="e.g. 0785094435"
+                        placeholder="07*********"
                         className={INPUT}
                       />
                       {/* Operator detection status */}
@@ -778,7 +819,12 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
                             <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
                               <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.35-8.65a.75.75 0 00-1.06-1.06L7 8.585 5.71 7.295a.75.75 0 10-1.06 1.06l1.75 1.75a.75.75 0 001.06 0l3.89-3.89z" clipRule="evenodd" />
                             </svg>
-                            {predictedProvider!.provider.replace(/_/g, " ")} confirmed
+                            {predictedProvider!.provider.replace(/_/g, " ")} · {detectedCountryName}
+                          </p>
+                        )}
+                        {!predictLoading && isUnsupportedProvider && (
+                          <p className="text-xs text-red-600 font-medium">
+                            {predictedProvider!.provider.replace(/_/g, " ")} is not currently supported. Please use MTN or Airtel Mobile Money.
                           </p>
                         )}
                         {!predictLoading && mmMismatch && (
@@ -788,9 +834,6 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
                         )}
                         {!predictLoading && !predictedProvider && predictError && (
                           <p className="text-xs text-red-500">{predictError}</p>
-                        )}
-                        {!predictLoading && !predictedProvider && !predictError && cleanPhone.length > 0 && cleanPhone.length < 9 && (
-                          <p className="text-xs text-gray-400">Enter your full number</p>
                         )}
                       </div>
                     </div>
@@ -950,7 +993,7 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
                   : "bg-red-600 text-white hover:bg-red-700"
               }`}
             >
-              {predictLoading ? <><Spinner sm /><span>Detecting operator…</span></> : `Pay RWF ${rwfTotal.toLocaleString()}`}
+              {predictLoading ? <><Spinner sm /><span>Detecting operator…</span></> : payButtonLabel()}
             </button>
           )}
 
