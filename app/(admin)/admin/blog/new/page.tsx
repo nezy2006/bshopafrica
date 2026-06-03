@@ -1,115 +1,368 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
+import NextImage from "next/image";
 import { PageHeader } from "@/lib/admin-utils";
 
-const CATEGORIES = ["General", "Hosting Tips", "Domain Guide", "Business Growth", "Tech News", "Company News"];
-
+/* ─── Constants ──────────────────────────────────────────────────────────── */
+const CATEGORIES = ["News", "Tutorial", "Tips", "Company Update", "Industry"];
+const INPUT = "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all";
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-const INPUT = "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all";
+/* ─── Toolbar button ─────────────────────────────────────────────────────── */
+function ToolBtn({
+  active, onClick, title, children,
+}: {
+  active?: boolean; onClick: () => void; title: string; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onMouseDown={e => { e.preventDefault(); onClick(); }}
+      title={title}
+      className={`px-2 py-1.5 rounded-lg text-sm font-medium transition-all ${
+        active
+          ? "bg-[#6B21A8] text-white"
+          : "text-gray-600 hover:bg-purple-50 hover:text-[#6B21A8]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
+/* ─── Toolbar ────────────────────────────────────────────────────────────── */
+function Toolbar({ editor }: { editor: Editor | null }) {
+  const [linkUrl, setLinkUrl] = useState("");
+  const [showLink, setShowLink] = useState(false);
+  const [imgUrl,   setImgUrl]  = useState("");
+  const [showImg,  setShowImg] = useState(false);
+
+  if (!editor) return null;
+
+  const addLink = () => {
+    if (!linkUrl) { editor.chain().focus().unsetLink().run(); return; }
+    editor.chain().focus().extendMarkRange("link").setLink({ href: linkUrl }).run();
+    setLinkUrl(""); setShowLink(false);
+  };
+
+  const addImage = () => {
+    if (imgUrl) { editor.chain().focus().setImage({ src: imgUrl }).run(); }
+    setImgUrl(""); setShowImg(false);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 border-b-2 border-gray-100 bg-gray-50 rounded-t-xl">
+      {/* Text style */}
+      <ToolBtn active={editor.isActive("bold")}   onClick={() => editor.chain().focus().toggleBold().run()}   title="Bold">   <b>B</b>   </ToolBtn>
+      <ToolBtn active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"> <i>I</i>   </ToolBtn>
+      <ToolBtn active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough"> <s>S</s> </ToolBtn>
+      <ToolBtn active={editor.isActive("code")}   onClick={() => editor.chain().focus().toggleCode().run()}   title="Inline code"> <code className="text-xs">`c`</code> </ToolBtn>
+
+      <span className="w-px h-5 bg-gray-200 mx-1" />
+
+      {/* Headings */}
+      <ToolBtn active={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1">H1</ToolBtn>
+      <ToolBtn active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">H2</ToolBtn>
+      <ToolBtn active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">H3</ToolBtn>
+
+      <span className="w-px h-5 bg-gray-200 mx-1" />
+
+      {/* Lists */}
+      <ToolBtn active={editor.isActive("bulletList")}  onClick={() => editor.chain().focus().toggleBulletList().run()}  title="Bullet list">  ≡</ToolBtn>
+      <ToolBtn active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list">1.</ToolBtn>
+      <ToolBtn active={editor.isActive("blockquote")}  onClick={() => editor.chain().focus().toggleBlockquote().run()}  title="Quote">  ❝</ToolBtn>
+      <ToolBtn active={editor.isActive("codeBlock")}   onClick={() => editor.chain().focus().toggleCodeBlock().run()}   title="Code block"> {"</>"} </ToolBtn>
+
+      <span className="w-px h-5 bg-gray-200 mx-1" />
+
+      {/* Link */}
+      <div className="relative">
+        <ToolBtn active={editor.isActive("link") || showLink} onClick={() => setShowLink(v => !v)} title="Link">
+          🔗
+        </ToolBtn>
+        {showLink && (
+          <div className="absolute top-full left-0 mt-1 z-10 flex gap-1 bg-white border border-gray-200 rounded-xl shadow-lg p-2 w-64">
+            <input
+              value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addLink()}
+              placeholder="https://…"
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded-lg outline-none focus:border-[#6B21A8]"
+            />
+            <button type="button" onClick={addLink} className="px-2 py-1 bg-[#6B21A8] text-white text-xs rounded-lg font-bold">Add</button>
+          </div>
+        )}
+      </div>
+
+      {/* Image from URL */}
+      <div className="relative">
+        <ToolBtn active={showImg} onClick={() => setShowImg(v => !v)} title="Insert image">
+          🖼
+        </ToolBtn>
+        {showImg && (
+          <div className="absolute top-full left-0 mt-1 z-10 flex gap-1 bg-white border border-gray-200 rounded-xl shadow-lg p-2 w-64">
+            <input
+              value={imgUrl} onChange={e => setImgUrl(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addImage()}
+              placeholder="Image URL…"
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded-lg outline-none focus:border-[#6B21A8]"
+            />
+            <button type="button" onClick={addImage} className="px-2 py-1 bg-[#6B21A8] text-white text-xs rounded-lg font-bold">Add</button>
+          </div>
+        )}
+      </div>
+
+      <span className="w-px h-5 bg-gray-200 mx-1" />
+
+      {/* Undo/Redo */}
+      <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="Undo">↩</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="Redo">↪</ToolBtn>
+    </div>
+  );
+}
+
+/* ─── Main page ──────────────────────────────────────────────────────────── */
 export default function NewBlogPostPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    title: "", slug: "", excerpt: "", content: "", category: CATEGORIES[0],
-    author: "The B.Shop Team", coverImage: "", readTime: "5 min read", published: false,
+    title:       "",
+    slug:        "",
+    coverImage:  "",
+    category:    CATEGORIES[0],
+    tags:        "",
+    author:      "The B.Shop Team",
+    seoDesc:     "",
   });
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState("");
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const set = (k: string, v: string | boolean) => {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Image.configure({ inline: false, allowBase64: false }),
+      Link.configure({ openOnClick: false, HTMLAttributes: { rel: "noopener noreferrer" } }),
+      Placeholder.configure({ placeholder: "Write your article content here…" }),
+    ],
+    editorProps: {
+      attributes: {
+        class: "prose prose-sm max-w-none min-h-[400px] px-6 py-5 outline-none text-black",
+      },
+    },
+  });
+
+  const set = (k: string, v: string) => {
     setForm(f => {
       const next = { ...f, [k]: v };
-      if (k === "title") next.slug = slugify(v as string);
+      if (k === "title") next.slug = slugify(v);
       return next;
     });
   };
 
-  const submit = async (publish: boolean) => {
-    if (!form.title || !form.excerpt || !form.content) { setError("Title, excerpt and content are required."); return; }
+  const saveDraft = useCallback(async (silent = false) => {
+    if (!form.title || !editor) return;
+    if (!silent) setSaving(true);
+    try {
+      const res  = await fetch("/api/blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          content:   editor.getHTML(),
+          excerpt:   form.seoDesc,
+          published: false,
+        }),
+      });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (json.success) setLastSaved(new Date());
+      else if (!silent) setError(json.error ?? "Failed to save draft.");
+    } catch {
+      if (!silent) setError("Something went wrong.");
+    } finally {
+      if (!silent) setSaving(false);
+    }
+  }, [form, editor]);
+
+  const publish = async () => {
+    if (!form.title || !editor?.getText().trim()) {
+      setError("Title and content are required.");
+      return;
+    }
     setSaving(true); setError("");
     try {
-      const res  = await fetch("/api/blog", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, published: publish }) });
+      const res  = await fetch("/api/blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          content:   editor.getHTML(),
+          excerpt:   form.seoDesc,
+          published: true,
+        }),
+      });
       const json = await res.json() as { success: boolean; error?: string };
-      if (!json.success) { setError(json.error ?? "Failed to save post."); }
-      else router.push("/admin/blog");
+      if (json.success) router.push("/admin/blog");
+      else setError(json.error ?? "Failed to publish.");
     } catch { setError("Something went wrong."); }
     finally { setSaving(false); }
   };
 
+  /* Auto-save every 30 s */
+  useEffect(() => {
+    autoSaveRef.current = setInterval(() => { saveDraft(true); }, 30_000);
+    return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
+  }, [saveDraft]);
+
   return (
-    <div className="max-w-4xl">
-      <PageHeader title="New Blog Post" subtitle="Create a new blog article" />
+    <div className="max-w-5xl">
+      <PageHeader
+        title="New Blog Post"
+        subtitle="Create a new article"
+        action={
+          <div className="flex items-center gap-2">
+            {lastSaved && (
+              <span className="text-xs text-gray-400">
+                Auto-saved {lastSaved.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={() => saveDraft(false)} disabled={saving}
+              className="px-4 py-2 border-2 border-gray-200 text-gray-700 text-sm font-bold rounded-xl hover:border-gray-300 transition-all disabled:opacity-60"
+            >
+              Save Draft
+            </button>
+            <button
+              onClick={publish} disabled={saving}
+              className="px-5 py-2 bg-[#6B21A8] text-white text-sm font-bold rounded-xl hover:bg-[#581c87] transition-all disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Publish"}
+            </button>
+          </div>
+        }
+      />
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
+      <div className="space-y-6">
         {/* Title */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Title <span className="text-red-400">*</span></label>
-          <input value={form.title} onChange={e => set("title", e.target.value)} placeholder="Your post title…" className={INPUT} />
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <input
+            value={form.title}
+            onChange={e => set("title", e.target.value)}
+            placeholder="Article title…"
+            className="w-full text-3xl font-black text-black placeholder-gray-300 outline-none border-none bg-transparent"
+          />
         </div>
 
-        {/* Slug */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Slug</label>
-          <input value={form.slug} onChange={e => set("slug", e.target.value)} placeholder="auto-generated-from-title" className={INPUT} />
+        {/* Cover image */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-3">Cover Image</label>
+          <div className="flex gap-3">
+            <input
+              value={form.coverImage}
+              onChange={e => set("coverImage", e.target.value)}
+              placeholder="Paste image URL here…"
+              className={`${INPUT} flex-1`}
+            />
+          </div>
+          {form.coverImage && (
+            <div className="mt-3 relative w-full h-40 rounded-xl overflow-hidden bg-gray-100">
+              <NextImage src={form.coverImage} alt="Cover preview" fill className="object-cover" unoptimized />
+            </div>
+          )}
         </div>
 
-        {/* Category + Author */}
-        <div className="grid sm:grid-cols-2 gap-4">
+        {/* Meta row */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Category</label>
             <select value={form.category} onChange={e => set("category", e.target.value)} className={`${INPUT} cursor-pointer`}>
               {CATEGORIES.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Author</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Author</label>
             <input value={form.author} onChange={e => set("author", e.target.value)} className={INPUT} />
           </div>
-        </div>
-
-        {/* Cover image + Read time */}
-        <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Cover Image URL</label>
-            <input value={form.coverImage} onChange={e => set("coverImage", e.target.value)} placeholder="https://…" className={INPUT} />
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags <span className="normal-case font-normal">(comma separated)</span></label>
+            <input value={form.tags} onChange={e => set("tags", e.target.value)} placeholder="hosting, domain, tips" className={INPUT} />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Read Time</label>
-            <input value={form.readTime} onChange={e => set("readTime", e.target.value)} placeholder="5 min read" className={INPUT} />
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Slug</label>
+            <input value={form.slug} onChange={e => set("slug", e.target.value)} placeholder="auto-generated" className={INPUT} />
           </div>
         </div>
 
-        {/* Excerpt */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Excerpt <span className="text-red-400">*</span></label>
-          <textarea value={form.excerpt} onChange={e => set("excerpt", e.target.value)} rows={3} placeholder="Short description for previews and SEO…" className={`${INPUT} resize-none`} />
+        {/* Rich text editor */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <Toolbar editor={editor} />
+          <EditorContent editor={editor} />
         </div>
 
-        {/* Content */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Content <span className="text-red-400">*</span> <span className="text-gray-400 font-normal">(HTML supported)</span></label>
-          <textarea value={form.content} onChange={e => set("content", e.target.value)} rows={16}
-            placeholder="Write your post content here. You can use HTML tags for formatting…"
-            className={`${INPUT} resize-y font-mono text-xs`} />
+        {/* SEO description */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            SEO Description <span className="text-gray-400 font-normal">({form.seoDesc.length}/160)</span>
+          </label>
+          <textarea
+            value={form.seoDesc}
+            onChange={e => set("seoDesc", e.target.value.slice(0, 160))}
+            rows={3}
+            placeholder="Brief description for search engines and previews…"
+            className={`${INPUT} resize-none`}
+          />
         </div>
 
         {error && <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
-          <button onClick={() => submit(false)} disabled={saving}
-            className="px-6 py-3 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:border-gray-300 transition-all text-sm disabled:opacity-60">
+        {/* Bottom action bar */}
+        <div className="flex items-center gap-3 pb-8">
+          <button
+            onClick={() => saveDraft(false)} disabled={saving}
+            className="px-6 py-3 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:border-gray-300 transition-all text-sm disabled:opacity-60"
+          >
             Save Draft
           </button>
-          <button onClick={() => submit(true)} disabled={saving}
-            className="px-6 py-3 bg-[#6B21A8] text-white font-bold rounded-xl hover:bg-[#581c87] transition-all text-sm disabled:opacity-60">
+          <button
+            onClick={publish} disabled={saving}
+            className="px-6 py-3 bg-[#6B21A8] text-white font-bold rounded-xl hover:bg-[#581c87] transition-all text-sm disabled:opacity-60"
+          >
             {saving ? "Publishing…" : "Publish"}
           </button>
-          <button onClick={() => router.back()} className="ml-auto px-4 py-3 text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors">Cancel</button>
+          <button onClick={() => router.back()} className="ml-auto px-4 py-3 text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors">
+            Cancel
+          </button>
         </div>
       </div>
+
+      <style>{`
+        .ProseMirror { min-height: 400px; }
+        .ProseMirror p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          color: #adb5bd;
+          pointer-events: none;
+          height: 0;
+        }
+        .ProseMirror h1 { font-size: 2em; font-weight: 900; margin: 0.67em 0; }
+        .ProseMirror h2 { font-size: 1.5em; font-weight: 800; margin: 0.83em 0; }
+        .ProseMirror h3 { font-size: 1.17em; font-weight: 700; margin: 1em 0; }
+        .ProseMirror blockquote { border-left: 4px solid #6B21A8; padding-left: 1rem; color: #6b7280; margin: 1rem 0; font-style: italic; }
+        .ProseMirror pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        .ProseMirror code { background: #f3f4f6; color: #6B21A8; padding: 0.1em 0.3em; border-radius: 0.25rem; font-size: 0.875em; }
+        .ProseMirror pre code { background: none; color: inherit; padding: 0; }
+        .ProseMirror ul { list-style: disc; padding-left: 1.5rem; }
+        .ProseMirror ol { list-style: decimal; padding-left: 1.5rem; }
+        .ProseMirror a { color: #6B21A8; text-decoration: underline; }
+        .ProseMirror img { max-width: 100%; border-radius: 0.5rem; margin: 1rem 0; }
+        .ProseMirror hr { border: none; border-top: 2px solid #e5e7eb; margin: 2rem 0; }
+      `}</style>
     </div>
   );
 }

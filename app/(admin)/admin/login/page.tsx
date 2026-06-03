@@ -7,7 +7,7 @@ import Image from "next/image";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
@@ -15,12 +15,22 @@ export default function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError("");
-    await new Promise(r => setTimeout(r, 600));
-    if (username === "admin" && password === "bshop2025") {
-      localStorage.setItem("bshop_admin_session", "true");
-      router.replace("/admin/dashboard");
-    } else {
-      setError("Invalid username or password.");
+    try {
+      const res  = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (json.success) {
+        localStorage.setItem("bshop_admin_token", "authenticated");
+        router.replace("/admin/dashboard");
+      } else {
+        setError(json.error ?? "Invalid credentials.");
+        setLoading(false);
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   };
@@ -41,14 +51,19 @@ export default function AdminLoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
-            <input type="text" value={username} onChange={e => setUsername(e.target.value)} required
-              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all" />
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              placeholder="admin@bshopafrica.com"
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all"
+            />
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all" />
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all"
+            />
           </div>
 
           {error && <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium">{error}</p>}

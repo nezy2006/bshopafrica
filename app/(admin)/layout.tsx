@@ -66,7 +66,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router   = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem("bshop_admin_session");
+    localStorage.removeItem("bshop_admin_token");
     router.replace("/admin/login");
   };
 
@@ -144,8 +144,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const checkAuth = useCallback(() => {
     if (!isLogin) {
-      const session = localStorage.getItem("bshop_admin_session");
-      if (!session) { router.replace("/admin/login"); return; }
+      const token = localStorage.getItem("bshop_admin_token");
+      if (!token) { router.replace("/admin/login"); return; }
     }
     setChecked(true);
   }, [isLogin, router]);
