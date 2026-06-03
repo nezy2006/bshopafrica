@@ -39,22 +39,29 @@ export async function POST(req: NextRequest) {
   /* ── checkTransfer ── */
   if (action === "checkTransfer") {
     const parsed = parseDomain(domain);
-    if (!parsed) return NextResponse.json({ success: false, error: "Invalid domain name" }, { status: 400 });
+    if (!parsed) return NextResponse.json({ success: false, error: "Invalid domain name — please enter a full domain like example.com" }, { status: 400 });
+
+    console.log("[/api/transfer] checkTransfer:", parsed.full);
 
     try {
-      // Get TLD pricing
+      // Get TLD pricing from WHMCS
       const pricing = await callWhmcs("GetTLDPricing", { currencyid: 1 });
+      console.log("[/api/transfer] GetTLDPricing result:", pricing.result);
+
+      if (pricing.result !== "success") {
+        console.error("[/api/transfer] GetTLDPricing failed:", pricing);
+        return NextResponse.json({
+          success: false,
+          error: "Unable to verify transfer eligibility right now. Please try again in a moment.",
+        }, { status: 502 });
+      }
+
       const pricingMap = pricing.pricing as Record<string, Record<string, Record<string, string>>> | undefined;
-      const tldKey = parsed.tld.replace(/^\./, ""); // strip leading dot
+      const tldKey = parsed.tld.replace(/^\./, ""); // strip leading dot: ".com" → "com"
       const transferPrice = parseFloat(pricingMap?.[tldKey]?.transfer?.["1"] ?? "0");
       const supported = transferPrice > 0;
 
-      // Check domain exists via WHOIS
-      let exists = true;
-      try {
-        const whois = await callWhmcs("DomainWhois", { domain: parsed.full });
-        exists = String(whois.status ?? "").toLowerCase() !== "available";
-      } catch { /* assume exists if WHOIS fails */ }
+      console.log("[/api/transfer] tldKey:", tldKey, "transferPrice:", transferPrice, "supported:", supported);
 
       if (!supported) {
         return NextResponse.json({
@@ -64,8 +71,18 @@ export async function POST(req: NextRequest) {
           tld: parsed.tld,
           transferPrice: 0,
           currency: "USD",
-          message: `Sorry, we don't currently support transfers for ${parsed.tld} domains. Please contact support.`,
+          message: `We don't currently support transfers for .${tldKey} domains. Please contact support or register a new domain instead.`,
         });
+      }
+
+      // Check domain exists via WHOIS (best-effort — don't fail if WHOIS is unavailable)
+      let exists = true;
+      try {
+        const whois = await callWhmcs("DomainWhois", { domain: parsed.full });
+        console.log("[/api/transfer] DomainWhois status:", whois.status);
+        exists = String(whois.status ?? "").toLowerCase() !== "available";
+      } catch (e) {
+        console.warn("[/api/transfer] DomainWhois failed (ignored):", e instanceof Error ? e.message : e);
       }
 
       if (!exists) {
@@ -83,28 +100,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         eligible: true,
-        domain:   parsed.full,
-        tld:      parsed.tld,
-        transferPrice: transferPrice > 0 ? transferPrice : 14.99,
-        currency: "USD",
-        nameservers: Object.values(BSHOP_NAMESERVERS),
-        message: `Great! ${parsed.full} is eligible for transfer. The fee covers one year of renewal.`,
+        domain:        parsed.full,
+        tld:           parsed.tld,
+        transferPrice,
+        currency:      "USD",
+        nameservers:   Object.values(BSHOP_NAMESERVERS),
+        message:       `${parsed.full} is eligible for transfer. The fee includes one year of renewal.`,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Check failed";
-      console.error("[/api/transfer] checkTransfer:", msg);
-      // Graceful fallback — return eligible with a placeholder price
-      const parsed2 = parseDomain(domain)!;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[/api/transfer] checkTransfer exception:", msg);
       return NextResponse.json({
-        success: true,
-        eligible: true,
-        domain:   parsed2.full,
-        tld:      parsed2.tld,
-        transferPrice: 14.99,
-        currency: "USD",
-        nameservers: Object.values(BSHOP_NAMESERVERS),
-        message: `${parsed2.full} appears eligible for transfer. Price shown is an estimate.`,
-      });
+        success: false,
+        error: "Unable to verify this domain. Please try again or contact support if the problem continues.",
+      }, { status: 500 });
     }
   }
 

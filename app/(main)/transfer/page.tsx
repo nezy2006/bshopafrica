@@ -59,7 +59,18 @@ function TransferInner() {
         body: JSON.stringify({ action: "checkTransfer", domain: d }),
       });
       const json = (await res.json()) as { success: boolean; eligible?: boolean; domain?: string; tld?: string; transferPrice?: number; currency?: string; message?: string; error?: string };
-      if (!json.success) { setCheckErr(json.error ?? "Check failed"); return; }
+      console.log("[transfer] API response:", json);
+      if (!json.success) {
+        setResult({
+          eligible:      false,
+          domain:        d,
+          tld:           "",
+          transferPrice: 0,
+          currency:      "USD",
+          message:       json.error || "Unable to verify this domain. Please check the domain name and try again.",
+        });
+        return;
+      }
       setResult({
         eligible:      json.eligible ?? false,
         domain:        json.domain   ?? d,
@@ -68,7 +79,17 @@ function TransferInner() {
         currency:      json.currency ?? "USD",
         message:       json.message  ?? "",
       });
-    } catch { setCheckErr("Network error. Please try again."); }
+    } catch (err) {
+      console.error("[transfer] fetch error:", err);
+      setResult({
+        eligible:      false,
+        domain:        d,
+        tld:           "",
+        transferPrice: 0,
+        currency:      "USD",
+        message:       "Network error — please check your connection and try again.",
+      });
+    }
     finally { setChecking(false); }
   }
 
@@ -147,13 +168,19 @@ function TransferInner() {
                 className={`mt-4 rounded-xl p-4 border ${result.eligible ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                 <div className="flex items-start gap-3">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${result.eligible ? "bg-green-500" : "bg-red-500"}`}>
-                    {result.eligible ? <Check className="w-3.5 h-3.5 text-white" /> : <span className="text-white text-xs font-bold">×</span>}
+                    {result.eligible ? <Check className="w-3.5 h-3.5 text-white" /> : <span className="text-white text-xs font-bold">✕</span>}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className={`font-semibold text-sm ${result.eligible ? "text-green-800" : "text-red-800"}`}>
-                      {result.eligible ? `${result.domain} is eligible for transfer` : "Transfer not available"}
+                      {result.eligible
+                        ? `${result.domain} is eligible for transfer`
+                        : "Unable to verify this domain"}
                     </p>
-                    <p className={`text-xs mt-0.5 ${result.eligible ? "text-green-700" : "text-red-700"}`}>{result.message}</p>
+                    <p className={`text-xs mt-0.5 ${result.eligible ? "text-green-700" : "text-red-700"}`}>
+                      {result.eligible
+                        ? result.message
+                        : result.message || "Please check the domain name and try again."}
+                    </p>
                     {result.eligible && (
                       <p className="text-green-900 font-bold text-base mt-2">
                         Transfer + 1 Year Renewal: <span className="text-[#6B21A8]">${result.transferPrice.toFixed(2)} USD</span>
