@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
-import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
+import { PaymentOptionCard, PayPalWordmark, CardLogo, MobileMoneyLogo } from "@/components/PaymentOptions";
 
 // Legacy shape for checkout summary compat
 interface Cart {
@@ -24,7 +24,7 @@ function itemsToCart(items: CartItem[]): Cart {
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 type Step = 2 | 3 | 4;
-type PayMethod = "card" | "paypal" | "mtn" | "airtel";
+type PayMethod = "card" | "paypal" | "mobile_money";
 type CardBrand = "visa" | "mastercard" | "amex" | "discover" | null;
 
 interface CouponState {
@@ -432,11 +432,14 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   const brand = detectBrand(cardNum);
 
   // Mobile money
-  const [mmPhone,     setMmPhone]     = useState("");
-  const [mmStep,      setMmStep]      = useState<MmStep>("input");
-  const [mmDepositId, setMmDepositId] = useState("");
-  const [mmCountdown, setMmCountdown] = useState(120);
-  const [mmError,     setMmError]     = useState("");
+  const [mmPhone,           setMmPhone]           = useState("");
+  const [mmStep,            setMmStep]            = useState<MmStep>("input");
+  const [mmDepositId,       setMmDepositId]       = useState("");
+  const [mmCountdown,       setMmCountdown]       = useState(120);
+  const [mmError,           setMmError]           = useState("");
+  const [predictedProvider, setPredictedProvider] = useState<{ provider: string; country: string; phoneNumber: string } | null>(null);
+  const [predictLoading,    setPredictLoading]    = useState(false);
+  const [predictError,      setPredictError]      = useState("");
 
   // Coupon
   const [coupon, setCoupon] = useState<CouponState>({
@@ -451,13 +454,9 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   const usdTotal   = Math.max(0, subtotal - bundleDisc - (coupon.applied ? coupon.discount : 0));
   const rwfTotal   = Math.round(usdTotal * 1400);
 
-  // Phone validation
-  const cleanPhone    = mmPhone.replace(/\D/g, "");
-  const isMtnPhone    = (cleanPhone.startsWith("078") || cleanPhone.startsWith("079")) && cleanPhone.length === 10;
-  const isAirtelPhone = (cleanPhone.startsWith("072") || cleanPhone.startsWith("073")) && cleanPhone.length === 10;
-  const isMmValid     = method === "mtn" ? isMtnPhone : isAirtelPhone;
-
-  const isMobileMethod = method === "mtn" || method === "airtel";
+  const cleanPhone     = mmPhone.replace(/\D/g, "");
+  const isMmValid      = predictedProvider !== null;
+  const isMobileMethod = method === "mobile_money";
   const inMmFlow       = isMobileMethod && mmStep !== "input";
 
   // Polling
@@ -497,6 +496,36 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
     return () => clearTimeout(t);
   }, [mmStep, mmCountdown]);
 
+  // Predict provider as user types their phone number (debounced 600 ms)
+  useEffect(() => {
+    if (!isMobileMethod || cleanPhone.length < 9) {
+      setPredictedProvider(null); setPredictError(""); setPredictLoading(false);
+      return;
+    }
+    const intl = cleanPhone.startsWith("250") ? cleanPhone :
+                 cleanPhone.startsWith("0")   ? "250" + cleanPhone.slice(1) :
+                                                "250" + cleanPhone;
+    setPredictLoading(true); setPredictError("");
+    const timer = setTimeout(async () => {
+      try {
+        const res  = await fetch("/api/pawapay/predict-provider", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phoneNumber: intl }),
+        });
+        const json = (await res.json()) as { success: boolean; provider?: string; country?: string; phoneNumber?: string };
+        if (json.success && json.provider) {
+          setPredictedProvider({ provider: json.provider, country: json.country ?? "", phoneNumber: json.phoneNumber ?? intl });
+          setPredictError("");
+        } else {
+          setPredictedProvider(null);
+          setPredictError("Operator not supported for this number.");
+        }
+      } catch { setPredictedProvider(null); }
+      setPredictLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [isMobileMethod, cleanPhone]);
+
   function resetMm() {
     setMmStep("input"); setMmDepositId(""); setMmCountdown(120); setMmError("");
   }
@@ -525,9 +554,9 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
   }
 
   async function handleMobileMoneyPay() {
+    if (!predictedProvider) return;
     setMmStep("sending"); setMmError("");
     try {
-      const operator    = method === "mtn" ? "MTN_MOMO_RWF" : "AIRTEL_MONEY_RWF";
       const cartItems   = getCart();
       const clientId    = typeof window !== "undefined" ? localStorage.getItem("bshop_client_id")    : null;
       const clientEmail = typeof window !== "undefined" ? localStorage.getItem("bshop_client_email") : null;
@@ -538,11 +567,11 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
         body:    JSON.stringify({
           amount:      rwfTotal,
           currency:    "RWF",
-          phone:       cleanPhone,
-          operator,
+          phone:       predictedProvider.phoneNumber, // canonical intl number
+          operator:    predictedProvider.provider,    // canonical provider code
           clientId,
           clientEmail,
-          cartItems,   // full cart — used by callback to create WHMCS order
+          cartItems,
           totalUSD:    usdTotal,
           totalRWF:    rwfTotal,
         }),
@@ -626,34 +655,27 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
           {!inMmFlow && (
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <PaymentOptionCard
                   id="paypal" selected={method === "paypal"}
                   onSelect={() => { setMethod("paypal"); setError(null); resetMm(); }}
                   logo={<PayPalWordmark />}
                   title="PayPal"
-                  subtitle="Pay securely with your PayPal account or card"
+                  subtitle="PayPal account or card"
                 />
                 <PaymentOptionCard
                   id="card" selected={method === "card"}
                   onSelect={() => { setMethod("card"); setError(null); resetMm(); }}
                   logo={<CardLogo />}
                   title="Pay with Card"
-                  subtitle="Visa, Mastercard via PayPal"
+                  subtitle="Visa, Mastercard"
                 />
                 <PaymentOptionCard
-                  id="mtn" selected={method === "mtn"}
-                  onSelect={() => { setMethod("mtn"); setError(null); resetMm(); }}
-                  logo={<MtnLogo />}
-                  title="MTN Mobile Money"
-                  subtitle="Pay with MTN MoMo Rwanda"
-                />
-                <PaymentOptionCard
-                  id="airtel" selected={method === "airtel"}
-                  onSelect={() => { setMethod("airtel"); setError(null); resetMm(); }}
-                  logo={<AirtelLogo />}
-                  title="Airtel Money"
-                  subtitle="Pay with Airtel Money Rwanda"
+                  id="mobile_money" selected={method === "mobile_money"}
+                  onSelect={() => { setMethod("mobile_money"); setError(null); resetMm(); }}
+                  logo={<MobileMoneyLogo />}
+                  title="Mobile Money"
+                  subtitle="MTN MoMo · Airtel Money"
                 />
               </div>
             </div>
@@ -714,26 +736,45 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
               </motion.div>
             )}
 
-            {(method === "mtn" || method === "airtel") && (
-              <motion.div key={method} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+            {method === "mobile_money" && (
+              <motion.div key="mobile_money" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
 
                 {mmStep === "input" && (
-                  <div className={`rounded-2xl p-5 space-y-4 border-2 ${
-                    method === "mtn" ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-100"
-                  }`}>
+                  <div className="rounded-2xl p-5 space-y-4 border-2 bg-purple-50 border-purple-100">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Enter {method === "mtn" ? "MTN" : "Airtel"} number
+                        Mobile Money number
                       </label>
                       <input
                         type="tel" value={mmPhone}
-                        onChange={e => setMmPhone(e.target.value.replace(/[^\d\s]/g, ""))}
-                        placeholder={method === "mtn" ? "078XXXXXXX" : "073XXXXXXX"}
+                        onChange={e => { setMmPhone(e.target.value.replace(/[^\d\s+]/g, "")); setPredictedProvider(null); }}
+                        placeholder="e.g. 0785094435"
                         className={INPUT}
                       />
-                      <p className="mt-1 text-xs text-gray-400">
-                        {method === "mtn" ? "Must start with 078 or 079" : "Must start with 072 or 073"} — 10 digits
-                      </p>
+                      {/* Operator detection status */}
+                      <div className="mt-2 min-h-[20px]">
+                        {predictLoading && (
+                          <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                            <span className="animate-spin inline-block w-3 h-3 border border-gray-300 border-t-gray-500 rounded-full" />
+                            Detecting operator…
+                          </p>
+                        )}
+                        {!predictLoading && predictedProvider && (
+                          <p className="text-xs text-green-700 font-semibold flex items-center gap-1.5">
+                            <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+                              <path fillRule="evenodd" d="M8 15A7 7 0 108 1a7 7 0 000 14zm3.35-8.65a.75.75 0 00-1.06-1.06L7 8.585 5.71 7.295a.75.75 0 10-1.06 1.06l1.75 1.75a.75.75 0 001.06 0l3.89-3.89z" clipRule="evenodd" />
+                            </svg>
+                            {predictedProvider.provider.replace(/_/g, " ")}
+                            {predictedProvider.country ? ` · ${predictedProvider.country}` : ""}
+                          </p>
+                        )}
+                        {!predictLoading && !predictedProvider && predictError && (
+                          <p className="text-xs text-red-500">{predictError}</p>
+                        )}
+                        {!predictLoading && !predictedProvider && !predictError && cleanPhone.length > 0 && cleanPhone.length < 9 && (
+                          <p className="text-xs text-gray-400">Enter full number to detect operator</p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center justify-between text-sm bg-white/70 rounded-xl px-4 py-2.5">
                       <span className="text-gray-500">Amount</span>
@@ -753,14 +794,15 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
 
                 {mmStep === "waiting" && (
                   <div className="text-center py-8 space-y-4">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl ${
-                      method === "mtn" ? "bg-amber-100" : "bg-red-100"
-                    }`}>📱</div>
+                    <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto text-3xl">📱</div>
                     <div>
                       <p className="font-bold text-lg text-gray-800">Check your phone and approve the payment</p>
                       <p className="text-gray-500 text-sm mt-1">
                         RWF {rwfTotal.toLocaleString()} request sent to {mmPhone}
                       </p>
+                      {predictedProvider && (
+                        <p className="text-xs text-gray-400 mt-0.5">{predictedProvider.provider.replace(/_/g, " ")}</p>
+                      )}
                     </div>
                     <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
                       <Spinner sm />
@@ -885,13 +927,9 @@ function StepPayment({ cart, onDone }: { cart: Cart; onDone: (orderNum: string, 
             <button
               onClick={handleMobileMoneyPay}
               disabled={!isMmValid || !agreed}
-              className={`w-full flex items-center justify-center gap-2 py-4 font-black rounded-xl text-base transition-all disabled:opacity-40 ${
-                method === "mtn"
-                  ? "bg-[#FFC107] text-black hover:bg-[#f0b400]"
-                  : "bg-red-600 text-white hover:bg-red-700"
-              }`}
+              className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-40"
             >
-              Pay RWF {rwfTotal.toLocaleString()}
+              {predictLoading ? <><Spinner sm /><span>Detecting operator…</span></> : `Pay RWF ${rwfTotal.toLocaleString()}`}
             </button>
           )}
 

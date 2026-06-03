@@ -100,3 +100,18 @@ export function AirtelLogo() {
     </div>
   );
 }
+
+/* ─── Mobile Money (combined MTN + Airtel) ────────────────────────────────── */
+export function MobileMoneyLogo() {
+  return (
+    <div className="flex items-center justify-center gap-1.5 h-8">
+      <div className="bg-[#FFC107] rounded px-1.5 py-0.5">
+        <span className="font-black text-black text-[10px] tracking-wider">MTN</span>
+      </div>
+      <span className="text-gray-300 text-xs">|</span>
+      <div className="bg-[#FF0000] rounded px-1.5 py-0.5">
+        <span className="font-black text-white text-[10px] tracking-wide">airtel</span>
+      </div>
+    </div>
+  );
+}

@@ -7,12 +7,32 @@ const BASE_URL =
     ? "https://api.pawapay.io"
     : "https://api.sandbox.pawapay.cloud";
 
-/** Convert local Rwanda number to international format (250XXXXXXXXX). */
+/** Normalise phone to international format (e.g. 0785094435 → 250785094435). */
 function toInternational(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("250")) return digits;      // already international
-  if (digits.startsWith("0"))   return "250" + digits.slice(1); // 07X → 2507X
-  return "250" + digits;
+  const d = phone.replace(/\D/g, "");
+  if (d.startsWith("250")) return d;
+  if (d.startsWith("0"))   return "250" + d.slice(1);
+  return "250" + d;
+}
+
+/** Call PawaPay predict-provider to validate phone and get canonical provider + phoneNumber. */
+async function predictProvider(
+  phoneNumber: string,
+): Promise<{ provider: string; phoneNumber: string } | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/v2/predict-provider`, {
+      method:  "POST",
+      headers: {
+        Authorization:  `Bearer ${process.env.PAWAPAY_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phoneNumber }),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as { provider?: string; phoneNumber?: string };
+    if (!d.provider) return null;
+    return { provider: d.provider, phoneNumber: d.phoneNumber ?? phoneNumber };
+  } catch { return null; }
 }
 
 export async function POST(req: NextRequest) {
@@ -20,7 +40,7 @@ export async function POST(req: NextRequest) {
     amount:       number;
     currency?:    string;
     phone:        string;
-    operator:     string;
+    operator?:    string;   // client hint — overridden by predict-provider
     clientId?:    string | null;
     clientEmail?: string | null;
     cartItems?:   unknown[];
@@ -29,17 +49,31 @@ export async function POST(req: NextRequest) {
   };
 
   const {
-    amount, phone, operator,
+    amount,
+    phone,
     clientId    = "",
     clientEmail = "",
     cartItems   = [],
     totalUSD    = 0,
     totalRWF    = amount,
   } = body;
-  const currency      = body.currency ?? "RWF";
-  const depositId     = randomUUID();
-  const orderId       = randomUUID();
-  const phoneIntl     = toInternational(phone);
+  const currency  = body.currency ?? "RWF";
+  const depositId = randomUUID();
+  const orderId   = randomUUID();
+
+  // Validate phone and get canonical provider via predict-provider
+  const intlPhone = toInternational(phone);
+  const predicted = await predictProvider(intlPhone);
+
+  if (!predicted) {
+    console.error("[pawapay/initiate] predict-provider failed for phone:", intlPhone);
+    // Fall back to client-supplied operator rather than blocking the payment
+  }
+
+  const finalPhone    = predicted?.phoneNumber ?? intlPhone;
+  const finalProvider = predicted?.provider    ?? body.operator ?? "MTN_MOMO_RWA";
+
+  console.log("[pawapay/initiate]", { finalPhone, finalProvider, totalUSD, totalRWF });
 
   const res = await fetch(`${BASE_URL}/v2/deposits`, {
     method:  "POST",
@@ -52,8 +86,8 @@ export async function POST(req: NextRequest) {
       payer: {
         type: "MMO",
         accountDetails: {
-          phoneNumber: phoneIntl,
-          provider:    operator,
+          phoneNumber: finalPhone,
+          provider:    finalProvider,
         },
       },
       amount:            String(amount),
@@ -61,7 +95,7 @@ export async function POST(req: NextRequest) {
       clientReferenceId: orderId,
       customerMessage:   "BShop Africa Payment",
       metadata: [
-        { orderId  },
+        { orderId },
         { clientId: String(clientId ?? "") },
       ],
     }),
@@ -69,7 +103,7 @@ export async function POST(req: NextRequest) {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("[pawapay/initiate]", res.status, text);
+    console.error("[pawapay/initiate] deposit failed:", res.status, text);
     return NextResponse.json({ success: false, error: "PawaPay request failed" }, { status: 502 });
   }
 
@@ -84,8 +118,6 @@ export async function POST(req: NextRequest) {
     totalRWF,
     createdAt:   Date.now(),
   });
-
-  console.log("[pawapay/initiate] deposit created", { depositId, phoneIntl, operator, totalUSD, totalRWF });
 
   return NextResponse.json({ success: true, depositId, status: data.status ?? "ACCEPTED" });
 }
