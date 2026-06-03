@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { depositStore, cleanupDeposits } from "@/lib/pawapay-store";
+import { config } from "@/lib/config";
 
 const BASE_URL =
-  process.env.PAWAPAY_ENVIRONMENT === "production"
+  config.pawapayEnvironment === "production"
     ? "https://api.pawapay.io"
     : "https://api.sandbox.pawapay.cloud";
 
@@ -23,7 +24,7 @@ async function predictProvider(
     const res = await fetch(`${BASE_URL}/v2/predict-provider`, {
       method:  "POST",
       headers: {
-        Authorization:  `Bearer ${process.env.PAWAPAY_API_KEY}`,
+        Authorization:  `Bearer ${config.pawapayApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ phoneNumber }),
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
   const res = await fetch(`${BASE_URL}/v2/deposits`, {
     method:  "POST",
     headers: {
-      Authorization:  `Bearer ${process.env.PAWAPAY_API_KEY}`,
+      Authorization:  `Bearer ${config.pawapayApiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

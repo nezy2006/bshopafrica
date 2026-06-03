@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { config } from "@/lib/config";
 
 const BASE_URL =
-  process.env.PAWAPAY_ENVIRONMENT === "production"
+  config.pawapayEnvironment === "production"
     ? "https://api.pawapay.io"
     : "https://api.sandbox.pawapay.cloud";
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: "Missing depositId" }, { status: 400 });
 
   const res = await fetch(`${BASE_URL}/v2/deposits/${depositId}`, {
-    headers: { Authorization: `Bearer ${process.env.PAWAPAY_API_KEY}` },
+    headers: { Authorization: `Bearer ${config.pawapayApiKey}` },
     cache: "no-store",
   });
 

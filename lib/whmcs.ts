@@ -4,6 +4,7 @@
 // A missing whitelist entry causes all API calls to return HTTP 403.
 
 import crypto from "crypto";
+import { config } from "@/lib/config";
 
 export const BSHOP_NAMESERVERS = {
   ns1: "ns1.mysecurecloudhost.com",
@@ -70,9 +71,7 @@ export interface AdminTicket {
 
 /* ─── Core ───────────────────────────────────────────────────────────────── */
 function getCredentials() {
-  const url = process.env.WHMCS_URL; const identifier = process.env.WHMCS_IDENTIFIER; const secret = process.env.WHMCS_SECRET;
-  if (!url || !identifier || !secret) throw new Error("WHMCS not configured — add WHMCS_URL, WHMCS_IDENTIFIER, WHMCS_SECRET to .env.local");
-  return { url, identifier, secret };
+  return { url: config.whmcsUrl, identifier: config.whmcsIdentifier, secret: config.whmcsSecret };
 }
 
 async function callWhmcs(action: string, params: Record<string, string | number | boolean> = {}): Promise<WhmcsRaw> {
@@ -369,11 +368,11 @@ export async function updateClientDetails(clientId: number, updates: Record<stri
 }
 
 export function getInvoicePDFUrl(invoiceId: number): string {
-  return `${process.env.WHMCS_URL ?? ""}/viewinvoice.php?id=${invoiceId}&download=1`;
+  return `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}&download=1`;
 }
 
 export function getPaymentUrl(invoiceId: number): string {
-  return `${process.env.WHMCS_URL ?? ""}/viewinvoice.php?id=${invoiceId}`;
+  return `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}`;
 }
 
 export async function initiateTransfer(clientId: number, domain: string, authCode: string): Promise<OrderResult> {
@@ -424,7 +423,7 @@ export async function createPawapayOrder(
   clientId:  number,
   cartItems: CartItemLike[],
 ): Promise<PawapayOrderResult> {
-  const gateway    = process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer";
+  const gateway    = process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer"; // intentionally not in config — set per-deployment
   const baseParams = { clientid: clientId, paymentmethod: gateway };
 
   const domain   = cartItems.find(i => i.type === "domain");
@@ -610,7 +609,7 @@ export async function addAnnouncement(subject: string, message: string): Promise
 }
 
 export function generateAutoAuthUrl(email: string, destination = "clientarea.php"): string {
-  const whmcsUrl     = process.env.WHMCS_URL          ?? "";
+  const whmcsUrl     = config.whmcsUrl;
   const autoAuthKey  = process.env.WHMCS_AUTOAUTH_KEY ?? "";
   const timestamp    = Math.floor(Date.now() / 1000);
   const hash         = crypto.createHash("sha1").update(email + timestamp + autoAuthKey).digest("hex");
