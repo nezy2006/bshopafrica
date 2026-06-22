@@ -153,6 +153,7 @@ export default function LoginPage() {
   const [otpLoading,     setOtpLoading]     = useState(false);
   const [otpError,       setOtpError]       = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [devCode,        setDevCode]        = useState<string | null>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Cooldown timer
@@ -183,7 +184,8 @@ export default function LoginPage() {
         return;
       }
       setPendingClient(json.data);
-      await sendOtp(json.data.email || email, json.data.clientId);
+      const code = await sendOtp(json.data.email || email, json.data.clientId);
+      setDevCode(code ?? null);
       setStep("otp");
       setResendCooldown(30);
     } catch {
@@ -193,12 +195,14 @@ export default function LoginPage() {
     }
   };
 
-  const sendOtp = async (emailAddr: string, clientId: number) => {
-    await fetch("/api/auth/send-otp", {
+  const sendOtp = async (emailAddr: string, clientId: number): Promise<string | undefined> => {
+    const res  = await fetch("/api/auth/send-otp", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ email: emailAddr, clientId }),
     });
+    const json = (await res.json()) as { success: boolean; devCode?: string };
+    return json.devCode;
   };
 
   /* ── OTP digit input ── */
@@ -257,7 +261,8 @@ export default function LoginPage() {
     if (!pendingClient || resendCooldown > 0) return;
     setOtpError(null);
     setOtp(["", "", "", "", "", ""]);
-    await sendOtp(pendingClient.email || email, pendingClient.clientId);
+    const code = await sendOtp(pendingClient.email || email, pendingClient.clientId);
+    setDevCode(code ?? null);
     setResendCooldown(30);
     otpRefs.current[0]?.focus();
   };
@@ -409,6 +414,18 @@ export default function LoginPage() {
                 </p>
               </div>
 
+              {/* Fallback: shown when WHMCS email delivery fails */}
+              {devCode && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-5 px-4 py-3.5 bg-yellow-50 border border-yellow-300 rounded-xl text-sm"
+                >
+                  <p className="font-semibold text-yellow-800 mb-1">Email delivery issue — use this code:</p>
+                  <p className="text-2xl font-black tracking-[0.3em] text-yellow-900">{devCode}</p>
+                </motion.div>
+              )}
+
               {/* 6 OTP boxes */}
               <div className="flex gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
                 {otp.map((digit, i) => (
@@ -459,7 +476,7 @@ export default function LoginPage() {
                   )}
                 </p>
                 <button
-                  onClick={() => { setStep("credentials"); setOtp(["","","","","",""]); setOtpError(null); }}
+                  onClick={() => { setStep("credentials"); setOtp(["","","","","",""]); setOtpError(null); setDevCode(null); }}
                   className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   ← Back to login
