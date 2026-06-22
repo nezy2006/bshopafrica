@@ -11,6 +11,110 @@ import {
 } from "@/lib/cart";
 import { PaymentIconsRow } from "@/components/PaymentIcons";
 
+/* ─── Free domain search (shown when hosting in cart, no domain) ─────────── */
+function FreeDomainSearch({ onDomainAdded }: { onDomainAdded: () => void }) {
+  const [query,     setQuery]     = useState("");
+  const [searching, setSearching] = useState(false);
+  const [result,    setResult]    = useState<{ available: boolean; domain: string; price: number } | null>(null);
+  const [added,     setAdded]     = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = query.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (!raw) return;
+    const hasExt = raw.includes(".");
+    const domain = hasExt ? raw : raw + ".com";
+    const [name, ...rest] = domain.split(".");
+    const tld = "." + rest.join(".");
+    setSearching(true);
+    setResult(null);
+    setAdded(false);
+    try {
+      const res  = await fetch("/api/whmcs", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ action: "checkDomain", params: { domain: name, tld } }),
+      });
+      const json = await res.json() as { success: boolean; data?: { available: boolean; domain: string; price: number } };
+      if (json.success && json.data) setResult(json.data);
+    } catch { /* ignore */ }
+    setSearching(false);
+  };
+
+  const handleAdd = () => {
+    if (!result?.available) return;
+    const [name, ...rest] = result.domain.split(".");
+    addToCart({
+      id:     result.domain,
+      type:   "domain",
+      name:   result.domain,
+      tld:    "." + rest.join("."),
+      domain: result.domain,
+      price:  0, // free with hosting
+    });
+    setAdded(true);
+    onDomainAdded();
+  };
+
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="mt-2 rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#6B21A8] shadow-sm text-xl flex-shrink-0">
+          🌐
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 text-sm">Choose your free domain</p>
+          <p className="text-xs text-green-700 font-semibold">Your first domain is FREE with this hosting plan</p>
+        </div>
+      </div>
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="yourbusiness.com"
+          className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-sm text-black outline-none transition-all focus:border-[#6B21A8] focus:shadow-[0_0_0_3px_rgba(107,33,168,0.1)]"
+        />
+        <button type="submit" disabled={searching}
+          className="px-4 py-2.5 bg-[#6B21A8] text-white text-sm font-bold rounded-xl hover:bg-[#581c87] transition-colors disabled:opacity-60 whitespace-nowrap">
+          {searching ? "Searching…" : "Search"}
+        </button>
+      </form>
+
+      {result && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className={`mt-3 p-3 rounded-xl flex items-center justify-between gap-3 ${
+            result.available ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
+          }`}
+        >
+          <div>
+            <p className={`text-sm font-bold ${result.available ? "text-green-800" : "text-red-700"}`}>
+              {result.domain}
+            </p>
+            <p className={`text-xs ${result.available ? "text-green-700" : "text-red-600"}`}>
+              {result.available
+                ? added ? "Added to cart!" : "Available — FREE with your hosting plan"
+                : "Not available. Try a different name."}
+            </p>
+          </div>
+          {result.available && !added && (
+            <button onClick={handleAdd}
+              className="flex-shrink-0 px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-colors">
+              Add Free
+            </button>
+          )}
+          {added && (
+            <span className="flex-shrink-0 text-green-600 text-sm font-bold">✓ Added</span>
+          )}
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
+
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
@@ -338,6 +442,11 @@ export default function CartPage() {
                 {websiteBuilder  && <WebsiteBuilderCard   key={websiteBuilder.id} item={websiteBuilder} onRemove={() => handleRemove(websiteBuilder.id)} />}
               </AnimatePresence>
 
+              {/* Free domain prompt when hosting is in cart but no domain yet */}
+              {hosting && !domain && !transfer && (
+                <FreeDomainSearch onDomainAdded={() => setItems(getCart())} />
+              )}
+
               {/* Website Builder badge when hosting is in cart */}
               {hosting && (
                 <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -463,11 +572,23 @@ export default function CartPage() {
                 </div>
 
                 {/* Proceed */}
-                <button
-                  onClick={() => router.push("/checkout")}
-                  className="w-full mt-6 py-3.5 bg-[#6B21A8] text-white font-bold rounded-2xl hover:shadow-[0_0_30px_rgba(107,33,168,0.45)] transition-shadow text-base">
-                  Proceed to Checkout →
-                </button>
+                {hosting && !domain && !transfer ? (
+                  <div className="mt-6">
+                    <button disabled
+                      className="w-full py-3.5 bg-gray-200 text-gray-400 font-bold rounded-2xl text-base cursor-not-allowed">
+                      Proceed to Checkout →
+                    </button>
+                    <p className="mt-2 text-xs text-center text-amber-700 font-medium">
+                      Please choose a domain to continue
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => router.push("/checkout")}
+                    className="w-full mt-6 py-3.5 bg-[#6B21A8] text-white font-bold rounded-2xl hover:shadow-[0_0_30px_rgba(107,33,168,0.45)] transition-shadow text-base">
+                    Proceed to Checkout →
+                  </button>
+                )}
 
                 {/* Trust badges */}
                 <div className="mt-5 flex items-center justify-center gap-1.5 text-xs text-gray-400">

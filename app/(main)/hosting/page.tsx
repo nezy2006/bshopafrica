@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import Link from "next/link";
 import { HostingTimeline, IncludedCards } from "@/components/HostingTimeline";
+import { addToCart } from "@/lib/cart";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
@@ -11,6 +13,7 @@ const EASE: Ease = [0.22, 1, 0.36, 1];
 /* ─── Data ───────────────────────────────────────────────────────────────── */
 
 interface Plan {
+  id: string;
   name: string;
   badge?: string;
   monthly: number;
@@ -21,6 +24,7 @@ interface Plan {
 
 const PLANS: Plan[] = [
   {
+    id: "hosting_starter",
     name: "Business Starter Kit",
     monthly: 8,
     yearly: 96,
@@ -40,6 +44,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
+    id: "hosting_grower",
     name: "Business Grower Kit",
     badge: "BEST VALUE",
     monthly: 12,
@@ -61,6 +66,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
+    id: "hosting_plus",
     name: "Business Plus Kit",
     monthly: 16,
     yearly: 192,
@@ -239,6 +245,7 @@ function useCountUp(target: number, duration = 1200) {
 
 /* ─── 3-D Tilt Plan Card ─────────────────────────────────────────────────── */
 function PlanCard({ plan, index }: { plan: Plan; index: number }) {
+  const router = useRouter();
   const cardRef = useRef<HTMLDivElement>(null);
   const [mob, setMob] = useState(false);
   const { ref: priceRef, count: priceCount } = useCountUp(plan.monthly);
@@ -319,8 +326,16 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
         </ul>
 
         <div className="mt-8">
-          <a
-            href="/signup"
+          <button
+            onClick={() => {
+              const loggedIn = typeof window !== "undefined" && !!localStorage.getItem("bshop_client_id");
+              if (loggedIn) {
+                addToCart({ id: plan.id, type: "hosting", name: plan.name, monthly: plan.monthly, yearly: plan.yearly, cycle: "yearly" });
+                router.push("/cart");
+              } else {
+                router.push(`/signup?redirect=/cart&plan=${plan.id}`);
+              }
+            }}
             className={`relative overflow-hidden group flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
               plan.best
                 ? "bg-white text-[#6B21A8] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
@@ -333,7 +348,7 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
                 plan.best ? "bg-purple-100" : "bg-[#581c87]"
               }`}
             />
-          </a>
+          </button>
         </div>
       </div>
     </motion.div>

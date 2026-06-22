@@ -2,31 +2,46 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Lightbulb, Search, Handshake, Globe } from "lucide-react";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
-const VALUES = [
+const FEATURES = [
   {
-    Icon: Lightbulb, color: "bg-yellow-50 text-yellow-600",
-    title: "Innovation",
-    desc: "We constantly push the boundaries of what African web infrastructure can be, embracing new technologies to serve our clients better.",
+    icon: "🏗️",
+    color: "bg-blue-50 text-blue-600",
+    title: "Reliable Infrastructure",
+    desc: "Fast, secure, and dependable hosting that keeps your website available when your customers need it most.",
   },
   {
-    Icon: Search, color: "bg-blue-50 text-blue-600",
-    title: "Transparency",
-    desc: "No hidden fees. No surprises. What you see is exactly what you pay — forever. Honest pricing is the foundation of trust.",
+    icon: "🎧",
+    color: "bg-green-50 text-green-600",
+    title: "Responsive Support",
+    desc: "When you need assistance, you speak to real people who understand your business and are committed to finding solutions quickly.",
   },
   {
-    Icon: Handshake, color: "bg-green-50 text-green-600",
-    title: "Partnership",
-    desc: "We don't just sell hosting — we invest in your success. Our team grows when our clients grow. Your win is our win.",
+    icon: "💡",
+    color: "bg-yellow-50 text-yellow-600",
+    title: "Transparent Pricing",
+    desc: "Simple, straightforward pricing with no hidden surprises, making it easier to plan and manage your digital investment.",
   },
   {
-    Icon: Globe, color: "bg-purple-50 text-purple-600",
-    title: "African Pride",
-    desc: "Built in Africa, for Africa. We understand local markets, local challenges, and the immense potential of the African digital economy.",
+    icon: "🌐",
+    color: "bg-purple-50 text-purple-600",
+    title: "Complete Digital Solutions",
+    desc: "From domain registration and web hosting to website development and ongoing support, everything you need is available in one place.",
+  },
+  {
+    icon: "🚀",
+    color: "bg-orange-50 text-orange-600",
+    title: "Built for Growth",
+    desc: "Whether you're launching a new venture or scaling an established organisation, our solutions are designed to grow alongside your business.",
+  },
+  {
+    icon: "🌍",
+    color: "bg-teal-50 text-teal-600",
+    title: "An African Perspective, Global Standards",
+    desc: "We understand the realities of doing business in African markets while delivering the quality, reliability, and professionalism expected anywhere in the world.",
   },
 ];
 
@@ -60,101 +75,41 @@ function HeroSection() {
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.75, ease: EASE }}
         >
-          About The B.Shop
+          Why Businesses Choose<br />
+          <span className="text-purple-200">The B.Shop</span>
         </motion.h1>
         <motion.p
-          className="text-lg sm:text-xl text-purple-200"
+          className="text-lg sm:text-xl text-purple-200 max-w-xl mx-auto"
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.65 }}
         >
-          Building Africa&apos;s Digital Future
+          Building a website is easy. Building a reliable digital presence requires the right foundation.
         </motion.p>
       </div>
     </section>
   );
 }
 
-/* ─── Our Story ──────────────────────────────────────────────────────────── */
-function StorySection() {
+/* ─── Intro ──────────────────────────────────────────────────────────────── */
+function IntroSection() {
   return (
-    <section className="bg-white py-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-14 items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }} transition={{ duration: 0.7, ease: EASE }}
-          >
-            <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-5">
-              Our Story
-            </span>
-            <h2 className="text-4xl font-black text-black mb-5 leading-tight">
-              Why We Built<br /><span className="text-[#6B21A8]">The B.Shop</span>
-            </h2>
-            <div className="space-y-4 text-gray-500 text-base leading-relaxed">
-              <p>
-                The B.Shop was born out of a simple observation: African businesses were being
-                underserved by web hosting providers that didn&apos;t understand local needs,
-                charged in foreign currencies, and offered little to no local support.
-              </p>
-              <p>
-                We set out to change that. Since 2020, we&apos;ve been building the web infrastructure
-                that African businesses deserve — fast, reliable, transparently priced, and backed by
-                a team that genuinely cares about your success.
-              </p>
-              <p>
-                Today, hundreds of businesses across the continent trust The B.Shop to power
-                their digital presence. From small startups in Kigali to growing enterprises across
-                East Africa, we&apos;re proud to be the foundation for Africa&apos;s digital future.
-              </p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 40 }} whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
-            className="space-y-5"
-          >
-            {/* Company details card */}
-            <div className="bg-gray-50 rounded-2xl p-7 border border-gray-100">
-              <h3 className="font-bold text-black text-base mb-5">Company Details</h3>
-              <dl className="space-y-4">
-                {[
-                  { label: "Founded",    value: "2020" },
-                  { label: "Based in",   value: "Kigali, Rwanda" },
-                  { label: "Mission",    value: "Building Africa's digital economy" },
-                  { label: "Email",      value: <a href="mailto:admin@bshopafrica.com" className="text-[#6B21A8] hover:underline">admin@bshopafrica.com</a> },
-                  { label: "Website",    value: "bshopafrica.com" },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex items-start gap-4">
-                    <dt className="text-sm font-semibold text-gray-500 w-24 flex-shrink-0">{label}</dt>
-                    <dd className="text-sm text-black font-medium">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { num: "2020",  label: "Founded"    },
-                { num: "500+",  label: "Clients"    },
-                { num: "99.9%", label: "Uptime SLA" },
-              ].map(s => (
-                <div key={s.label} className="bg-[#6B21A8] rounded-2xl p-4 text-center">
-                  <p className="text-2xl font-black text-white">{s.num}</p>
-                  <p className="text-purple-300 text-xs font-medium mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
+    <section className="bg-white py-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto text-center">
+        <motion.p
+          className="text-xl text-gray-600 leading-relaxed"
+          initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }} transition={{ duration: 0.65 }}
+        >
+          At The B.Shop, we help businesses across Africa and beyond establish, manage, and grow
+          their online presence with dependable digital solutions designed for real-world business needs.
+        </motion.p>
       </div>
     </section>
   );
 }
 
-/* ─── Values ─────────────────────────────────────────────────────────────── */
-function ValuesSection() {
+/* ─── Feature cards ──────────────────────────────────────────────────────── */
+function FeaturesSection() {
   return (
     <section className="bg-gray-50 py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
@@ -164,29 +119,47 @@ function ValuesSection() {
           viewport={{ once: true }} transition={{ duration: 0.65 }}
         >
           <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-4">
-            What We Stand For
+            What We Offer
           </span>
-          <h2 className="text-4xl sm:text-5xl font-black text-black">Our Values</h2>
+          <h2 className="text-4xl sm:text-5xl font-black text-black">Built for Your Success</h2>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {VALUES.map((v, i) => (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {FEATURES.map((f, i) => (
             <motion.div
-              key={v.title}
+              key={f.title}
               initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.55, ease: EASE }}
+              transition={{ delay: i * 0.08, duration: 0.55, ease: EASE }}
               whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.14)" }}
               className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:border-purple-200 transition-colors duration-300 cursor-default"
             >
-              <div className={`w-12 h-12 rounded-xl ${v.color} flex items-center justify-center mb-4`}>
-                <v.Icon className="w-6 h-6" />
+              <div className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mb-4 text-2xl`}>
+                {f.icon}
               </div>
-              <h3 className="text-base font-bold text-black mb-2">{v.title}</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">{v.desc}</p>
+              <h3 className="text-base font-bold text-black mb-2">{f.title}</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Closing statement ──────────────────────────────────────────────────── */
+function ClosingSection() {
+  return (
+    <section className="bg-white py-20 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto text-center">
+        <motion.blockquote
+          className="text-2xl sm:text-3xl font-bold text-black leading-relaxed"
+          initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }} transition={{ duration: 0.7, ease: EASE }}
+        >
+          &ldquo;Your website is more than a digital asset. It is often the first impression customers
+          have of your business. We&apos;re here to help you make it count.&rdquo;
+        </motion.blockquote>
       </div>
     </section>
   );
@@ -219,7 +192,7 @@ function CTASection() {
           Start Your Digital Journey
         </h2>
         <p className="text-purple-200 text-lg mb-10">
-          Join hundreds of African businesses already growing with The B.Shop
+          Join businesses across Africa already growing with The B.Shop
         </p>
         <Link
           href="/signup"
@@ -240,8 +213,9 @@ export default function AboutPage() {
   return (
     <>
       <HeroSection />
-      <StorySection />
-      <ValuesSection />
+      <IntroSection />
+      <FeaturesSection />
+      <ClosingSection />
       <CTASection />
     </>
   );

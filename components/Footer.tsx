@@ -44,7 +44,7 @@ const SOCIALS = [
   { icon: <InstagramIcon />, href: "https://www.instagram.com/thebshopafrica/",        label: "Instagram" },
   { icon: <TwitterIcon />,   href: "https://x.com/thebshopafrica",                     label: "X / Twitter" },
   { icon: <LinkedinIcon />,  href: "https://rw.linkedin.com/company/the-bshop-africa", label: "LinkedIn" },
-  { icon: <TikTokIcon />,    href: "https://www.tiktok.com/@thebshopafrica",           label: "TikTok" },
+  { icon: <TikTokIcon />,    href: "https://www.tiktok.com/@b.shopafrica_",           label: "TikTok" },
 ];
 
 const FOOTER_LINKS = {
@@ -118,15 +118,15 @@ export default function Footer() {
             />
             <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
               Africa&apos;s premier web hosting provider. Fast, reliable, and
-              transparently priced — helping businesses tell their digital
-              story since 2020.
+              transparently priced — helping businesses across Africa and beyond
+              establish their digital presence.
             </p>
 
             {/* Address + contact */}
             <div className="space-y-1.5">
               <p className="flex items-center gap-2 text-sm text-gray-500">
                 <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                Kigali, Rwanda
+                Africa and beyond
               </p>
               <p className="flex items-center gap-2 text-sm text-gray-500">
                 <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -242,7 +242,7 @@ export default function Footer() {
         >
           <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
             <p className="text-xs text-gray-500">
-              © {new Date().getFullYear()} The B.Shop · Kigali, Rwanda · All rights reserved.
+              © {new Date().getFullYear()} The B.Shop · All rights reserved.
             </p>
             <div className="flex gap-3">
               {LEGAL.map((l) => (

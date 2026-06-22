@@ -22,7 +22,7 @@ const SOCIALS = [
   { label: "Instagram",  href: "https://www.instagram.com/thebshopafrica/",        Icon: InstagramIcon },
   { label: "X / Twitter",href: "https://x.com/thebshopafrica",                     Icon: TwitterIcon   },
   { label: "LinkedIn",   href: "https://rw.linkedin.com/company/the-bshop-africa", Icon: LinkedInIcon  },
-  { label: "TikTok",     href: "https://www.tiktok.com/@thebshopafrica",           Icon: TikTokIcon    },
+  { label: "TikTok",     href: "https://www.tiktok.com/@b.shopafrica_",           Icon: TikTokIcon    },
 ];
 
 const FAQ_TEASER = [

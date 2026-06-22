@@ -407,15 +407,56 @@ const AIRTEL_PROVIDERS = new Set([
   "AIRTEL_KEN", "AIRTEL_MOZ", "AIRTEL_TZA", "AIRTEL_MDG", "AIRTEL_NGA",
 ]);
 
+/* ─── Invoice redirect countdown ────────────────────────────────────────── */
+function InvoiceRedirectBanner({ invoiceId, paymentUrl }: { invoiceId: number; paymentUrl: string }) {
+  const [count, setCount] = useState(3);
+  useEffect(() => {
+    if (count <= 0) { window.location.href = paymentUrl; return; }
+    const t = setTimeout(() => setCount(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [count, paymentUrl]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="text-center py-10 space-y-5"
+    >
+      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+        <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+      <div>
+        <p className="font-bold text-lg text-gray-900">Invoice #{invoiceId} has been created</p>
+        <p className="text-gray-500 text-sm mt-1">You will be redirected to complete payment in {count} second{count !== 1 ? "s" : ""}…</p>
+      </div>
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border-4 border-[#6B21A8] text-[#6B21A8] text-xl font-black">
+        {count}
+      </div>
+      <div>
+        <a href={paymentUrl}
+          className="text-sm text-[#6B21A8] font-semibold hover:underline">
+          Click here if you are not redirected automatically
+        </a>
+      </div>
+    </motion.div>
+  );
+}
+
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
 type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
 
 function StepPayment({ cart }: { cart: Cart }) {
   const router = useRouter();
-  const [method,  setMethod]  = useState<PayMethod>("paypal");
-  const [agreed,  setAgreed]  = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [method,         setMethod]         = useState<PayMethod>("paypal");
+  const [agreed,         setAgreed]         = useState(false);
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [invoiceCreated, setInvoiceCreated] = useState<{ invoiceId: number; paymentUrl: string } | null>(null);
 
   // Mobile money
   const [mmPhone,           setMmPhone]           = useState("");
@@ -611,10 +652,11 @@ function StepPayment({ cart }: { cart: Cart }) {
         return;
       }
 
-      // Store invoiceId so /checkout/complete can read it if WHMCS doesn't pass it back in the URL
+      // Store invoiceId so /checkout/complete can read it
       localStorage.setItem("bshop_pending_invoice", String(json.invoiceId));
       clearCart();
-      window.location.href = json.paymentUrl;
+      // Show countdown banner before redirecting
+      setInvoiceCreated({ invoiceId: json.invoiceId!, paymentUrl: json.paymentUrl });
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -623,6 +665,10 @@ function StepPayment({ cart }: { cart: Cart }) {
 
   const clientName  = typeof window !== "undefined" ? (localStorage.getItem("bshop_client_name") || localStorage.getItem("bshop_client_firstname")) : null;
   const clientEmail = typeof window !== "undefined" ? localStorage.getItem("bshop_client_email") : null;
+
+  if (invoiceCreated) {
+    return <InvoiceRedirectBanner invoiceId={invoiceCreated.invoiceId} paymentUrl={invoiceCreated.paymentUrl} />;
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}>

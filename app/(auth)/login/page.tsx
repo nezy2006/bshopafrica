@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { setAuth } from "@/lib/auth";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
@@ -20,6 +21,15 @@ const fadeUp  = {
   hidden:  { opacity: 0, y: 18 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
 };
+
+type LoginStep = "credentials" | "otp";
+
+interface PendingClient {
+  clientId:  number;
+  firstname: string;
+  lastname:  string;
+  email:     string;
+}
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
 function EyeIcon({ open }: { open: boolean }) {
@@ -56,7 +66,7 @@ function GoogleIcon() {
   );
 }
 
-/* ─── Left panel (shared purple side) ───────────────────────────────────── */
+/* ─── Left panel ─────────────────────────────────────────────────────────── */
 function LeftPanel() {
   return (
     <motion.div
@@ -65,26 +75,20 @@ function LeftPanel() {
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.8, ease: EASE }}
     >
-      {/* grid overlay */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage:
-            "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)",
+          backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)",
           backgroundSize: "60px 60px",
         }}
       />
-      {/* glow orb */}
       <div
         className="pointer-events-none absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-20"
         style={{
-          background:
-            "radial-gradient(ellipse at center, rgba(216,180,254,0.5) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse at center, rgba(216,180,254,0.5) 0%, transparent 70%)",
           filter: "blur(80px)",
         }}
       />
-
-      {/* logo */}
       <div className="relative z-10">
         <Image
           src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png"
@@ -94,8 +98,6 @@ function LeftPanel() {
           className="h-11 w-auto object-contain"
         />
       </div>
-
-      {/* copy */}
       <div className="relative z-10 mt-auto mb-auto pt-16">
         <motion.h1
           className="text-5xl font-black text-white mb-4 leading-tight"
@@ -137,13 +139,31 @@ function LeftPanel() {
 /* ─── Login Page ─────────────────────────────────────────────────────────── */
 export default function LoginPage() {
   const router = useRouter();
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [step,           setStep]           = useState<LoginStep>("credentials");
+  const [email,          setEmail]          = useState("");
+  const [password,       setPassword]       = useState("");
+  const [showPw,         setShowPw]         = useState(false);
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [pendingClient,  setPendingClient]  = useState<PendingClient | null>(null);
+
+  // OTP step
+  const [otp,            setOtp]            = useState(["", "", "", "", "", ""]);
+  const [otpLoading,     setOtpLoading]     = useState(false);
+  const [otpError,       setOtpError]       = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  /* ── Credentials step ── */
+  const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -155,19 +175,17 @@ export default function LoginPage() {
       });
       const json = (await res.json()) as {
         success: boolean;
-        data?:   { clientId: number; firstname: string; lastname: string; email: string };
+        data?:   PendingClient;
         error?:  string;
       };
       if (!json.success || !json.data?.clientId) {
         setError(json.error ?? "Invalid email or password. Please try again.");
         return;
       }
-      const { clientId, firstname, lastname, email: clientEmail } = json.data;
-      localStorage.setItem("bshop_client_id",        String(clientId));
-      localStorage.setItem("bshop_client_firstname", firstname);
-      localStorage.setItem("bshop_client_name",      `${firstname} ${lastname}`.trim());
-      localStorage.setItem("bshop_client_email",     clientEmail || email);
-      router.push("/dashboard");
+      setPendingClient(json.data);
+      await sendOtp(json.data.email || email, json.data.clientId);
+      setStep("otp");
+      setResendCooldown(30);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -175,135 +193,281 @@ export default function LoginPage() {
     }
   };
 
+  const sendOtp = async (emailAddr: string, clientId: number) => {
+    await fetch("/api/auth/send-otp", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ email: emailAddr, clientId }),
+    });
+  };
+
+  /* ── OTP digit input ── */
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const next = [...otp];
+    next[index] = value.slice(-1);
+    setOtp(next);
+    if (value && index < 5) otpRefs.current[index + 1]?.focus();
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (digits.length === 6) {
+      setOtp(digits.split(""));
+      setTimeout(() => otpRefs.current[5]?.focus(), 0);
+    }
+  };
+
+  /* ── Verify OTP ── */
+  const handleVerifyOtp = async () => {
+    if (!pendingClient) return;
+    const code = otp.join("");
+    if (code.length !== 6) { setOtpError("Please enter the 6-digit code."); return; }
+    setOtpLoading(true);
+    setOtpError(null);
+    try {
+      const res  = await fetch("/api/auth/verify-otp", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email: pendingClient.email || email, otp: code }),
+      });
+      const json = (await res.json()) as { success: boolean; error?: string };
+      if (!json.success) {
+        setOtpError(json.error ?? "Invalid code. Please try again.");
+        return;
+      }
+      setAuth(pendingClient.clientId, pendingClient.firstname, pendingClient.lastname, pendingClient.email || email);
+      window.dispatchEvent(new Event("bshop_cart_update"));
+      router.push("/dashboard");
+    } catch {
+      setOtpError("Something went wrong. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  /* ── Resend OTP ── */
+  const handleResend = async () => {
+    if (!pendingClient || resendCooldown > 0) return;
+    setOtpError(null);
+    setOtp(["", "", "", "", "", ""]);
+    await sendOtp(pendingClient.email || email, pendingClient.clientId);
+    setResendCooldown(30);
+    otpRefs.current[0]?.focus();
+  };
+
+  const maskedEmail = pendingClient
+    ? (pendingClient.email || email).replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + "*".repeat(Math.max(1, b.length)) + c)
+    : email;
+
   return (
     <div className="min-h-screen flex">
       <LeftPanel />
 
       {/* Right — form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 bg-white">
-        <motion.div
-          className="w-full max-w-md"
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
-        >
-          {/* mobile logo */}
-          <motion.div variants={fadeUp} className="lg:hidden mb-10 flex justify-center">
-            <Image
-              src="/logo.png"
-              alt="The B.Shop"
-              width={160}
-              height={48}
-              className="h-10 w-auto object-contain"
-            />
-          </motion.div>
+        <AnimatePresence mode="wait">
+          {step === "credentials" ? (
+            <motion.div
+              key="credentials"
+              className="w-full max-w-md"
+              variants={stagger}
+              initial="hidden"
+              animate="visible"
+              exit={{ opacity: 0, x: -20 }}
+            >
+              {/* mobile logo */}
+              <motion.div variants={fadeUp} className="lg:hidden mb-10 flex justify-center">
+                <Image src="/logo.png" alt="The B.Shop" width={160} height={48} className="h-10 w-auto object-contain" />
+              </motion.div>
 
-          <motion.div variants={fadeUp} className="mb-8">
-            <h2 className="text-3xl font-black text-black mb-1">Log In to Your Account</h2>
-            <p className="text-gray-500 text-sm">Welcome back — we missed you.</p>
-          </motion.div>
+              <motion.div variants={fadeUp} className="mb-8">
+                <h2 className="text-3xl font-black text-black mb-1">Log In to Your Account</h2>
+                <p className="text-gray-500 text-sm">Welcome back — we missed you.</p>
+              </motion.div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <motion.div variants={fadeUp}>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                required
-                className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black placeholder-gray-400 outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
-              />
-            </motion.div>
+              <form onSubmit={handleCredentials} className="space-y-5">
+                <motion.div variants={fadeUp}>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    required
+                    className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black placeholder-gray-400 outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
+                  />
+                </motion.div>
 
-            {/* Password */}
-            <motion.div variants={fadeUp}>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-semibold text-gray-700">Password</label>
-                <a
-                  href="https://bshopafrica.com/billing/pwreset.php"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-semibold text-[#6B21A8] hover:underline"
+                <motion.div variants={fadeUp}>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-semibold text-gray-700">Password</label>
+                    <a
+                      href="https://bshopafrica.com/billing/pwreset.php"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-[#6B21A8] hover:underline"
+                    >
+                      Forgot Password?
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className="w-full px-4 py-3.5 pr-12 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black placeholder-gray-400 outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((v) => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#6B21A8] transition-colors"
+                    >
+                      <EyeIcon open={showPw} />
+                    </button>
+                  </div>
+                </motion.div>
+
+                <motion.div variants={fadeUp}>
+                  <motion.button
+                    type="submit"
+                    disabled={loading}
+                    whileHover={!loading ? { scale: 1.01 } : {}}
+                    whileTap={!loading ? { scale: 0.98 } : {}}
+                    className="relative overflow-hidden w-full flex items-center justify-center gap-2 py-3.5 bg-[#6B21A8] text-white font-bold rounded-xl text-base transition-all duration-300 hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70"
+                  >
+                    {loading ? <><Spinner /><span>Logging in…</span></> : "Log In"}
+                  </motion.button>
+                </motion.div>
+              </form>
+
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl"
                 >
-                  Forgot Password?
-                </a>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-4 py-3.5 pr-12 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black placeholder-gray-400 outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
-                />
+                  <span className="text-red-500 text-base">✕</span>
+                  <p className="text-sm text-red-600 font-medium">{error}</p>
+                </motion.div>
+              )}
+
+              <motion.div variants={fadeUp} className="my-6 flex items-center gap-4">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-medium">or</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </motion.div>
+
+              <motion.div variants={fadeUp}>
                 <button
                   type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#6B21A8] transition-colors"
-                  aria-label={showPw ? "Hide password" : "Show password"}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 border-2 border-gray-200 rounded-xl text-gray-700 font-semibold text-sm hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
                 >
-                  <EyeIcon open={showPw} />
+                  <GoogleIcon />
+                  Continue with Google
+                </button>
+              </motion.div>
+
+              <motion.p variants={fadeUp} className="mt-8 text-center text-sm text-gray-500">
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="text-[#6B21A8] font-bold hover:underline">
+                  Sign up
+                </Link>
+              </motion.p>
+            </motion.div>
+          ) : (
+            /* ── OTP Step ── */
+            <motion.div
+              key="otp"
+              className="w-full max-w-md"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.4, ease: EASE }}
+            >
+              {/* mobile logo */}
+              <div className="lg:hidden mb-10 flex justify-center">
+                <Image src="/logo.png" alt="The B.Shop" width={160} height={48} className="h-10 w-auto object-contain" />
+              </div>
+
+              <div className="mb-8 text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl">
+                  🔐
+                </div>
+                <h2 className="text-3xl font-black text-black mb-2">Check your email</h2>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  We sent a 6-digit code to<br />
+                  <span className="font-semibold text-gray-700">{maskedEmail}</span>
+                </p>
+              </div>
+
+              {/* 6 OTP boxes */}
+              <div className="flex gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
+                {otp.map((digit, i) => (
+                  <input
+                    key={i}
+                    ref={el => { otpRefs.current[i] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={e => handleOtpChange(i, e.target.value)}
+                    onKeyDown={e => handleOtpKeyDown(i, e)}
+                    className="w-12 h-14 text-center text-xl font-bold rounded-xl border-2 border-gray-200 bg-gray-50 text-black outline-none transition-all duration-200 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] caret-transparent"
+                  />
+                ))}
+              </div>
+
+              {otpError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl"
+                >
+                  <span className="text-red-500">✕</span>
+                  <p className="text-sm text-red-600 font-medium">{otpError}</p>
+                </motion.div>
+              )}
+
+              <motion.button
+                onClick={handleVerifyOtp}
+                disabled={otpLoading || otp.join("").length < 6}
+                whileHover={!otpLoading ? { scale: 1.01 } : {}}
+                whileTap={!otpLoading ? { scale: 0.98 } : {}}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#6B21A8] text-white font-bold rounded-xl text-base transition-all duration-300 hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-50"
+              >
+                {otpLoading ? <><Spinner /><span>Verifying…</span></> : "Verify Code"}
+              </motion.button>
+
+              <div className="mt-5 text-center space-y-3">
+                <p className="text-sm text-gray-500">
+                  Didn&apos;t receive it?{" "}
+                  {resendCooldown > 0 ? (
+                    <span className="text-gray-400">Resend in {resendCooldown}s</span>
+                  ) : (
+                    <button onClick={handleResend} className="text-[#6B21A8] font-semibold hover:underline">
+                      Resend code
+                    </button>
+                  )}
+                </p>
+                <button
+                  onClick={() => { setStep("credentials"); setOtp(["","","","","",""]); setOtpError(null); }}
+                  className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  ← Back to login
                 </button>
               </div>
             </motion.div>
-
-            {/* Submit */}
-            <motion.div variants={fadeUp}>
-              <motion.button
-                type="submit"
-                disabled={loading}
-                whileHover={!loading ? { scale: 1.01 } : {}}
-                whileTap={!loading ? { scale: 0.98 } : {}}
-                className="relative overflow-hidden w-full flex items-center justify-center gap-2 py-3.5 bg-[#6B21A8] text-white font-bold rounded-xl text-base transition-all duration-300 hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70"
-              >
-                {loading ? <><Spinner /><span>Logging in…</span></> : "Log In"}
-              </motion.button>
-            </motion.div>
-          </form>
-
-          {/* Error message */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl"
-            >
-              <span className="text-red-500 text-base">✕</span>
-              <p className="text-sm text-red-600 font-medium">{error}</p>
-            </motion.div>
           )}
-
-          {/* Divider */}
-          <motion.div variants={fadeUp} className="my-6 flex items-center gap-4">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">or</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </motion.div>
-
-          {/* Google */}
-          <motion.div variants={fadeUp}>
-            <button
-              type="button"
-              className="w-full flex items-center justify-center gap-3 py-3.5 border-2 border-gray-200 rounded-xl text-gray-700 font-semibold text-sm hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
-            >
-              <GoogleIcon />
-              Continue with Google
-            </button>
-          </motion.div>
-
-          {/* Sign up link */}
-          <motion.p variants={fadeUp} className="mt-8 text-center text-sm text-gray-500">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-[#6B21A8] font-bold hover:underline">
-              Sign up
-            </Link>
-          </motion.p>
-        </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

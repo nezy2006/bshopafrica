@@ -74,6 +74,14 @@ function InvoicePaid({ invoice }: { invoice: InvoiceDetails }) {
           >
             Go to Dashboard
           </Link>
+          <a
+            href={`https://bshopafrica.com/billing/viewinvoice.php?id=${invoice.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-8 py-3.5 border-2 border-[#6B21A8] text-[#6B21A8] font-bold rounded-full text-sm hover:bg-purple-50 transition-colors"
+          >
+            View Invoice →
+          </a>
           <Link
             href="/"
             className="px-8 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-full text-sm hover:border-gray-300 transition-colors"

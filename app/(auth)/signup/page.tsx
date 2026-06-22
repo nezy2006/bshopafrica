@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { addToCart } from "@/lib/cart";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
@@ -186,9 +187,18 @@ function LeftPanel() {
   );
 }
 
+const HOSTING_PLANS: Record<string, { id: string; name: string; monthly: number; yearly: number }> = {
+  hosting_starter: { id: "hosting_starter", name: "Business Starter Kit", monthly: 8,  yearly: 96  },
+  hosting_grower:  { id: "hosting_grower",  name: "Business Grower Kit",  monthly: 12, yearly: 144 },
+  hosting_plus:    { id: "hosting_plus",    name: "Business Plus Kit",    monthly: 16, yearly: 192 },
+};
+
 /* ─── Signup Page ────────────────────────────────────────────────────────── */
-export default function SignupPage() {
-  const router = useRouter();
+function SignupPageInner() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo   = searchParams.get("redirect") ?? "/dashboard";
+  const planParam    = searchParams.get("plan") ?? "";
 
   const [firstName,       setFirstName]       = useState("");
   const [lastName,        setLastName]        = useState("");
@@ -280,8 +290,16 @@ export default function SignupPage() {
       localStorage.setItem("bshop_client_firstname", firstName);
       localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
       localStorage.setItem("bshop_client_email",     email);
+      localStorage.setItem("bshop_login_time",       Date.now().toString());
+
+      // If came from hosting page, add plan to cart
+      if (planParam && HOSTING_PLANS[planParam]) {
+        const p = HOSTING_PLANS[planParam];
+        addToCart({ id: p.id, type: "hosting", name: p.name, monthly: p.monthly, yearly: p.yearly, cycle: "yearly" });
+      }
+
       window.dispatchEvent(new Event("bshop_cart_update"));
-      router.push("/dashboard");
+      router.push(redirectTo);
     } catch (err) {
       clearTimeout(timeout);
       if (err instanceof Error && err.name === "AbortError") {
@@ -512,5 +530,13 @@ export default function SignupPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" /></div>}>
+      <SignupPageInner />
+    </Suspense>
   );
 }

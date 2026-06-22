@@ -12,6 +12,46 @@ import {
 
 type Params = Record<string, unknown>;
 
+/* ─── Brute-force rate limiter (in-memory, per-IP) ──────────────────────── */
+interface RateEntry { failures: number; blockedUntil: number; }
+declare global { var __loginRateLimit: Map<string, RateEntry> | undefined; }
+const loginRateLimit: Map<string, RateEntry> =
+  globalThis.__loginRateLimit ?? (globalThis.__loginRateLimit = new Map());
+
+function getClientIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    req.headers.get("x-real-ip") ??
+    "unknown"
+  );
+}
+
+function checkLoginRateLimit(ip: string): string | null {
+  const now   = Date.now();
+  const entry = loginRateLimit.get(ip);
+  if (!entry) return null;
+  if (entry.blockedUntil > now) {
+    const mins = Math.ceil((entry.blockedUntil - now) / 60000);
+    return `Too many failed attempts. Try again in ${mins} minute${mins !== 1 ? "s" : ""}.`;
+  }
+  return null;
+}
+
+function recordLoginFailure(ip: string): void {
+  const now   = Date.now();
+  const entry = loginRateLimit.get(ip) ?? { failures: 0, blockedUntil: 0 };
+  entry.failures++;
+  if (entry.failures >= 5) {
+    entry.blockedUntil = now + 15 * 60 * 1000;
+    entry.failures     = 0;
+  }
+  loginRateLimit.set(ip, entry);
+}
+
+function clearLoginFailures(ip: string): void {
+  loginRateLimit.delete(ip);
+}
+
 export async function POST(req: NextRequest) {
   let action: string | undefined, params: Params = {};
   try {
@@ -32,9 +72,14 @@ export async function POST(req: NextRequest) {
       case "getProducts":    data = await getProducts(); break;
 
       case "loginClient": {
+        const ip        = getClientIp(req);
+        const blocked   = checkLoginRateLimit(ip);
+        if (blocked) return NextResponse.json({ success: false, error: blocked });
         try {
           data = await loginClient(s("email"), s("password"));
+          clearLoginFailures(ip);
         } catch (e) {
+          recordLoginFailure(ip);
           const msg = e instanceof Error ? e.message : "Invalid email or password.";
           console.error("[loginClient]", msg);
           return NextResponse.json({ success: false, error: msg });

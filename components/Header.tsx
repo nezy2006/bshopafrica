@@ -8,6 +8,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { User } from "lucide-react";
 import { getCartCount } from "@/lib/cart";
 import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
+import { isSessionExpired, clearAuth, refreshSession } from "@/lib/auth";
 
 // Primary links — always shown on md+ screens
 const PRIMARY_NAV = [
@@ -121,7 +122,16 @@ export default function Header() {
 
   /* Sync cart + notifications + auth */
   useEffect(() => {
+    // Session expiry check on mount
+    if (isSessionExpired()) {
+      clearAuth();
+      router.push("/login");
+      return;
+    }
+
     function sync() {
+      // Refresh session activity timestamp on each sync
+      refreshSession();
       setCartCount(getCartCount());
       setUnread(getUnreadCount());
       setNotifs(getNotifications().slice(0, 5));
@@ -187,10 +197,7 @@ export default function Header() {
   }, []);
 
   function handleLogout() {
-    localStorage.removeItem("bshop_client_id");
-    localStorage.removeItem("bshop_client_name");
-    localStorage.removeItem("bshop_client_firstname");
-    localStorage.removeItem("bshop_client_email");
+    clearAuth();
     setLoggedIn(false);
     setUserDropOpen(false);
     router.push("/");
