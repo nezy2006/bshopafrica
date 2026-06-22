@@ -8,4 +8,8 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || 'mysql://bshopafrica_cms_admin:qLinT{aOE%fS@localhost:3306/bshopafrica_cms',
   appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://test.bshopafrica.com',
   websiteBuilderProductId: process.env.WEBSITE_BUILDER_PRODUCT_ID || '34',
+  smtpHost: process.env.SMTP_HOST || 'mail.bshopafrica.com',
+  smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
+  smtpUser: process.env.SMTP_USER || 'admin@bshopafrica.com',
+  smtpPass: process.env.SMTP_PASS || '',
 }

@@ -16,11 +16,13 @@
     "@tiptap/extension-placeholder": "^3.25.0",
     "@tiptap/react": "^3.25.0",
     "@tiptap/starter-kit": "^3.25.0",
+    "@types/nodemailer": "^8.0.1",
     "axios": "^1.16.1",
     "framer-motion": "^12.39.0",
     "lucide-react": "^1.16.0",
     "mysql2": "^3.22.3",
     "next": "16.2.6",
+    "nodemailer": "^9.0.1",
     "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
