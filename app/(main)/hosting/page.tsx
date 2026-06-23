@@ -328,13 +328,8 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
         <div className="mt-8">
           <button
             onClick={() => {
-              const loggedIn = typeof window !== "undefined" && !!localStorage.getItem("bshop_client_id");
-              if (loggedIn) {
-                addToCart({ id: plan.id, type: "hosting", name: plan.name, monthly: plan.monthly, yearly: plan.yearly, cycle: "yearly" });
-                router.push("/cart");
-              } else {
-                router.push(`/signup?redirect=/cart&plan=${plan.id}`);
-              }
+              addToCart({ id: plan.id, type: "hosting", name: plan.name, monthly: plan.monthly, yearly: plan.yearly, cycle: "yearly" });
+              router.push("/cart");
             }}
             className={`relative overflow-hidden group flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
               plan.best

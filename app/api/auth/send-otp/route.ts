@@ -10,7 +10,7 @@ function buildEmailHtml(code: string) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your B.Shop Login Code</title>
+  <title>Login verification code</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 20px;">
@@ -18,34 +18,43 @@ function buildEmailHtml(code: string) {
       <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
         <!-- Header -->
         <tr>
-          <td style="background:linear-gradient(135deg,#3b0764,#6B21A8);padding:36px 40px;text-align:center;">
-            <div style="font-size:28px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">The B.Shop</div>
-            <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-top:4px;">bshopafrica.com</div>
+          <td style="background:#6B21A8;padding:36px 40px;text-align:center;">
+            <div style="font-size:26px;font-weight:700;color:#ffffff;">The B.Shop Africa</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-top:4px;">bshopafrica.com</div>
           </td>
         </tr>
         <!-- Body -->
         <tr>
           <td style="padding:40px;">
             <p style="margin:0 0 8px;font-size:16px;color:#374151;">Hi,</p>
-            <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">
-              Your login verification code for <strong style="color:#111827;">The B.Shop</strong> is:
+            <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6;">
+              You requested to log in to your B.Shop Africa account. Use the code below to complete your login:
             </p>
             <!-- OTP code box -->
-            <div style="text-align:center;margin:0 0 28px;">
+            <div style="text-align:center;margin:0 0 24px;">
               <div style="display:inline-block;background:#f5f3ff;border:2px solid #c4b5fd;border-radius:12px;padding:18px 40px;">
-                <span style="font-size:42px;font-weight:900;letter-spacing:0.25em;color:#6B21A8;">${code}</span>
+                <span style="font-size:40px;font-weight:700;letter-spacing:0.2em;color:#6B21A8;">${code}</span>
               </div>
             </div>
             <p style="margin:0 0 8px;font-size:14px;color:#6b7280;line-height:1.6;">
-              This code expires in <strong style="color:#111827;">10 minutes</strong>.
+              This code is valid for <strong style="color:#111827;">10 minutes</strong>.
             </p>
             <p style="margin:0 0 28px;font-size:14px;color:#6b7280;line-height:1.6;">
-              If you did not request this code, you can safely ignore this email. Your account remains secure.
+              If you did not request this, you can safely ignore this email. Your account remains secure.
             </p>
             <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 24px;" />
-            <p style="margin:0;font-size:13px;color:#9ca3af;">
-              The B.Shop Africa Team<br />
-              <a href="https://bshopafrica.com" style="color:#6B21A8;text-decoration:none;">https://bshopafrica.com</a>
+            <!-- Footer -->
+            <p style="margin:0 0 8px;font-size:12px;color:#9ca3af;line-height:1.6;">
+              This email was sent because you requested to log in to your B.Shop Africa account.
+            </p>
+            <p style="margin:0 0 8px;font-size:12px;color:#9ca3af;line-height:1.6;">
+              The B.Shop Africa &nbsp;|&nbsp;
+              <a href="mailto:admin@bshopafrica.com" style="color:#9ca3af;text-decoration:none;">admin@bshopafrica.com</a> &nbsp;|&nbsp;
+              <a href="https://bshopafrica.com" style="color:#9ca3af;text-decoration:none;">bshopafrica.com</a>
+            </p>
+            <p style="margin:0;font-size:11px;color:#d1d5db;line-height:1.6;">
+              To stop receiving these emails, contact
+              <a href="mailto:admin@bshopafrica.com" style="color:#d1d5db;">admin@bshopafrica.com</a>
             </p>
           </td>
         </tr>
@@ -59,12 +68,15 @@ function buildEmailHtml(code: string) {
 function buildEmailText(code: string) {
   return (
     `Hi,\n\n` +
-    `Your login verification code for The B.Shop is:\n\n` +
-    `  ${code}\n\n` +
-    `This code expires in 10 minutes.\n\n` +
-    `If you did not request this code, you can safely ignore this email.\n\n` +
-    `The B.Shop Africa Team\n` +
-    `https://bshopafrica.com`
+    `You requested to log in to your B.Shop Africa account.\n\n` +
+    `Your verification code is: ${code}\n\n` +
+    `This code is valid for 10 minutes.\n\n` +
+    `If you did not request this, you can safely ignore this email.\n\n` +
+    `---\n` +
+    `This email was sent because you requested to log in to your B.Shop Africa account.\n` +
+    `If you did not request this, you can safely ignore this email.\n\n` +
+    `The B.Shop Africa | admin@bshopafrica.com | bshopafrica.com\n` +
+    `To stop receiving these emails, contact admin@bshopafrica.com`
   );
 }
 
@@ -118,11 +130,19 @@ async function sendViaSmtp(email: string, code: string): Promise<boolean> {
     });
 
     const info = await transporter.sendMail({
-      from:    `"The B.Shop" <${config.smtpUser}>`,
-      to:      email,
-      subject: "Your B.Shop Login Code",
-      text:    buildEmailText(code),
-      html:    buildEmailHtml(code),
+      from:      `"The B.Shop Africa" <${config.smtpUser}>`,
+      to:        email,
+      subject:   "Your login verification code",
+      text:      buildEmailText(code),
+      html:      buildEmailHtml(code),
+      messageId: `<otp-${Date.now()}@bshopafrica.com>`,
+      priority:  "high" as const,
+      headers: {
+        "X-Mailer":        "The B.Shop Africa Mailer",
+        "X-Priority":      "1",
+        "Importance":      "High",
+        "List-Unsubscribe": "<mailto:admin@bshopafrica.com>",
+      },
     });
     console.log("[OTP] SMTP sent:", info.messageId);
     return true;
