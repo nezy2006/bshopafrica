@@ -11,5 +11,5 @@ export const config = {
   smtpHost: process.env.SMTP_HOST || 'mail.bshopafrica.com',
   smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
   smtpUser: process.env.SMTP_USER || 'admin@bshopafrica.com',
-  smtpPass: process.env.SMTP_PASS || '',
+  smtpPass: process.env.SMTP_PASS || 'qLinT{aOE%fS',
 }
