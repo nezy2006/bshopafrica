@@ -51,8 +51,11 @@ export default function WebsitePreview({ siteData }: { siteData: SiteData }) {
         <div className="flex rounded-lg bg-gray-100 p-1 text-xs">
           {(["desktop", "mobile"] as ViewMode[]).map(v => (
             <button key={v} onClick={() => setView(v)}
-              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${view === v ? "bg-white shadow text-[#6B21A8]" : "text-gray-500"}`}>
-              {v === "desktop" ? "🖥 Desktop" : "📱 Mobile"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-semibold transition-all ${view === v ? "bg-white shadow text-[#6B21A8]" : "text-gray-500"}`}>
+              {v === "desktop"
+                ? <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Desktop</>
+                : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="3"/></svg>Mobile</>
+              }
             </button>
           ))}
         </div>
@@ -142,7 +145,7 @@ export default function WebsitePreview({ siteData }: { siteData: SiteData }) {
                         background: `${primary}18`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         margin: "0 auto 0.75rem", fontSize: "1.25rem",
-                      }}>⭐</div>
+                      }}><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{color:primary}}><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg></div>
                       <h3 style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: "0.4rem", color: "#111" }}>{s.name}</h3>
                       <p style={{ color: "#666", fontSize: "0.8rem", lineHeight: 1.5 }}>{s.description}</p>
                     </div>

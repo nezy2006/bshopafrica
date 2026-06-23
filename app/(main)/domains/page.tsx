@@ -9,17 +9,17 @@ const TLDS = [".com", ".net", ".org", ".biz", ".xyz", ".africa", ".co.rw"];
 
 const WHY_CARDS = [
   {
-    icon: "🎯",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
     title: "Your Brand Identity",
     desc: "Your domain is your digital address. Make it memorable and professional.",
   },
   {
-    icon: "📧",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
     title: "Professional Email",
     desc: "Get branded emails like you@yourbusiness.com that build trust.",
   },
   {
-    icon: "🌐",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
     title: "Own Your Space",
     desc: "Unlike social media, your domain is yours forever. No algorithm can take it away.",
   },
@@ -223,7 +223,7 @@ function WhySection() {
               whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.14)" }}
               className="bg-white rounded-2xl p-7 border border-gray-100 shadow-md hover:border-purple-200 cursor-default transition-colors duration-300"
             >
-              <div className="text-4xl mb-4">{card.icon}</div>
+              <div className="w-12 h-12 rounded-xl bg-purple-50 text-[#6B21A8] flex items-center justify-center mb-4">{card.icon}</div>
               <h3 className="text-lg font-bold text-black mb-2">{card.title}</h3>
               <p className="text-sm text-gray-500 leading-relaxed">{card.desc}</p>
             </motion.div>
@@ -286,8 +286,8 @@ function TransferSection() {
                   transition={{ delay: 0.25 + i * 0.1, duration: 0.5 }}
                   className="flex items-center gap-4"
                 >
-                  <span className="flex-shrink-0 w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-[#6B21A8] font-black text-sm">
-                    ✓
+                  <span className="flex-shrink-0 w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-[#6B21A8]">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </span>
                   <span className="text-gray-700 font-medium text-base">{perk}</span>
                 </motion.li>

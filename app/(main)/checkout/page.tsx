@@ -732,7 +732,7 @@ function StepPayment({ cart }: { cart: Cart }) {
             {method === "card" && (
               <motion.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
                 className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center space-y-2">
-                <div className="text-3xl">💳</div>
+                <svg className="w-10 h-10 mx-auto text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 <p className="font-bold text-blue-900">Pay with Card via PayPal</p>
                 <p className="text-blue-700 text-sm">
                   You&apos;ll be securely redirected to WHMCS / PayPal Checkout to enter your card details.
@@ -824,7 +824,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                   <div className="text-center py-8 space-y-4">
                     <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl ${
                       method === "mtn" ? "bg-amber-100" : "bg-red-100"
-                    }`}>📱</div>
+                    }`}><svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="2.5"/></svg></div>
                     <div>
                       <p className="font-bold text-lg text-gray-800">Check your phone and approve the payment</p>
                       <p className="text-gray-500 text-sm mt-1">

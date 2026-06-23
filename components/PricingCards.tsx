@@ -132,7 +132,7 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
         {/* best-value badge */}
         {plan.badge && (
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-[#6B21A8] text-xs font-black tracking-widest px-5 py-1.5 rounded-full shadow-lg border-2 border-[#6B21A8] uppercase whitespace-nowrap">
-            ⭐ {plan.badge}
+            <svg className="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>{plan.badge}
           </div>
         )}
 

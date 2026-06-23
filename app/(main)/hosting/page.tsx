@@ -106,22 +106,22 @@ const TABLE_ROWS = [
 
 const WHY_CARDS = [
   {
-    icon: "⚡",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
     title: "LiteSpeed Servers",
     desc: "Blazing fast servers optimised for African internet conditions.",
   },
   {
-    icon: "🔒",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
     title: "Free SSL Certificate",
     desc: "Every plan includes a free SSL to keep your site secure.",
   },
   {
-    icon: "🟢",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
     title: "99.9% Uptime SLA",
     desc: "We guarantee your site stays online, always.",
   },
   {
-    icon: "🤝",
+    icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
     title: "24/7 Expert Support",
     desc: "Our team is available around the clock to help you.",
   },
@@ -292,7 +292,7 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
       >
         {plan.badge && (
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-[#6B21A8] text-xs font-black tracking-widest px-5 py-1.5 rounded-full shadow-lg border-2 border-[#6B21A8] uppercase whitespace-nowrap">
-            ⭐ {plan.badge}
+            <svg className="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>{plan.badge}
           </div>
         )}
 
@@ -429,7 +429,7 @@ function ComparisonTable() {
                     Starter
                   </th>
                   <th className="bg-[#4c1d95] text-white px-6 py-4 text-center font-bold tracking-wide whitespace-nowrap">
-                    ⭐ Grower
+                    <svg className="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>Grower
                   </th>
                   <th className="bg-[#6B21A8] text-white/80 px-6 py-4 text-center font-bold tracking-wide">
                     Plus
@@ -502,7 +502,7 @@ function WhySection() {
               whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.14)" }}
               className="bg-white rounded-2xl p-6 border border-gray-100 shadow-md hover:border-purple-200 cursor-default transition-colors duration-300"
             >
-              <div className="text-4xl mb-4">{card.icon}</div>
+              <div className="w-12 h-12 rounded-xl bg-purple-50 text-[#6B21A8] flex items-center justify-center mb-4">{card.icon}</div>
               <h3 className="text-base font-bold text-black mb-2">{card.title}</h3>
               <p className="text-sm text-gray-500 leading-relaxed">{card.desc}</p>
             </motion.div>
@@ -670,7 +670,7 @@ function BuilderTeaser() {
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
           className="flex flex-col sm:flex-row items-center gap-6 bg-[#6B21A8]/20 border border-[#6B21A8]/40 rounded-3xl p-8"
         >
-          <div className="text-5xl">✨</div>
+          <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-purple-300"><svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z"/></svg></div>
           <div className="flex-1 text-center sm:text-left">
             <p className="text-purple-300 text-sm font-semibold mb-1">Coming Soon</p>
             <h3 className="text-xl font-black text-white mb-2">

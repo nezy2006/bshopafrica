@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,7 +70,20 @@ const FOOTER_LINKS = {
 };
 
 const PAYMENTS = ["Visa", "Mastercard", "PayPal", "Payoneer"];
-const TRUST   = ["🔒 SSL Secured", "↩ 30-Day Money Back", "🎧 24/7 Support"];
+const TRUST: { icon: React.ReactNode; label: string }[] = [
+  {
+    icon: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+    label: "SSL Secured",
+  },
+  {
+    icon: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>,
+    label: "30-Day Money Back",
+  },
+  {
+    icon: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>,
+    label: "24/7 Support",
+  },
+];
 const LEGAL   = [
   { label: "Terms of Service", href: "#" },
   { label: "Privacy Policy",   href: "#" },
@@ -226,8 +239,8 @@ export default function Footer() {
           transition={{ duration: 0.6, delay: 0.2 }}
         >
           {TRUST.map((t) => (
-            <span key={t} className="px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-gray-400 font-medium">
-              {t}
+            <span key={t.label} className="flex items-center gap-1.5 px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-gray-400 font-medium">
+              {t.icon}{t.label}
             </span>
           ))}
         </motion.div>

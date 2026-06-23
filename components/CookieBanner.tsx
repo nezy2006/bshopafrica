@@ -34,7 +34,7 @@ export default function CookieBanner() {
         >
           <div className="max-w-4xl mx-auto bg-gray-900 border border-white/10 rounded-2xl px-5 py-4 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <span className="text-xl flex-shrink-0 mt-0.5">🍪</span>
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p className="text-sm text-gray-300 leading-relaxed">
                 We use cookies to improve your experience and analyse site performance.{" "}
                 <Link href="#" className="text-[#c084fc] hover:text-white underline underline-offset-2 transition-colors">

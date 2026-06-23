@@ -166,7 +166,7 @@ function PricingCard({ plan, cycle, index }: { plan: Plan; cycle: Cycle; index: 
       {plan.badge && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
           <span className="bg-white text-[#6B21A8] text-xs font-black tracking-widest px-5 py-1.5 rounded-full shadow-lg border-2 border-[#6B21A8] uppercase whitespace-nowrap">
-            ⭐ {plan.badge}
+            <svg className="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>{plan.badge}
           </span>
         </div>
       )}
@@ -393,9 +393,9 @@ function FeaturesSection() {
 /* ─── How It Works ───────────────────────────────────────────────────────── */
 function HowItWorksSection() {
   const steps = [
-    { num: "01", icon: "🎨", title: "Pick a Template",  desc: "Choose from 500+ professional designs built for your industry." },
-    { num: "02", icon: "🖱️",  title: "Drag & Drop",     desc: "Customise every element — text, images, colors — visually with no code." },
-    { num: "03", icon: "🚀", title: "Publish & Go Live", desc: "One click to publish. Your site is live instantly with a free SSL." },
+    { num: "01", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>, title: "Pick a Template",  desc: "Choose from 500+ professional designs built for your industry." },
+    { num: "02", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07 4 4z"/></svg>, title: "Drag & Drop",     desc: "Customise every element — text, images, colors — visually with no code." },
+    { num: "03", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>, title: "Publish & Go Live", desc: "One click to publish. Your site is live instantly with a free SSL." },
   ];
   return (
     <section className="bg-[#0d0118] py-24 px-4 sm:px-6 lg:px-8">
@@ -415,7 +415,7 @@ function HowItWorksSection() {
               transition={{ delay: i * 0.15, duration: 0.6, ease: EASE }}
               className="text-center">
               <motion.div whileHover={{ scale: 1.1, rotate: [0,-5,5,0] }} transition={{ duration: 0.4 }}
-                className="w-20 h-20 rounded-3xl bg-[#6B21A8]/20 border border-[#6B21A8]/40 flex items-center justify-center text-4xl mx-auto mb-5">
+                className="w-20 h-20 rounded-3xl bg-[#6B21A8]/20 border border-[#6B21A8]/40 flex items-center justify-center mx-auto mb-5">
                 {s.icon}
               </motion.div>
               <div className="text-xs text-purple-400 font-bold tracking-widest mb-2">{s.num}</div>

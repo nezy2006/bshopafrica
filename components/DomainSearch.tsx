@@ -181,7 +181,7 @@ function ErrorCard({ message, onReset }: { message: string; onReset: () => void 
       transition={{ duration: 0.4, ease: EASE }}
       className="mt-6 rounded-2xl border-2 border-orange-200 bg-orange-50 px-5 py-4 flex items-start gap-3"
     >
-      <span className="flex-shrink-0 text-orange-500 text-lg">⚠</span>
+      <svg className="w-5 h-5 flex-shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <div>
         <p className="font-semibold text-orange-800 text-sm">{message}</p>
         <button onClick={onReset} className="text-xs text-orange-600 hover:text-orange-800 font-medium mt-1 transition-colors">← Try again</button>

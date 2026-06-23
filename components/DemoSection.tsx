@@ -41,7 +41,7 @@ const HOSTING_STEPS = [
   "SSL certificate installed",
   "Nameservers configured",
   "Email accounts ready",
-  "🎉 Your hosting is live!",
+  "Your hosting is live!",
 ];
 
 /* ─── Register Domain Demo ───────────────────────────────────────────────── */
@@ -149,7 +149,10 @@ function RegisterTab() {
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-base">{r.ok ? "✅" : "❌"}</span>
+                      {r.ok
+                        ? <svg className="w-4 h-4 text-green-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        : <svg className="w-4 h-4 text-red-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      }
                       <span className="text-white font-semibold text-sm font-mono truncate">
                         {seq.name}{r.ext}
                       </span>
@@ -363,7 +366,7 @@ function LaunchTab() {
               className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             >
               <div className="bg-green-500 text-white font-bold text-sm px-8 py-4 rounded-2xl shadow-2xl text-center">
-                <div className="text-2xl mb-1">🚀</div>
+                <svg className="w-7 h-7 mx-auto mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
                 Your site is live!
                 <div className="text-xs font-normal opacity-80 mt-1">yourdomain.com</div>
                 <div className="mt-2 flex items-center justify-center gap-1.5">

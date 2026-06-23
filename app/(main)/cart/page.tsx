@@ -61,8 +61,8 @@ function FreeDomainSearch({ onDomainAdded }: { onDomainAdded: () => void }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="mt-2 rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#6B21A8] shadow-sm text-xl flex-shrink-0">
-          🌐
+        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#6B21A8] shadow-sm flex-shrink-0">
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </div>
         <div>
           <p className="font-bold text-gray-900 text-sm">Choose your free domain</p>
@@ -162,10 +162,10 @@ function HostingUpsell({ onAdd }: { onAdd: (plan: typeof HOSTING_UPSELL_PLANS[nu
               ${plan.monthly}<span className={`text-xs font-medium ${plan.best ? "text-purple-200" : "text-gray-400"}`}>/mo</span>
             </p>
             <ul className={`text-xs space-y-0.5 ${plan.best ? "text-purple-200" : "text-gray-500"}`}>
-              <li>📦 {plan.disk} disk</li>
-              <li>📧 {plan.emails} email accounts</li>
-              <li>🔒 Free SSL</li>
-              <li>⚙️ cPanel included</li>
+              <li className="flex items-center gap-1.5"><svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"/></svg>{plan.disk} disk</li>
+              <li className="flex items-center gap-1.5"><svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>{plan.emails} email accounts</li>
+              <li className="flex items-center gap-1.5"><svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Free SSL</li>
+              <li className="flex items-center gap-1.5"><svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>cPanel included</li>
             </ul>
             <button onClick={() => onAdd(plan)}
               className={`mt-auto w-full py-2 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 ${
@@ -282,7 +282,7 @@ function WebsiteBuilderCard({ item, onRemove }: { item: CartWebsiteBuilder; onRe
       <div className="flex items-center gap-4">
         <div className="w-11 h-11 rounded-xl flex-shrink-0 overflow-hidden shadow-sm"
           style={{ background: `linear-gradient(135deg, ${secondaryColor}, ${primaryColor})` }}>
-          <div className="w-full h-full flex items-center justify-center text-white text-lg">✨</div>
+          <div className="w-full h-full flex items-center justify-center text-white"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z"/></svg></div>
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900">AI Website Builder</p>
@@ -454,7 +454,7 @@ export default function CartPage() {
                   className="bg-green-50 border border-green-200 rounded-2xl p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <span className="text-2xl flex-shrink-0">🌐</span>
+                      <svg className="w-6 h-6 flex-shrink-0 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                       <div>
                         <p className="font-bold text-green-800 text-sm flex items-center gap-2">
                           Free Website Builder Included

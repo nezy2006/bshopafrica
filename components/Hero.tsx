@@ -235,7 +235,9 @@ export default function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.7, duration: 0.6 }}
             >
-              <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-lg">🌍</div>
+              <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-[#6B21A8]">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              </div>
               <div>
                 <p className="text-xs text-gray-400 font-medium">Domains from</p>
                 <p className="text-sm font-bold text-black">$8<span className="text-gray-400 font-normal">/yr</span></p>
@@ -249,7 +251,7 @@ export default function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 2.0, duration: 0.6 }}
             >
-              <span className="text-2xl">⚡</span>
+              <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
               <div>
                 <p className="text-xs text-purple-300 font-medium">Performance</p>
                 <p className="text-sm font-bold text-white">99.9% Uptime</p>

@@ -64,7 +64,7 @@ function SearchStep() {
             transition={{ type: "spring", stiffness: 300, damping: 22 }}
             className="flex items-center gap-3"
           >
-            <span className="text-xl">✅</span>
+            <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             <div>
               <p className="font-bold text-gray-900 text-sm font-mono">mybusiness.com</p>
               <p className="text-xs text-gray-500">$12/yr</p>
@@ -109,7 +109,7 @@ function CheckoutStep() {
             className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-3 py-2.5 mb-3"
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm">🌐</span>
+              <svg className="w-4 h-4 text-[#6B21A8]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               <span className="font-mono text-sm font-semibold text-gray-800">mybusiness.com</span>
             </div>
             <span className="text-[#6B21A8] font-bold text-sm">$12</span>

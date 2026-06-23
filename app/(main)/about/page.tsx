@@ -8,37 +8,68 @@ const EASE: Ease = [0.22, 1, 0.36, 1];
 
 const FEATURES = [
   {
-    icon: "🏗️",
+    icon: (
+      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    ),
     color: "bg-blue-50 text-blue-600",
     title: "Reliable Infrastructure",
     desc: "Fast, secure, and dependable hosting that keeps your website available when your customers need it most.",
   },
   {
-    icon: "🎧",
+    icon: (
+      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+        <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+      </svg>
+    ),
     color: "bg-green-50 text-green-600",
     title: "Responsive Support",
     desc: "When you need assistance, you speak to real people who understand your business and are committed to finding solutions quickly.",
   },
   {
-    icon: "💡",
+    icon: (
+      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/>
+        <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
+      </svg>
+    ),
     color: "bg-yellow-50 text-yellow-600",
     title: "Transparent Pricing",
     desc: "Simple, straightforward pricing with no hidden surprises, making it easier to plan and manage your digital investment.",
   },
   {
-    icon: "🌐",
+    icon: (
+      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+    ),
     color: "bg-purple-50 text-purple-600",
     title: "Complete Digital Solutions",
     desc: "From domain registration and web hosting to website development and ongoing support, everything you need is available in one place.",
   },
   {
-    icon: "🚀",
+    icon: (
+      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+        <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+      </svg>
+    ),
     color: "bg-orange-50 text-orange-600",
     title: "Built for Growth",
     desc: "Whether you're launching a new venture or scaling an established organisation, our solutions are designed to grow alongside your business.",
   },
   {
-    icon: "🌍",
+    icon: (
+      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+    ),
     color: "bg-teal-50 text-teal-600",
     title: "An African Perspective, Global Standards",
     desc: "We understand the realities of doing business in African markets while delivering the quality, reliability, and professionalism expected anywhere in the world.",
@@ -134,7 +165,7 @@ function FeaturesSection() {
               whileHover={{ y: -6, boxShadow: "0 20px 50px rgba(107,33,168,0.14)" }}
               className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:border-purple-200 transition-colors duration-300 cursor-default"
             >
-              <div className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mb-4 text-2xl`}>
+              <div className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mb-4`}>
                 {f.icon}
               </div>
               <h3 className="text-base font-bold text-black mb-2">{f.title}</h3>

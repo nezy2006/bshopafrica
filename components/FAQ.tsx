@@ -140,8 +140,8 @@ export default function FAQ() {
           >
           <div className="animate-float" style={{ willChange: "transform" }}>
             <div className="bg-white rounded-3xl p-8 shadow-2xl">
-              <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-3xl mb-6">
-                💬
+              <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-[#6B21A8] mb-6">
+                <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </div>
               <h3 className="text-xl font-black text-black mb-2">
                 Still have questions?
