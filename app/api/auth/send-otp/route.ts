@@ -161,6 +161,7 @@ export async function POST(req: NextRequest) {
     });
 
     console.log(`[OTP] Generated for ${email} (clientId=${clientId}): ${code}`);
+    console.log(`[OTP] Will send TO: ${email} FROM: ${config.smtpUser}`);
 
     // Method 1 — WHMCS SendEmail
     console.log("[OTP] Trying WHMCS SendEmail...");

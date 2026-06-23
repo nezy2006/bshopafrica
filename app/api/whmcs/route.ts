@@ -72,17 +72,29 @@ export async function POST(req: NextRequest) {
       case "getProducts":    data = await getProducts(); break;
 
       case "loginClient": {
-        const ip        = getClientIp(req);
-        const blocked   = checkLoginRateLimit(ip);
+        const ip      = getClientIp(req);
+        const blocked = checkLoginRateLimit(ip);
         if (blocked) return NextResponse.json({ success: false, error: blocked });
         try {
           data = await loginClient(s("email"), s("password"));
           clearLoginFailures(ip);
         } catch (e) {
           recordLoginFailure(ip);
-          const msg = e instanceof Error ? e.message : "Invalid email or password.";
-          console.error("[loginClient]", msg);
-          return NextResponse.json({ success: false, error: msg });
+          console.error("[loginClient]", e instanceof Error ? e.message : e);
+          // Distinguish "no account" from "wrong password" so the UI can offer signup
+          const exists = await checkEmailExists(s("email")).catch(() => true);
+          if (!exists) {
+            return NextResponse.json({
+              success:   false,
+              errorType: "not_found",
+              error:     "No account found with that email address.",
+            });
+          }
+          return NextResponse.json({
+            success:   false,
+            errorType: "wrong_password",
+            error:     "Incorrect password. Please try again.",
+          });
         }
         break;
       }

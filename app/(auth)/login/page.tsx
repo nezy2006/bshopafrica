@@ -146,6 +146,7 @@ export default function LoginPage() {
   const [showPw,         setShowPw]         = useState(false);
   const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState<string | null>(null);
+  const [notFound,       setNotFound]       = useState(false);
   const [pendingClient,  setPendingClient]  = useState<PendingClient | null>(null);
 
   // OTP step
@@ -168,6 +169,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotFound(false);
     try {
       const res  = await fetch("/api/whmcs", {
         method:  "POST",
@@ -175,12 +177,17 @@ export default function LoginPage() {
         body:    JSON.stringify({ action: "loginClient", params: { email, password } }),
       });
       const json = (await res.json()) as {
-        success: boolean;
-        data?:   PendingClient;
-        error?:  string;
+        success:    boolean;
+        data?:      PendingClient;
+        error?:     string;
+        errorType?: "not_found" | "wrong_password";
       };
       if (!json.success || !json.data?.clientId) {
-        setError(json.error ?? "Invalid email or password. Please try again.");
+        if (json.errorType === "not_found") {
+          setNotFound(true);
+        } else {
+          setError(json.error ?? "Invalid email or password. Please try again.");
+        }
         return;
       }
       setPendingClient(json.data);
@@ -362,6 +369,24 @@ export default function LoginPage() {
                 >
                   <span className="text-red-500 text-base">✕</span>
                   <p className="text-sm text-red-600 font-medium">{error}</p>
+                </motion.div>
+              )}
+
+              {notFound && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 px-4 py-3.5 bg-amber-50 border border-amber-200 rounded-xl"
+                >
+                  <p className="text-sm text-amber-800 font-medium mb-1.5">
+                    No account found with that email address.
+                  </p>
+                  <Link
+                    href={`/signup?email=${encodeURIComponent(email)}`}
+                    className="inline-block text-sm font-bold text-[#6B21A8] hover:underline"
+                  >
+                    Create an account →
+                  </Link>
                 </motion.div>
               )}
 
