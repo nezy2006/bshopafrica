@@ -621,6 +621,59 @@ export async function createSsoToken(clientId: number, destination = "clientarea
   return { redirectUrl };
 }
 
+/* ─── Impersonation tokens (short-lived, single-use, HMAC-signed) ───────── */
+const IMPERSONATE_TTL_MS = 5 * 60 * 1000;
+
+// Process-level singleton so issued tokens can't be redeemed twice.
+declare global {
+  // eslint-disable-next-line no-var
+  var __bshopUsedImpersonateTokens: Set<string> | undefined;
+}
+const usedImpersonateTokens: Set<string> =
+  globalThis.__bshopUsedImpersonateTokens ?? (globalThis.__bshopUsedImpersonateTokens = new Set<string>());
+
+function pruneExpiredImpersonateTokens(): void {
+  const cutoff = Date.now() - IMPERSONATE_TTL_MS;
+  for (const t of usedImpersonateTokens) {
+    const ts = Number(t.split(".")[0]);
+    if (!Number.isFinite(ts) || ts < cutoff) usedImpersonateTokens.delete(t);
+  }
+}
+
+export interface ImpersonateToken { token: string; expires: number; }
+
+export function generateImpersonateToken(clientId: number): ImpersonateToken {
+  const timestamp = Date.now();
+  const signature = crypto
+    .createHmac("sha256", config.adminPassword)
+    .update(`${clientId}:${timestamp}`)
+    .digest("hex");
+  return { token: `${timestamp}.${signature}`, expires: timestamp + IMPERSONATE_TTL_MS };
+}
+
+export function verifyImpersonateToken(clientId: number, token: string): boolean {
+  pruneExpiredImpersonateTokens();
+
+  const [timestampStr, signature] = token.split(".");
+  if (!timestampStr || !signature) return false;
+
+  const timestamp = Number(timestampStr);
+  if (!Number.isFinite(timestamp) || timestamp > Date.now() || Date.now() - timestamp > IMPERSONATE_TTL_MS) return false;
+
+  const expected = crypto
+    .createHmac("sha256", config.adminPassword)
+    .update(`${clientId}:${timestamp}`)
+    .digest("hex");
+
+  const sigBuf = Buffer.from(signature, "hex");
+  const expBuf = Buffer.from(expected, "hex");
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return false;
+
+  if (usedImpersonateTokens.has(token)) return false; // single-use
+  usedImpersonateTokens.add(token);
+  return true;
+}
+
 export function generateAutoAuthUrl(email: string, destination = "clientarea.php"): string {
   const whmcsUrl     = config.whmcsUrl;
   const autoAuthKey  = process.env.WHMCS_AUTOAUTH_KEY ?? "";

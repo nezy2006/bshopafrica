@@ -14,6 +14,7 @@ export default function ClientsPage() {
   const [search,  setSearch]  = useState("");
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [busyId,   setBusyId]   = useState<number | null>(null);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -26,19 +27,31 @@ export default function ClientsPage() {
 
   useEffect(() => { const t = setTimeout(fetch_, 300); return () => clearTimeout(t); }, [fetch_]);
 
-  const getImpersonateUrl = (clientId: number): string | null => {
+  const getImpersonateUrl = async (clientId: number): Promise<string | null> => {
     const adminKey = localStorage.getItem("bshop_admin_password");
     if (!adminKey) { alert("Your admin session has expired. Please log in again."); return null; }
-    return `${window.location.origin}/impersonate?client_id=${clientId}&admin_key=${encodeURIComponent(adminKey)}`;
+    try {
+      const res  = await fetch(`/api/auth/sso?clientId=${clientId}`, { headers: { "x-admin-password": adminKey } });
+      const json = await res.json() as { success: boolean; token?: string; error?: string };
+      if (!json.success || !json.token) { alert(json.error ?? "Could not generate login link."); return null; }
+      return `${window.location.origin}/impersonate?client_id=${clientId}&token=${encodeURIComponent(json.token)}`;
+    } catch {
+      alert("Something went wrong. Please try again.");
+      return null;
+    }
   };
 
-  const handleLoginAsClient = (clientId: number) => {
-    const url = getImpersonateUrl(clientId);
+  const handleLoginAsClient = async (clientId: number) => {
+    setBusyId(clientId);
+    const url = await getImpersonateUrl(clientId);
+    setBusyId(null);
     if (url) window.open(url, "_blank");
   };
 
   const handleCopyLink = async (clientId: number) => {
-    const url = getImpersonateUrl(clientId);
+    setBusyId(clientId);
+    const url = await getImpersonateUrl(clientId);
+    setBusyId(null);
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
@@ -69,16 +82,18 @@ export default function ClientsPage() {
                 <div className="flex items-center justify-end gap-1.5">
                   <button
                     onClick={() => handleLoginAsClient(c.id)}
+                    disabled={busyId === c.id}
                     title="Open impersonation link in a new tab"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#6B21A8] bg-purple-50 hover:bg-purple-100 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#6B21A8] bg-purple-50 hover:bg-purple-100 transition-colors disabled:opacity-50"
                   >
                     <LogIn className="w-3.5 h-3.5" />
-                    Login as Client
+                    {busyId === c.id ? "Generating…" : "Login as Client"}
                   </button>
                   <button
                     onClick={() => handleCopyLink(c.id)}
+                    disabled={busyId === c.id}
                     title="Copy impersonation link"
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-50"
                   >
                     {copiedId === c.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>

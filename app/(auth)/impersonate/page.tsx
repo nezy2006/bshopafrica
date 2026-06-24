@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_KEYS } from "@/lib/auth";
 
@@ -8,23 +8,27 @@ type SsoClient = { id: number; email: string; firstname: string; fullname: strin
 type Status = "loading" | "unauthorized" | "error";
 
 function ImpersonateInner() {
-  const router = useRouter();
-  const params = useSearchParams();
+  const router  = useRouter();
+  const params  = useSearchParams();
+  const ranOnce = useRef(false);
   const [status, setStatus] = useState<Status>("loading");
   const [name,   setName]   = useState("client");
 
   useEffect(() => {
-    const clientId = params.get("client_id");
-    const adminKey = params.get("admin_key");
+    if (ranOnce.current) return;
+    ranOnce.current = true;
 
-    if (!clientId || !adminKey) { setStatus("unauthorized"); return; }
+    const clientId = params.get("client_id");
+    const token     = params.get("token");
+
+    if (!clientId || !token) { setStatus("unauthorized"); return; }
 
     (async () => {
       try {
         const res = await fetch("/api/auth/sso", {
           method:  "POST",
-          headers: { "Content-Type": "application/json", "x-admin-password": adminKey },
-          body:    JSON.stringify({ clientId: Number(clientId) }),
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ clientId: Number(clientId), token }),
         });
         if (res.status === 401) { setStatus("unauthorized"); return; }
 
