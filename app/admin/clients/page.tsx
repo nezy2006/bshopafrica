@@ -35,9 +35,12 @@ export default function ClientsPage() {
         headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
         body:    JSON.stringify({ clientId }),
       });
-      const json = await res.json() as { success: boolean; redirectUrl?: string; error?: string };
-      if (json.success && json.redirectUrl) {
-        window.open(json.redirectUrl, "_blank");
+      type SsoClient = { id: number; email: string; firstname: string; fullname: string };
+      const json = await res.json() as { success: boolean; client?: SsoClient; error?: string };
+      if (json.success && json.client) {
+        const { id, email, firstname, fullname } = json.client;
+        const qs = new URLSearchParams({ id: String(id), email, name: fullname, firstname }).toString();
+        window.open(`/impersonate?${qs}`, "_blank");
       } else {
         alert(json.error ?? "Could not log in as this client.");
       }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSsoToken } from "@/lib/whmcs";
+import { getClientDetails } from "@/lib/whmcs";
 import { config } from "@/lib/config";
 
 export async function POST(req: NextRequest) {
@@ -14,10 +14,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing clientId" }, { status: 400 });
     }
 
-    const { redirectUrl } = await createSsoToken(Number(clientId), "clientarea");
-    return NextResponse.json({ success: true, redirectUrl });
+    const client = await getClientDetails(Number(clientId));
+    return NextResponse.json({
+      success: true,
+      client: {
+        id:        client.id,
+        email:     client.email,
+        firstname: client.firstname,
+        fullname:  `${client.firstname} ${client.lastname}`.trim(),
+      },
+    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create SSO token";
+    const message = err instanceof Error ? err.message : "Failed to fetch client details";
     console.error("[auth/sso]", message);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
