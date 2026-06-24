@@ -1,5 +1,5 @@
 "use client";
-import { Users, LogIn } from "lucide-react";
+import { Users, LogIn, Copy, Check } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
@@ -13,7 +13,7 @@ export default function ClientsPage() {
   const [page,    setPage]    = useState(1);
   const [search,  setSearch]  = useState("");
   const [loading, setLoading] = useState(true);
-  const [ssoLoadingId, setSsoLoadingId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -26,28 +26,26 @@ export default function ClientsPage() {
 
   useEffect(() => { const t = setTimeout(fetch_, 300); return () => clearTimeout(t); }, [fetch_]);
 
-  const handleLoginAsClient = async (clientId: number) => {
-    setSsoLoadingId(clientId);
+  const getImpersonateUrl = (clientId: number): string | null => {
+    const adminKey = localStorage.getItem("bshop_admin_password");
+    if (!adminKey) { alert("Your admin session has expired. Please log in again."); return null; }
+    return `${window.location.origin}/impersonate?client_id=${clientId}&admin_key=${encodeURIComponent(adminKey)}`;
+  };
+
+  const handleLoginAsClient = (clientId: number) => {
+    const url = getImpersonateUrl(clientId);
+    if (url) window.open(url, "_blank");
+  };
+
+  const handleCopyLink = async (clientId: number) => {
+    const url = getImpersonateUrl(clientId);
+    if (!url) return;
     try {
-      const adminPassword = localStorage.getItem("bshop_admin_password") ?? "";
-      const res  = await fetch("/api/auth/sso", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
-        body:    JSON.stringify({ clientId }),
-      });
-      type SsoClient = { id: number; email: string; firstname: string; fullname: string };
-      const json = await res.json() as { success: boolean; client?: SsoClient; error?: string };
-      if (json.success && json.client) {
-        const { id, email, firstname, fullname } = json.client;
-        const qs = new URLSearchParams({ id: String(id), email, name: fullname, firstname }).toString();
-        window.open(`/impersonate?${qs}`, "_blank");
-      } else {
-        alert(json.error ?? "Could not log in as this client.");
-      }
+      await navigator.clipboard.writeText(url);
+      setCopiedId(clientId);
+      setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      alert("Something went wrong. Please try again.");
-    } finally {
-      setSsoLoadingId(null);
+      alert("Could not copy link.");
     }
   };
 
@@ -68,14 +66,23 @@ export default function ClientsPage() {
               <td className="px-5 py-3.5 text-gray-400 text-xs">{c.datecreated}</td>
               <td className="px-5 py-3.5"><Badge status={c.status} /></td>
               <td className="px-5 py-3.5 text-right">
-                <button
-                  onClick={() => handleLoginAsClient(c.id)}
-                  disabled={ssoLoadingId === c.id}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#6B21A8] bg-purple-50 hover:bg-purple-100 transition-colors disabled:opacity-50"
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  {ssoLoadingId === c.id ? "Logging in…" : "Login as Client"}
-                </button>
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    onClick={() => handleLoginAsClient(c.id)}
+                    title="Open impersonation link in a new tab"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#6B21A8] bg-purple-50 hover:bg-purple-100 transition-colors"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    Login as Client
+                  </button>
+                  <button
+                    onClick={() => handleCopyLink(c.id)}
+                    title="Copy impersonation link"
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                  >
+                    {copiedId === c.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

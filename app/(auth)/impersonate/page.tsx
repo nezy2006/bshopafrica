@@ -4,30 +4,64 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_KEYS } from "@/lib/auth";
 
+type SsoClient = { id: number; email: string; firstname: string; fullname: string };
+type Status = "loading" | "unauthorized" | "error";
+
 function ImpersonateInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const [name, setName] = useState("client");
+  const [status, setStatus] = useState<Status>("loading");
+  const [name,   setName]   = useState("client");
 
   useEffect(() => {
-    const id        = params.get("id");
-    const email     = params.get("email") ?? "";
-    const fullname  = params.get("name") ?? "";
-    const firstname = params.get("firstname") ?? "";
+    const clientId = params.get("client_id");
+    const adminKey = params.get("admin_key");
 
-    if (!id) { router.replace("/admin/login"); return; }
+    if (!clientId || !adminKey) { setStatus("unauthorized"); return; }
 
-    setName(fullname || firstname || "client");
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/sso", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", "x-admin-password": adminKey },
+          body:    JSON.stringify({ clientId: Number(clientId) }),
+        });
+        if (res.status === 401) { setStatus("unauthorized"); return; }
 
-    localStorage.setItem(AUTH_KEYS.clientId,    id);
-    localStorage.setItem(AUTH_KEYS.clientEmail, email);
-    localStorage.setItem(AUTH_KEYS.clientName,  fullname);
-    localStorage.setItem(AUTH_KEYS.clientFirst, firstname);
-    localStorage.setItem(AUTH_KEYS.loginTime,   Date.now().toString());
+        const json = await res.json() as { success: boolean; client?: SsoClient; error?: string };
+        if (!json.success || !json.client) { setStatus("error"); return; }
 
-    const t = setTimeout(() => router.replace("/dashboard"), 1000);
-    return () => clearTimeout(t);
+        const { id, email, firstname, fullname } = json.client;
+        setName(fullname || firstname || "client");
+
+        localStorage.setItem(AUTH_KEYS.clientId,    String(id));
+        localStorage.setItem(AUTH_KEYS.clientEmail, email);
+        localStorage.setItem(AUTH_KEYS.clientName,  fullname);
+        localStorage.setItem(AUTH_KEYS.clientFirst, firstname);
+        localStorage.setItem(AUTH_KEYS.loginTime,   Date.now().toString());
+
+        setTimeout(() => router.replace("/dashboard"), 1000);
+      } catch {
+        setStatus("error");
+      }
+    })();
   }, [params, router]);
+
+  if (status === "unauthorized") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <p className="text-red-600 font-bold text-lg">Unauthorized</p>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <p className="text-red-600 font-semibold">Could not log in as this client.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
