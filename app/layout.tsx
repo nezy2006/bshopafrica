@@ -7,9 +7,9 @@ export const metadata: Metadata = {
     "Professional web hosting built for African businesses. Fast, reliable, and transparently priced. Register your domain and get online today.",
   keywords: "web hosting, domain registration, Africa, bshopafrica",
   icons: {
-    icon:     "/fav.png",
-    shortcut: "/fav.png",
-    apple:    "/fav.png",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
   openGraph: {
     title: "The B.Shop — Your Digital Story Starts Here",

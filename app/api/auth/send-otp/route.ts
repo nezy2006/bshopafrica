@@ -132,16 +132,16 @@ async function sendViaSmtp(email: string, code: string): Promise<boolean> {
     const info = await transporter.sendMail({
       from:      `"The B.Shop Africa" <${config.smtpUser}>`,
       to:        email,
+      replyTo:   config.smtpUser,
       subject:   "Your login verification code",
       text:      buildEmailText(code),
       html:      buildEmailHtml(code),
       messageId: `<otp-${Date.now()}@bshopafrica.com>`,
-      priority:  "high" as const,
       headers: {
-        "X-Mailer":        "The B.Shop Africa Mailer",
-        "X-Priority":      "1",
-        "Importance":      "High",
-        "List-Unsubscribe": "<mailto:admin@bshopafrica.com>",
+        "X-Mailer":               "The B.Shop Africa Mailer",
+        "List-Unsubscribe":      "<mailto:admin@bshopafrica.com>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "Auto-Submitted":        "auto-generated",
       },
     });
     console.log("[OTP] SMTP sent:", info.messageId);
