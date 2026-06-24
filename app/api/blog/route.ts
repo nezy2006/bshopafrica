@@ -3,8 +3,21 @@ import { query, execute } from "@/lib/db";
 
 interface BlogRow { id: number; title: string; slug: string; excerpt: string; content: string; category: string; author: string; published: number; coverImage: string | null; readTime: string; createdAt: string; updatedAt: string; }
 
+let schemaMigrated = false;
+async function ensureSchema() {
+  if (schemaMigrated) return;
+  schemaMigrated = true;
+  const cols = ["coverImage VARCHAR(500)", "readTime VARCHAR(50)"];
+  for (const col of cols) {
+    try { await execute(`ALTER TABLE BlogPost ADD COLUMN ${col}`); } catch (e: unknown) {
+      if ((e as { code?: string }).code !== "ER_DUP_FIELDNAME") console.error("[migration]", col, e);
+    }
+  }
+}
+
 export async function GET() {
   try {
+    await ensureSchema();
     const posts = await query<BlogRow>(
       "SELECT id, title, slug, excerpt, category, author, coverImage, readTime, createdAt FROM BlogPost WHERE published = 1 ORDER BY createdAt DESC"
     );
