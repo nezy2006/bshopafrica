@@ -604,6 +604,10 @@ export async function getInvoice(invoiceId: number): Promise<InvoiceDetails> {
   };
 }
 
+export async function resetClientPassword(email: string): Promise<void> {
+  await callWhmcs("ResetPassword", { email });
+}
+
 export async function addAnnouncement(subject: string, message: string): Promise<void> {
   await callWhmcs("AddAnnouncement", { subject, message, published: 1 });
 }

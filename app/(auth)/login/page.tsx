@@ -320,14 +320,12 @@ export default function LoginPage() {
                 <motion.div variants={fadeUp}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-semibold text-gray-700">Password</label>
-                    <a
-                      href="https://bshopafrica.com/billing/pwreset.php"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href="/forgot-password"
                       className="text-xs font-semibold text-[#6B21A8] hover:underline"
                     >
                       Forgot Password?
-                    </a>
+                    </Link>
                   </div>
                   <div className="relative">
                     <input
