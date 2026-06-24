@@ -24,6 +24,7 @@ export default function AdminLoginPage() {
       const json = await res.json() as { success: boolean; error?: string };
       if (json.success) {
         localStorage.setItem("bshop_admin_token", "authenticated");
+        localStorage.setItem("bshop_admin_password", password);
         router.replace("/admin/dashboard");
       } else {
         setError(json.error ?? "Invalid credentials.");

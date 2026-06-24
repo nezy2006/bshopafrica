@@ -67,6 +67,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   const handleLogout = () => {
     localStorage.removeItem("bshop_admin_token");
+    localStorage.removeItem("bshop_admin_password");
     router.replace("/admin/login");
   };
 

@@ -29,9 +29,10 @@ export default function ClientsPage() {
   const handleLoginAsClient = async (clientId: number) => {
     setSsoLoadingId(clientId);
     try {
+      const adminPassword = localStorage.getItem("bshop_admin_password") ?? "";
       const res  = await fetch("/api/auth/sso", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
         body:    JSON.stringify({ clientId }),
       });
       const json = await res.json() as { success: boolean; redirectUrl?: string; error?: string };
