@@ -612,6 +612,15 @@ export async function addAnnouncement(subject: string, message: string): Promise
   await callWhmcs("AddAnnouncement", { subject, message, published: 1 });
 }
 
+export interface SsoTokenResult { redirectUrl: string; }
+
+export async function createSsoToken(clientId: number, destination = "clientarea"): Promise<SsoTokenResult> {
+  const data = await callWhmcs("CreateSsoToken", { client_id: clientId, destination });
+  const redirectUrl = String(data.redirect_url ?? data.token_url ?? "");
+  if (!redirectUrl) throw new Error("WHMCS did not return a redirect URL");
+  return { redirectUrl };
+}
+
 export function generateAutoAuthUrl(email: string, destination = "clientarea.php"): string {
   const whmcsUrl     = config.whmcsUrl;
   const autoAuthKey  = process.env.WHMCS_AUTOAUTH_KEY ?? "";
