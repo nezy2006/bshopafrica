@@ -20,15 +20,16 @@ function ImpersonateInner() {
 
     const clientId = params.get("client_id");
     const token     = params.get("token");
+    const adminKey  = params.get("admin_key");
 
-    if (!clientId || !token) { setStatus("unauthorized"); return; }
+    if (!clientId || (!token && !adminKey)) { setStatus("unauthorized"); return; }
 
     (async () => {
       try {
         const res = await fetch("/api/auth/sso", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ clientId: Number(clientId), token }),
+          body:    JSON.stringify({ clientId: Number(clientId), token, adminKey }),
         });
         if (res.status === 401) { setStatus("unauthorized"); return; }
 

@@ -18,15 +18,21 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ success: true, token, expires });
 }
 
-/* ─── POST — /impersonate redeems the token for client details ──────────── */
+/* ─── POST — /impersonate redeems a token or admin key for client details ── */
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, token } = (await req.json()) as { clientId?: number; token?: string };
-    if (!clientId || !token) {
-      return NextResponse.json({ success: false, error: "Missing clientId or token" }, { status: 400 });
+    const { clientId, token, adminKey } = (await req.json()) as { clientId?: number; token?: string; adminKey?: string };
+    if (!clientId || (!token && !adminKey)) {
+      return NextResponse.json({ success: false, error: "Missing clientId or credentials" }, { status: 400 });
     }
 
-    if (!verifyImpersonateToken(Number(clientId), token)) {
+    // Two ways to authorize: a single-use HMAC token (admin panel "Login as Client"
+    // link), or the shared admin key (WHMCS hook redirect, which can't mint a token).
+    const authorized = token
+      ? verifyImpersonateToken(Number(clientId), token)
+      : adminKey === config.adminPassword;
+
+    if (!authorized) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
