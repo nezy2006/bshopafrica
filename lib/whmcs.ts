@@ -638,8 +638,15 @@ export async function addAnnouncement(subject: string, message: string): Promise
 
 export interface SsoTokenResult { redirectUrl: string; }
 
-export async function createSsoToken(clientId: number, destination = "clientarea"): Promise<SsoTokenResult> {
-  const data = await callWhmcs("CreateSsoToken", { client_id: clientId, destination });
+export async function createSsoToken(clientId: number, destination = "clientarea", serviceId?: number): Promise<SsoTokenResult> {
+  // WHMCS's destination keywords are fixed strings (e.g. "clientarea:product_details") — it does NOT
+  // accept an embedded id like "clientarea:product_details:id=5". To deep-link into a specific
+  // service/domain, pass the id via the separate service_id param. Verified against the live API:
+  // "clientarea:product_details:id=5" -> {"result":"error","message":"Invalid destination"}
+  // "clientarea:product_details" + service_id=5 -> redirects to clientarea.php?action=productdetails&id=5
+  const params: Record<string, string | number> = { client_id: clientId, destination };
+  if (serviceId) params.service_id = serviceId;
+  const data = await callWhmcs("CreateSsoToken", params);
   const redirectUrl = String(data.redirect_url ?? data.token_url ?? "");
   if (!redirectUrl) throw new Error("WHMCS did not return a redirect URL");
   return { redirectUrl };

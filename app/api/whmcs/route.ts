@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
       case "adminCancelOrder":      await cancelOrder(n("orderId")); data = { ok: true }; break;
       case "adminAddAnnouncement":  await addAnnouncement(s("subject"), s("message")); data = { ok: true }; break;
       case "getAutoAuthUrl":        data = generateAutoAuthUrl(s("email"), s("destination", "clientarea.php")); break;
-      case "createSsoToken":        data = await createSsoToken(n("clientId"), s("destination", "clientarea")); break;
+      case "createSsoToken":        data = await createSsoToken(n("clientId"), s("destination", "clientarea"), params.serviceId ? n("serviceId") : undefined); break;
       case "getDomainNameservers":     data = await getDomainNameservers(n("domainId")); break;
       case "updateDomainNameservers":  await updateDomainNameservers(n("domainId"), (params.ns as Record<string, string>) ?? {}); data = { ok: true }; break;
       case "getDomainLockingStatus":   data = { locked: await getDomainLockingStatus(n("domainId")) }; break;

@@ -393,7 +393,7 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
         const match = products.find(p => p.domain === domain.domainname);
         if (match) {
           try {
-            const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: `clientarea:product_details:id=${match.id}` });
+            const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: match.id });
             setCpanelUrl(redirectUrl);
           } catch { /* no SSO link available — hosting service lookup is best-effort */ }
         }
@@ -532,7 +532,7 @@ function HostingSection({ clientId }: { clientId: number }) {
               <div className="flex flex-wrap gap-2">
                 <button onClick={async () => {
                     try {
-                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: `clientarea:product_details:id=${p.id}` });
+                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: p.id });
                       window.open(redirectUrl, "_blank", "noopener");
                     } catch {
                       alert("Could not open cPanel right now. Please try again.");
@@ -544,7 +544,7 @@ function HostingSection({ clientId }: { clientId: number }) {
                 {/* Website Builder button — SSO straight into the service's product page, no second login */}
                 <button onClick={async () => {
                     try {
-                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: `clientarea:product_details:id=${p.id}` });
+                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: p.id });
                       window.open(redirectUrl, "_blank", "noopener");
                     } catch {
                       alert("Could not open Website Builder right now. Please try again.");
