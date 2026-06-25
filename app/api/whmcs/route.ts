@@ -8,7 +8,8 @@ import {
   getAdminDomains, getAdminHosting, getAdminTickets, acceptOrder,
   cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
   getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
-  createSsoToken,
+  createSsoToken, getDomainNameservers, updateDomainNameservers,
+  getDomainLockingStatus, updateDomainLockingStatus,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -140,6 +141,10 @@ export async function POST(req: NextRequest) {
       case "adminAddAnnouncement":  await addAnnouncement(s("subject"), s("message")); data = { ok: true }; break;
       case "getAutoAuthUrl":        data = generateAutoAuthUrl(s("email"), s("destination", "clientarea.php")); break;
       case "createSsoToken":        data = await createSsoToken(n("clientId"), s("destination", "clientarea")); break;
+      case "getDomainNameservers":     data = await getDomainNameservers(n("domainId")); break;
+      case "updateDomainNameservers":  await updateDomainNameservers(n("domainId"), (params.ns as Record<string, string>) ?? {}); data = { ok: true }; break;
+      case "getDomainLockingStatus":   data = { locked: await getDomainLockingStatus(n("domainId")) }; break;
+      case "updateDomainLockingStatus": await updateDomainLockingStatus(n("domainId"), Boolean(params.locked)); data = { ok: true }; break;
       case "initiateTransfer":      data = await initiateTransfer(n("clientId"), s("domain"), s("authCode")); break;
       case "getTLDPricing":         data = await getTLDPricing(); break;
       case "validateCoupon":        data = await validateCoupon(s("code")); break;

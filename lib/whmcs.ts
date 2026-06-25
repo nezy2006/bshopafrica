@@ -604,6 +604,30 @@ export async function getInvoice(invoiceId: number): Promise<InvoiceDetails> {
   };
 }
 
+/* ─── Domain nameservers & lock status ──────────────────────────────────── */
+export interface DomainNameservers { ns1: string; ns2: string; ns3: string; ns4: string; ns5: string; }
+
+export async function getDomainNameservers(domainId: number): Promise<DomainNameservers> {
+  const data = await callWhmcs("DomainGetNameservers", { domainid: domainId });
+  return {
+    ns1: String(data.ns1 ?? ""), ns2: String(data.ns2 ?? ""), ns3: String(data.ns3 ?? ""),
+    ns4: String(data.ns4 ?? ""), ns5: String(data.ns5 ?? ""),
+  };
+}
+
+export async function updateDomainNameservers(domainId: number, ns: Partial<DomainNameservers>): Promise<void> {
+  await callWhmcs("DomainUpdateNameservers", { domainid: domainId, ...ns });
+}
+
+export async function getDomainLockingStatus(domainId: number): Promise<boolean> {
+  const data = await callWhmcs("DomainGetLockingStatus", { domainid: domainId });
+  return Boolean(data.locked);
+}
+
+export async function updateDomainLockingStatus(domainId: number, locked: boolean): Promise<void> {
+  await callWhmcs("DomainUpdateLockingStatus", { domainid: domainId, lockenabled: locked });
+}
+
 export async function resetClientPassword(email: string): Promise<void> {
   await callWhmcs("ResetPassword", { email });
 }

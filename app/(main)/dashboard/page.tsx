@@ -31,6 +31,7 @@ async function whmcs<T>(action: string, params: Record<string, unknown> = {}): P
 interface ClientDetails { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
 interface ClientProduct { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
 interface ClientDomain  { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; }
+interface DomainNameservers { ns1: string; ns2: string; ns3: string; ns4: string; ns5: string; }
 interface ClientInvoice { id: number; date: string; duedate: string; total: string; status: string; }
 interface ClientOrder   { id: number; date: string; total: string; status: string; currencycode: string; }
 interface SupportTicket { id: number; tid: string; title: string; status: string; priority: string; deptname: string; date: string; lastreply: string; replies?: TicketReply[]; }
@@ -296,6 +297,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
   const [search,  setSearch]  = useState("");
+  const [dnsDomain, setDnsDomain] = useState<ClientDomain | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -344,8 +346,11 @@ function DomainsSection({ clientId }: { clientId: number }) {
                       <td className="px-5 py-4"><span className="text-green-600 text-xs font-semibold">Enabled</span></td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
-                          <button className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Renew</button>
-                          <button className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">DNS</button>
+                          {days <= 30 && (
+                            <button className="text-xs px-2.5 py-1 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
+                          )}
+                          <button onClick={() => setDnsDomain(d)}
+                            className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">DNS</button>
                         </div>
                       </td>
                     </tr>
@@ -356,12 +361,131 @@ function DomainsSection({ clientId }: { clientId: number }) {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {dnsDomain && <DnsModal domain={dnsDomain} clientId={clientId} onClose={() => setDnsDomain(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
 
+/* ─── DNS MODAL ──────────────────────────────────────────────────────────── */
+function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientId: number; onClose: () => void }) {
+  const [ns,       setNs]       = useState<DomainNameservers>({ ns1: "", ns2: "", ns3: "", ns4: "", ns5: "" });
+  const [locked,   setLocked]   = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [saved,    setSaved]    = useState(false);
+  const [cpanelUrl, setCpanelUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true); setError(false);
+      try {
+        const [nsRes, lockRes, products] = await Promise.all([
+          whmcs<DomainNameservers>("getDomainNameservers", { domainId: domain.id }),
+          whmcs<{ locked: boolean }>("getDomainLockingStatus", { domainId: domain.id }),
+          whmcs<ClientProduct[]>("getClientProducts", { clientId }),
+        ]);
+        setNs(nsRes); setLocked(lockRes.locked);
+
+        const match = products.find(p => p.domain === domain.domainname);
+        if (match) {
+          try {
+            const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: `clientarea:product_details:id=${match.id}` });
+            setCpanelUrl(redirectUrl);
+          } catch { /* no SSO link available — hosting service lookup is best-effort */ }
+        }
+      } catch { setError(true); }
+      finally { setLoading(false); }
+    })();
+  }, [domain.id, domain.domainname, clientId]);
+
+  async function saveNameservers() {
+    setSaving(true);
+    try {
+      await whmcs("updateDomainNameservers", { domainId: domain.id, ns });
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  }
+
+  async function toggleLock() {
+    const next = !locked;
+    setLocked(next);
+    try { await whmcs("updateDomainLockingStatus", { domainId: domain.id, locked: next }); }
+    catch { setLocked(!next); }
+  }
+
+  return (
+    <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto"
+        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2, ease: EASE }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">DNS Settings</h3>
+            <p className="text-sm text-gray-500">{domain.domainname}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><I.X /></button>
+        </div>
+
+        {loading ? <Skeleton className="h-64" /> :
+         error ? <p className="text-red-500 text-sm">Could not load DNS settings for this domain.</p> : (
+          <div className="space-y-6">
+            <div>
+              <h4 className="font-semibold text-gray-900 text-sm mb-3">Nameservers</h4>
+              <div className="space-y-2">
+                {(["ns1", "ns2", "ns3", "ns4", "ns5"] as const).map((key, i) => (
+                  <input key={key} value={ns[key]} onChange={e => setNs(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={`Nameserver ${i + 1}${i >= 2 ? " (optional)" : ""}`}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+                ))}
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <button onClick={saveNameservers} disabled={saving}
+                  className="px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+                  {saving ? "Saving…" : "Save Nameservers"}
+                </button>
+                {saved && <span className="text-sm text-green-600 flex items-center gap-1"><I.Check />Saved!</span>}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+              <div>
+                <p className="font-medium text-gray-900 text-sm">Domain Lock</p>
+                <p className="text-xs text-gray-500 mt-0.5">Prevents unauthorized transfers away from us.</p>
+              </div>
+              <button onClick={toggleLock}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${locked ? "bg-[#6B21A8]" : "bg-gray-300"}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${locked ? "translate-x-5" : ""}`} />
+              </button>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-sm text-gray-500 mb-3">
+                Need to edit A, CNAME, MX, or TXT records? Manage the full DNS zone in cPanel.
+              </p>
+              {cpanelUrl ? (
+                <a href={cpanelUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-purple-300 text-[#6B21A8] text-sm font-semibold rounded-xl hover:bg-purple-50 transition-colors">
+                  <I.ExternalLink />Manage DNS Records in cPanel
+                </a>
+              ) : (
+                <p className="text-xs text-gray-400">No hosting service found for this domain — DNS zone editing requires a hosting account with us.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ─── HOSTING ────────────────────────────────────────────────────────────── */
-function HostingSection({ clientId, clientEmail }: { clientId: number; clientEmail: string }) {
+function HostingSection({ clientId }: { clientId: number }) {
   const [products, setProducts] = useState<ClientProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(false);
@@ -408,22 +532,22 @@ function HostingSection({ clientId, clientEmail }: { clientId: number; clientEma
               <div className="flex flex-wrap gap-2">
                 <button onClick={async () => {
                     try {
-                      const res = await whmcs<string>("getAutoAuthUrl", { email: clientEmail, destination: "clientarea.php" });
-                      window.open(res, "_blank", "noopener");
+                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: `clientarea:product_details:id=${p.id}` });
+                      window.open(redirectUrl, "_blank", "noopener");
                     } catch {
-                      window.open("https://bshopafrica.com/billing/clientarea.php", "_blank", "noopener");
+                      alert("Could not open cPanel right now. Please try again.");
                     }
                   }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors">
                   <I.ExternalLink />cPanel Login
                 </button>
-                {/* Website Builder button — opens WHMCS Weebly config */}
+                {/* Website Builder button — SSO straight into the service's product page, no second login */}
                 <button onClick={async () => {
                     try {
-                      const res = await whmcs<string>("getAutoAuthUrl", { email: clientEmail, destination: "clientarea.php?action=productdetails&id=" + p.id });
-                      window.open(res, "_blank", "noopener");
+                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: `clientarea:product_details:id=${p.id}` });
+                      window.open(redirectUrl, "_blank", "noopener");
                     } catch {
-                      window.open("https://bshopafrica.com/billing/clientarea.php", "_blank", "noopener");
+                      alert("Could not open Website Builder right now. Please try again.");
                     }
                   }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
@@ -434,7 +558,9 @@ function HostingSection({ clientId, clientEmail }: { clientId: number; clientEma
                   Upgrade Builder
                 </Link>
                 <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
-                <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Renew</button>
+                {daysUntil(p.nextduedate) <= 30 && (
+                  <button className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
+                )}
               </div>
             </div>
           ))}
@@ -573,7 +699,7 @@ function InvoicesSection({ clientId }: { clientId: number }) {
                           </a>
                         )}
                         {inv.status === "Paid" && (
-                          <a href={`https://bshopafrica.com/billing/viewinvoice.php?id=${inv.id}&download=1`} target="_blank" rel="noopener noreferrer"
+                          <a href={`/api/invoices/${inv.id}/pdf`} download={`invoice-${inv.id}.pdf`}
                             className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors flex items-center gap-1">
                             <I.Download />PDF
                           </a>
@@ -1279,7 +1405,7 @@ function DashboardInner() {
               transition={{ duration: 0.2, ease: EASE }}>
               {section === "overview"      && <OverviewSection client={client} />}
               {section === "domains"       && <DomainsSection clientId={client.id} />}
-              {section === "hosting"       && <HostingSection clientId={client.id} clientEmail={client.email} />}
+              {section === "hosting"       && <HostingSection clientId={client.id} />}
               {section === "emails"        && <EmailsSection clientId={client.id} />}
               {section === "orders"        && <OrdersSection clientId={client.id} />}
               {section === "invoices"      && <InvoicesSection clientId={client.id} />}
