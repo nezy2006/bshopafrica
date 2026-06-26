@@ -484,20 +484,93 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
   );
 }
 
+/* ─── WHM helpers ────────────────────────────────────────────────────────── */
+interface WhmAccount { user: string; domain: string; diskused: string; disklimit: string; suspended: boolean; }
+
+async function fetchWhmAccounts(): Promise<WhmAccount[]> {
+  const res = await fetch("/api/whm/accounts");
+  const json = await res.json() as { success: boolean; accounts?: WhmAccount[] };
+  if (!json.success) throw new Error("WHM accounts fetch failed");
+  return json.accounts ?? [];
+}
+
+async function cpanelLogin(username: string): Promise<string> {
+  const res = await fetch(`/api/cpanel/login?username=${encodeURIComponent(username)}`);
+  const json = await res.json() as { success: boolean; url?: string; error?: string };
+  if (!json.success || !json.url) throw new Error(json.error ?? "No URL returned");
+  return json.url;
+}
+
+function parseMb(val: string): number {
+  if (!val) return 0;
+  const m = val.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?)/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  switch ((m[2] ?? "").toUpperCase()) {
+    case "G": return n * 1024;
+    case "T": return n * 1024 * 1024;
+    case "K": return n / 1024;
+    default:  return n;
+  }
+}
+
+function DiskBar({ diskused, disklimit }: { diskused: string; disklimit: string }) {
+  const usedMb  = parseMb(diskused);
+  const limitMb = parseMb(disklimit);
+  const pct = limitMb > 0 ? Math.min(100, (usedMb / limitMb) * 100) : 0;
+  const fmt = (mb: number) => mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+  return (
+    <div>
+      <div className="flex justify-between text-xs text-gray-500 mb-1">
+        <span>Disk Usage</span>
+        <span>{fmt(usedMb)} / {fmt(limitMb)}</span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full">
+        <div className="h-1.5 bg-[#6B21A8] rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 /* ─── HOSTING ────────────────────────────────────────────────────────────── */
 function HostingSection({ clientId }: { clientId: number }) {
-  const [products, setProducts] = useState<ClientProduct[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(false);
+  const [products,    setProducts]    = useState<ClientProduct[]>([]);
+  const [whmAccounts, setWhmAccounts] = useState<WhmAccount[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(false);
+  const [cpanelLoading, setCpanelLoading] = useState<Record<number, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
-    try { setProducts(await whmcs<ClientProduct[]>("getClientProducts", { clientId })); }
-    catch { setError(true); }
+    try {
+      const [prods, accts] = await Promise.all([
+        whmcs<ClientProduct[]>("getClientProducts", { clientId }),
+        fetchWhmAccounts().catch(() => [] as WhmAccount[]),
+      ]);
+      setProducts(prods); setWhmAccounts(accts);
+    } catch { setError(true); }
     finally { setLoading(false); }
   }, [clientId]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleCpanelLogin(p: ClientProduct) {
+    setCpanelLoading(prev => ({ ...prev, [p.id]: true }));
+    try {
+      const domain = p.domain?.replace(/^www\./, "");
+      const acct = whmAccounts.find(a => a.domain === domain || a.domain === p.domain);
+      if (!acct) {
+        alert("Could not find a cPanel account for this domain. Please contact support.");
+        return;
+      }
+      const url = await cpanelLogin(acct.user);
+      window.open(url, "_blank", "noopener");
+    } catch {
+      alert("Could not open cPanel right now. Please try again.");
+    } finally {
+      setCpanelLoading(prev => ({ ...prev, [p.id]: false }));
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -514,56 +587,55 @@ function HostingSection({ clientId }: { clientId: number }) {
           action={<Link href="/hosting" className="px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl text-sm">View Plans</Link>} />
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
-          {products.map(p => (
-            <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-gray-900">{p.domain || p.name}</p>
-                  <p className="text-sm text-gray-500">{p.name}</p>
+          {products.map(p => {
+            const domain = p.domain?.replace(/^www\./, "");
+            const acct = whmAccounts.find(a => a.domain === domain || a.domain === p.domain);
+            return (
+              <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">{p.domain || p.name}</p>
+                    <p className="text-sm text-gray-500">{p.name}</p>
+                  </div>
+                  <StatusBadge status={p.status} />
                 </div>
-                <StatusBadge status={p.status} />
-              </div>
-              {/* Disk usage placeholder */}
-              <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Disk Usage</span><span>— / 10 GB</span></div>
-                <div className="h-1.5 bg-gray-100 rounded-full"><div className="h-1.5 bg-[#6B21A8] rounded-full w-1/4" /></div>
-              </div>
-              <div className="text-xs text-gray-400">Renews: {p.nextduedate} · {p.billingcycle}</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={async () => {
-                    try {
-                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: p.id });
-                      window.open(redirectUrl, "_blank", "noopener");
-                    } catch {
-                      alert("Could not open cPanel right now. Please try again.");
-                    }
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors">
-                  <I.ExternalLink />cPanel Login
-                </button>
-                {/* Website Builder button — SSO straight into the service's product page, no second login */}
-                <button onClick={async () => {
-                    try {
-                      const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: p.id });
-                      window.open(redirectUrl, "_blank", "noopener");
-                    } catch {
-                      alert("Could not open Website Builder right now. Please try again.");
-                    }
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Website Builder
-                </button>
-                <Link href="/website-builder#pricing"
-                  className="text-xs px-3 py-1.5 border border-purple-300 text-[#6B21A8] rounded-lg hover:bg-purple-50 transition-colors font-semibold">
-                  Upgrade Builder
-                </Link>
-                <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
-                {daysUntil(p.nextduedate) <= 30 && (
-                  <button className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
+                {acct ? (
+                  <DiskBar diskused={acct.diskused} disklimit={acct.disklimit} />
+                ) : (
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Disk Usage</span><span>— / —</span></div>
+                    <div className="h-1.5 bg-gray-100 rounded-full" />
+                  </div>
                 )}
+                <div className="text-xs text-gray-400">Renews: {p.nextduedate} · {p.billingcycle}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => handleCpanelLogin(p)} disabled={cpanelLoading[p.id]}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] disabled:opacity-60 transition-colors">
+                    <I.ExternalLink />{cpanelLoading[p.id] ? "Opening…" : "cPanel Login"}
+                  </button>
+                  <button onClick={async () => {
+                      try {
+                        const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: p.id });
+                        window.open(redirectUrl, "_blank", "noopener");
+                      } catch {
+                        alert("Could not open Website Builder right now. Please try again.");
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Website Builder
+                  </button>
+                  <Link href="/website-builder#pricing"
+                    className="text-xs px-3 py-1.5 border border-purple-300 text-[#6B21A8] rounded-lg hover:bg-purple-50 transition-colors font-semibold">
+                    Upgrade Builder
+                  </Link>
+                  <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
+                  {daysUntil(p.nextduedate) <= 30 && (
+                    <button className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

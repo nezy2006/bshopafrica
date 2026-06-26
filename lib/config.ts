@@ -12,4 +12,7 @@ export const config = {
   smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
   smtpUser: process.env.SMTP_USER || 'admin@bshopafrica.com',
   smtpPass: process.env.SMTP_PASS || 'qLinT{aOE%fS',
+  whmHost: process.env.WHM_HOST || 'https://s12759.usc1.stableserver.net:2087',
+  whmUser: process.env.WHM_USER || 'bshopafrica',
+  whmToken: process.env.WHM_TOKEN || 'GDFFJ2O94Q3EBRWM0I3EJIU9TRZ9GZL6',
 }
