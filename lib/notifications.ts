@@ -60,9 +60,11 @@ async function poll(clientId: number): Promise<void> {
         body:    JSON.stringify({ action, params }),
       }).then(r => r.json());
 
-    const [domRes, invRes] = await Promise.all([
-      post("getClientDomains", { clientId }),
-      post("getInvoices",      { clientId }),
+    const [domRes, invRes, hostRes, tickRes] = await Promise.all([
+      post("getClientDomains",  { clientId }),
+      post("getInvoices",       { clientId }),
+      post("getClientProducts", { clientId }),
+      post("getTickets",        { clientId }),
     ]);
 
     if (domRes.success && Array.isArray(domRes.data)) {
@@ -91,6 +93,34 @@ async function poll(clientId: number): Promise<void> {
               link:    "/dashboard",
             });
           }
+        }
+      }
+    }
+
+    if (hostRes.success && Array.isArray(hostRes.data)) {
+      for (const p of hostRes.data as { name: string; domain: string; nextduedate: string; status: string }[]) {
+        if (p.status !== "Active") continue;
+        const days = daysUntil(p.nextduedate);
+        if (days > 0 && days <= 30) {
+          addNotification({
+            type:    "domain_expiring",
+            message: `Hosting for ${p.domain || p.name} renews in ${days} day${days === 1 ? "" : "s"}`,
+            date:    new Date().toISOString(),
+            link:    "/dashboard",
+          });
+        }
+      }
+    }
+
+    if (tickRes.success && Array.isArray(tickRes.data)) {
+      for (const t of tickRes.data as { tid: string; title: string; status: string }[]) {
+        if (t.status === "Answered") {
+          addNotification({
+            type:    "ticket_replied",
+            message: `Support ticket #${t.tid} has a new reply: ${t.title}`,
+            date:    new Date().toISOString(),
+            link:    "/dashboard",
+          });
         }
       }
     }

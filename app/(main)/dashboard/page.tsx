@@ -11,7 +11,7 @@ import {
   getUnreadCount, type AppNotification,
 } from "@/lib/notifications";
 
-type Section = "overview" | "domains" | "hosting" | "emails" | "orders" | "invoices" | "support" | "notifications" | "settings";
+type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
@@ -377,30 +377,27 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
   const [error,    setError]    = useState(false);
   const [saving,   setSaving]   = useState(false);
   const [saved,    setSaved]    = useState(false);
-  const [cpanelUrl, setCpanelUrl] = useState<string | null>(null);
+  const [cpanelUser,         setCpanelUser]         = useState<string | null>(null);
+  const [cpanelLoginLoading, setCpanelLoginLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true); setError(false);
       try {
-        const [nsRes, lockRes, products] = await Promise.all([
+        const [nsRes, lockRes, accounts] = await Promise.all([
           whmcs<DomainNameservers>("getDomainNameservers", { domainId: domain.id }),
           whmcs<{ locked: boolean }>("getDomainLockingStatus", { domainId: domain.id }),
-          whmcs<ClientProduct[]>("getClientProducts", { clientId }),
+          fetchWhmAccounts().catch(() => [] as WhmAccount[]),
         ]);
         setNs(nsRes); setLocked(lockRes.locked);
 
-        const match = products.find(p => p.domain === domain.domainname);
-        if (match) {
-          try {
-            const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: match.id });
-            setCpanelUrl(redirectUrl);
-          } catch { /* no SSO link available — hosting service lookup is best-effort */ }
-        }
+        const normalized = domain.domainname.replace(/^www\./, "");
+        const acct = accounts.find(a => a.domain === normalized || a.domain === domain.domainname);
+        if (acct) setCpanelUser(acct.user);
       } catch { setError(true); }
       finally { setLoading(false); }
     })();
-  }, [domain.id, domain.domainname, clientId]);
+  }, [domain.id, domain.domainname]);
 
   async function saveNameservers() {
     setSaving(true);
@@ -466,15 +463,25 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
 
             <div className="border-t border-gray-100 pt-4">
               <p className="text-sm text-gray-500 mb-3">
-                Need to edit A, CNAME, MX, or TXT records? Manage the full DNS zone in cPanel.
+                To manage DNS records (A, CNAME, MX, TXT), login to cPanel → Zone Editor.
               </p>
-              {cpanelUrl ? (
-                <a href={cpanelUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-purple-300 text-[#6B21A8] text-sm font-semibold rounded-xl hover:bg-purple-50 transition-colors">
-                  <I.ExternalLink />Manage DNS Records in cPanel
-                </a>
+              {cpanelUser ? (
+                <button onClick={async () => {
+                    setCpanelLoginLoading(true);
+                    try {
+                      const url = await cpanelLogin(cpanelUser);
+                      window.open(url, "_blank", "noopener");
+                    } catch {
+                      alert("Could not open cPanel right now. Please try again.");
+                    } finally {
+                      setCpanelLoginLoading(false);
+                    }
+                  }} disabled={cpanelLoginLoading}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-purple-300 text-[#6B21A8] text-sm font-semibold rounded-xl hover:bg-purple-50 disabled:opacity-60 transition-colors">
+                  <I.ExternalLink />{cpanelLoginLoading ? "Opening…" : "Login to cPanel"}
+                </button>
               ) : (
-                <p className="text-xs text-gray-400">No hosting service found for this domain — DNS zone editing requires a hosting account with us.</p>
+                <p className="text-xs text-gray-400">No hosting account found for this domain — DNS zone editing requires a hosting account with us.</p>
               )}
             </div>
           </div>
@@ -613,21 +620,6 @@ function HostingSection({ clientId }: { clientId: number }) {
                     className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] disabled:opacity-60 transition-colors">
                     <I.ExternalLink />{cpanelLoading[p.id] ? "Opening…" : "cPanel Login"}
                   </button>
-                  <button onClick={async () => {
-                      try {
-                        const { redirectUrl } = await whmcs<{ redirectUrl: string }>("createSsoToken", { clientId, destination: "clientarea:product_details", serviceId: p.id });
-                        window.open(redirectUrl, "_blank", "noopener");
-                      } catch {
-                        alert("Could not open Website Builder right now. Please try again.");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Website Builder
-                  </button>
-                  <Link href="/website-builder#pricing"
-                    className="text-xs px-3 py-1.5 border border-purple-300 text-[#6B21A8] rounded-lg hover:bg-purple-50 transition-colors font-semibold">
-                    Upgrade Builder
-                  </Link>
                   <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
                   {daysUntil(p.nextduedate) <= 30 && (
                     <button className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
@@ -1307,7 +1299,6 @@ const NAV: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "overview",       label: "Overview",          icon: <I.Home /> },
   { id: "domains",        label: "My Domains",        icon: <I.Globe /> },
   { id: "hosting",        label: "My Hosting",        icon: <I.Server /> },
-  { id: "emails",         label: "My Emails",         icon: <I.Mail /> },
   { id: "orders",         label: "My Orders",         icon: <I.ShoppingBag /> },
   { id: "invoices",       label: "Invoices",          icon: <I.FileText /> },
   { id: "support",        label: "Support Tickets",   icon: <I.Headset /> },
@@ -1478,7 +1469,6 @@ function DashboardInner() {
               {section === "overview"      && <OverviewSection client={client} />}
               {section === "domains"       && <DomainsSection clientId={client.id} />}
               {section === "hosting"       && <HostingSection clientId={client.id} />}
-              {section === "emails"        && <EmailsSection clientId={client.id} />}
               {section === "orders"        && <OrdersSection clientId={client.id} />}
               {section === "invoices"      && <InvoicesSection clientId={client.id} />}
               {section === "support"       && <SupportSection client={client} />}
