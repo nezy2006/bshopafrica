@@ -10,6 +10,7 @@ import {
   getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
   createSsoToken, getDomainNameservers, updateDomainNameservers,
   getDomainLockingStatus, updateDomainLockingStatus,
+  validateLogin, updateClientPassword,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
 
       case "getTickets":     data = await getTickets(n("clientId")); break;
       case "getTicket":      data = await getTicket(n("ticketId")); break;
-      case "openTicket":     data = await openTicket({ clientId: n("clientId"), subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium") }); break;
+      case "openTicket":     data = await openTicket({ clientId: n("clientId"), subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium"), name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined }); break;
       case "addTicketReply": await addTicketReply(n("ticketId"), n("clientId"), s("message")); data = { ok: true }; break;
       case "closeTicket":    await closeTicket(n("ticketId")); data = { ok: true }; break;
       case "updateClientDetails": await updateClientDetails(n("clientId"), params.updates as Record<string, string>); data = { ok: true }; break;
@@ -149,6 +150,8 @@ export async function POST(req: NextRequest) {
       case "getTLDPricing":         data = await getTLDPricing(); break;
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
       case "addPayment":            await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId")); data = { ok: true }; break;
+      case "validateLogin":         data = { valid: await validateLogin(s("email"), s("password")) }; break;
+      case "updateClientPassword":  await updateClientPassword(n("clientId"), s("password")); data = { ok: true }; break;
 
       default:
         return NextResponse.json({ success: false, error: `Unknown action: "${action}"` }, { status: 400 });

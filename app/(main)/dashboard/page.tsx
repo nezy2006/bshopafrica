@@ -795,6 +795,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
   const [newTicket,  setNewTicket]  = useState(false);
   const [form,       setForm]       = useState({ subject: "", message: "", dept: "1", priority: "Medium" });
   const [submitting, setSubmitting] = useState(false);
+  const [successId,  setSuccessId]  = useState("");
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -827,8 +828,17 @@ function SupportSection({ client }: { client: ClientDetails }) {
     if (!form.subject.trim() || !form.message.trim()) return;
     setSubmitting(true);
     try {
-      await whmcs("openTicket", { clientId: client.id, subject: form.subject, message: form.message, deptId: Number(form.dept), priority: form.priority });
-      setNewTicket(false); setForm({ subject: "", message: "", dept: "1", priority: "Medium" });
+      const name  = localStorage.getItem("bshop_client_name")  ?? `${client.firstname} ${client.lastname}`.trim();
+      const email = localStorage.getItem("bshop_client_email") ?? client.email;
+      const message = `${form.message}\n\n---\nNote: This ticket auto-closes after 48 hours of no response.`;
+      const { tid } = await whmcs<{ ticketId: number; tid: string }>("openTicket", {
+        clientId: client.id, subject: form.subject, message,
+        deptId: Number(form.dept), priority: form.priority, name, email,
+      });
+      setForm({ subject: "", message: "", dept: "1", priority: "Medium" });
+      setNewTicket(false);
+      setSuccessId(tid);
+      setTimeout(() => setSuccessId(""), 6000);
       load();
     } catch { /* ignore */ }
     finally { setSubmitting(false); }
@@ -913,6 +923,13 @@ function SupportSection({ client }: { client: ClientDetails }) {
           </button>
         ))}
       </div>
+
+      {successId && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 px-5 py-3 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm">
+          <I.Check />Ticket <span className="font-semibold">#{successId}</span> submitted successfully. We&apos;ll get back to you shortly.
+        </motion.div>
+      )}
 
       {error ? <ErrorState onRetry={load} /> :
        loading ? <Skeleton className="h-48" /> :
@@ -1030,26 +1047,34 @@ function NotificationsSection() {
 
 /* ─── ACCOUNT SETTINGS ───────────────────────────────────────────────────── */
 function AccountSettingsSection({ client }: { client: ClientDetails }) {
-  const [tab,     setTab]     = useState<"profile" | "security" | "billing">("profile");
-  const [form,    setForm]    = useState({ firstname: client.firstname, lastname: client.lastname, email: client.email, phonenumber: client.phonenumber });
-  const [pwForm,  setPwForm]  = useState({ current: "", newPw: "", confirm: "" });
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
+  const [tab,       setTab]       = useState<"security" | "billing">("security");
+  const [pwForm,    setPwForm]    = useState({ current: "", newPw: "", confirm: "" });
+  const [pwSaving,  setPwSaving]  = useState(false);
+  const [pwError,   setPwError]   = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
 
-  async function saveProfile() {
-    setSaving(true);
+  async function changePassword() {
+    setPwError(""); setPwSuccess(false);
+    if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) { setPwError("All fields are required."); return; }
+    if (pwForm.newPw !== pwForm.confirm) { setPwError("New passwords do not match."); return; }
+    if (pwForm.newPw.length < 8) { setPwError("Password must be at least 8 characters."); return; }
+    setPwSaving(true);
     try {
-      await whmcs("updateClientDetails", { clientId: client.id, updates: form });
-      setSaved(true); setTimeout(() => setSaved(false), 3000);
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+      const { valid } = await whmcs<{ valid: boolean }>("validateLogin", { email: client.email, password: pwForm.current });
+      if (!valid) { setPwError("Current password is incorrect."); return; }
+      await whmcs("updateClientPassword", { clientId: client.id, password: pwForm.newPw });
+      setPwSuccess(true);
+      setPwForm({ current: "", newPw: "", confirm: "" });
+      setTimeout(() => setPwSuccess(false), 4000);
+    } catch { setPwError("Failed to update password. Please try again."); }
+    finally { setPwSaving(false); }
   }
 
   return (
     <div className="p-6 space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {(["profile", "security", "billing"] as const).map(t => (
+        {(["security", "billing"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-all duration-200 ${tab === t ? "bg-white shadow text-[#6B21A8]" : "text-gray-500 hover:text-gray-700"}`}>
             {t}
@@ -1057,71 +1082,50 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
         ))}
       </div>
 
-      {tab === "profile" && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-lg">
-          <h3 className="font-semibold text-gray-900">Personal Information</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {([["firstname","First Name"],["lastname","Last Name"]] as const).map(([k,label]) => (
-              <div key={k}>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
-                <input value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
-              </div>
-            ))}
-          </div>
-          {([["email","Email Address"],["phonenumber","Phone Number"]] as const).map(([k,label]) => (
-            <div key={k}>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
-              <input value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
-            </div>
-          ))}
-          <div className="flex items-center gap-3">
-            <button onClick={saveProfile} disabled={saving}
-              className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
-            {saved && <span className="text-sm text-green-600 flex items-center gap-1"><I.Check />Saved!</span>}
-          </div>
-        </div>
-      )}
-
       {tab === "security" && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-lg">
           <h3 className="font-semibold text-gray-900">Change Password</h3>
-          {[["current","Current Password"],["newPw","New Password"],["confirm","Confirm New Password"]].map(([k,label]) => (
+          {([["current","Current Password"],["newPw","New Password"],["confirm","Confirm New Password"]] as const).map(([k, label]) => (
             <div key={k}>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
-              <input type="password" value={pwForm[k as keyof typeof pwForm]} onChange={e => setPwForm(f => ({ ...f, [k]: e.target.value }))}
+              <input type="password" value={pwForm[k]} onChange={e => setPwForm(f => ({ ...f, [k]: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
             </div>
           ))}
-          <button className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
-            Update Password
+          {pwError   && <p className="text-sm text-red-600 flex items-center gap-1.5"><I.Alert />{pwError}</p>}
+          {pwSuccess && <p className="text-sm text-green-600 flex items-center gap-1.5"><I.Check />Password updated successfully.</p>}
+          <button onClick={changePassword} disabled={pwSaving}
+            className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+            {pwSaving ? "Updating…" : "Update Password"}
           </button>
         </div>
       )}
 
       {tab === "billing" && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 max-w-lg">
-          <h3 className="font-semibold text-gray-900 mb-4">Payment Methods</h3>
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 max-w-lg space-y-4">
+          <h3 className="font-semibold text-gray-900">Payment Methods</h3>
+          <p className="text-sm text-gray-500">We accept the following payment methods for all orders and renewals.</p>
           <div className="space-y-3">
-            {[
-              { name: "PayPal", desc: "Pay securely via PayPal" },
-              { name: "PawaPay", desc: "Mobile money payments" },
-            ].map(pm => (
-              <div key={pm.name} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-purple-200 transition-colors">
-                <div>
-                  <p className="font-medium text-gray-900 text-sm">{pm.name}</p>
-                  <p className="text-xs text-gray-500">{pm.desc}</p>
-                </div>
-                <a href={`https://bshopafrica.com/billing/clientarea.php?action=paymentmethods`} target="_blank" rel="noopener noreferrer"
-                  className="text-xs font-semibold text-[#6B21A8] hover:underline flex items-center gap-1">
-                  Manage <I.ExternalLink />
-                </a>
+            <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl">
+              <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 00-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 00.554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 01.923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/></svg>
               </div>
-            ))}
+              <div>
+                <p className="font-medium text-gray-900 text-sm">PayPal</p>
+                <p className="text-xs text-gray-500 mt-0.5">Secure online payment. Available for all orders and renewals.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl">
+              <div className="w-9 h-9 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 text-sm">MTN / Airtel Mobile Money</p>
+                <p className="text-xs text-gray-500 mt-0.5">Pay with mobile money via PawaPay — Uganda, Rwanda, Tanzania and more.</p>
+              </div>
+            </div>
           </div>
+          <p className="text-xs text-gray-400 pt-1">To pay an outstanding invoice, go to the <span className="font-medium text-gray-600">Invoices</span> section in the sidebar.</p>
         </div>
       )}
     </div>

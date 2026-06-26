@@ -350,9 +350,23 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
   return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies };
 }
 
-export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string }): Promise<{ ticketId: number; tid: string }> {
-  const data = await callWhmcs("OpenSupportTicket", { clientid: params.clientId, subject: params.subject, message: params.message, deptid: params.deptId, priority: params.priority });
+export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string; name?: string; email?: string }): Promise<{ ticketId: number; tid: string }> {
+  const extra: Record<string, string | number> = {};
+  if (params.name)  extra.name  = params.name;
+  if (params.email) extra.email = params.email;
+  const data = await callWhmcs("OpenSupportTicket", { clientid: params.clientId, subject: params.subject, message: params.message, deptid: params.deptId, priority: params.priority, ...extra });
   return { ticketId: Number(data.id ?? 0), tid: String(data.tid ?? "") };
+}
+
+export async function validateLogin(email: string, password: string): Promise<boolean> {
+  try {
+    const data = await callWhmcs("ValidateLogin", { email, password2: password });
+    return Number(data.userid ?? 0) > 0;
+  } catch { return false; }
+}
+
+export async function updateClientPassword(clientId: number, newPassword: string): Promise<void> {
+  await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
 }
 
 export async function addTicketReply(ticketId: number, clientId: number, message: string): Promise<void> {
