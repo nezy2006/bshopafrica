@@ -782,20 +782,35 @@ function InvoicesSection({ clientId }: { clientId: number }) {
 }
 
 /* ─── SUPPORT ────────────────────────────────────────────────────────────── */
+function TicketStatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  const cls =
+    s === "open"           ? "bg-yellow-100 text-yellow-700" :
+    s === "answered"       ? "bg-green-100 text-green-700"  :
+    s === "closed"         ? "bg-gray-100 text-gray-500"    :
+    s === "customer-reply" ? "bg-blue-100 text-blue-700"    :
+    s === "in progress"    ? "bg-orange-100 text-orange-700":
+                             "bg-gray-100 text-gray-500";
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{status}</span>;
+}
+
 function SupportSection({ client }: { client: ClientDetails }) {
-  const [tickets,    setTickets]    = useState<SupportTicket[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(false);
-  const [filter,     setFilter]     = useState("All");
-  const [selected,   setSelected]   = useState<SupportTicket | null>(null);
-  const [ticketData, setTicketData] = useState<(SupportTicket & { replies: TicketReply[] }) | null>(null);
-  const [ticketLoading, setTicketLoading] = useState(false);
-  const [replyText,  setReplyText]  = useState("");
-  const [replying,   setReplying]   = useState(false);
-  const [newTicket,  setNewTicket]  = useState(false);
-  const [form,       setForm]       = useState({ subject: "", message: "", dept: "1", priority: "Medium" });
-  const [submitting, setSubmitting] = useState(false);
-  const [successId,  setSuccessId]  = useState("");
+  const [tickets,        setTickets]        = useState<SupportTicket[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(false);
+  const [filter,         setFilter]         = useState("All");
+  const [selected,       setSelected]       = useState<SupportTicket | null>(null);
+  const [ticketData,     setTicketData]     = useState<(SupportTicket & { replies: TicketReply[] }) | null>(null);
+  const [ticketLoading,  setTicketLoading]  = useState(false);
+  const [replyText,      setReplyText]      = useState("");
+  const [replying,       setReplying]       = useState(false);
+  const [newTicket,      setNewTicket]      = useState(false);
+  const [form,           setForm]           = useState({ subject: "", message: "", dept: "1", priority: "Medium" });
+  const [submitting,     setSubmitting]     = useState(false);
+  const [successId,      setSuccessId]      = useState("");
+  const [newReplyBanner, setNewReplyBanner] = useState(false);
+  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevStatus = useRef("");
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -806,12 +821,34 @@ function SupportSection({ client }: { client: ClientDetails }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function openTicket(t: SupportTicket) {
-    setSelected(t); setTicketLoading(true);
-    try { setTicketData(await whmcs("getTicket", { ticketId: t.id })); }
-    catch { setTicketData(null); }
-    finally { setTicketLoading(false); }
+  async function viewTicket(t: SupportTicket, silent = false) {
+    if (!silent) { setSelected(t); setTicketLoading(true); }
+    try {
+      const data = await whmcs<SupportTicket & { replies: TicketReply[] }>("getTicket", { ticketId: t.id });
+      if (silent && prevStatus.current && prevStatus.current !== data.status && data.status === "Answered") {
+        setNewReplyBanner(true);
+        setTimeout(() => setNewReplyBanner(false), 8000);
+      }
+      if (silent) prevStatus.current = data.status;
+      setTicketData(data);
+      if (silent) setSelected(prev => prev?.id === t.id ? { ...prev, status: data.status } : prev);
+    } catch { if (!silent) setTicketData(null); }
+    finally { if (!silent) setTicketLoading(false); }
   }
+
+  // Poll every 30 s while viewing a ticket
+  useEffect(() => {
+    if (!selected) {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      setNewReplyBanner(false);
+      return;
+    }
+    prevStatus.current = selected.status;
+    const snap = { ...selected };
+    pollRef.current = setInterval(() => viewTicket(snap, true), 30_000);
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
 
   async function submitReply() {
     if (!selected || !replyText.trim()) return;
@@ -819,9 +856,18 @@ function SupportSection({ client }: { client: ClientDetails }) {
     try {
       await whmcs("addTicketReply", { ticketId: selected.id, clientId: client.id, message: replyText });
       setReplyText("");
-      openTicket(selected);
+      viewTicket(selected);
     } catch { /* ignore */ }
     finally { setReplying(false); }
+  }
+
+  async function closeSelected() {
+    if (!selected) return;
+    try {
+      await whmcs("closeTicket", { ticketId: selected.id });
+      setSelected(null); setTicketData(null);
+      load();
+    } catch { /* ignore */ }
   }
 
   async function submitNewTicket() {
@@ -844,56 +890,76 @@ function SupportSection({ client }: { client: ClientDetails }) {
     finally { setSubmitting(false); }
   }
 
-  const tabs = ["All", "Open", "Answered", "Closed"];
-  const filtered = filter === "All" ? tickets : tickets.filter(t => t.status === filter || (filter === "Open" && t.status === "Customer-Reply"));
+  const tabs     = ["All", "Open", "Answered", "Closed"];
+  const filtered = filter === "All" ? tickets : tickets.filter(t =>
+    t.status === filter || (filter === "Open" && t.status === "Customer-Reply")
+  );
 
+  /* ── Single ticket conversation view ── */
   if (selected) {
     return (
-      <div className="p-6 space-y-6">
-        <button onClick={() => { setSelected(null); setTicketData(null); }}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
-          ← Back to tickets
-        </button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">{selected.title}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <StatusBadge status={selected.status} />
-              <PriorityBadge priority={selected.priority} />
-              <span className="text-xs text-gray-400">#{selected.tid} · {selected.deptname}</span>
-            </div>
-          </div>
-          <button onClick={async () => { await whmcs("closeTicket", { ticketId: selected.id }); setSelected(null); load(); }}
-            className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg hover:border-red-300 hover:text-red-500 transition-colors">
-            Close Ticket
+      <div className="p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <button onClick={() => { setSelected(null); setTicketData(null); }}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
+            ← Back to tickets
           </button>
+          {selected.status !== "Closed" && (
+            <button onClick={closeSelected}
+              className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg hover:border-red-300 hover:text-red-500 transition-colors">
+              Close Ticket
+            </button>
+          )}
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-5">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">{selected.title}</h2>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <TicketStatusBadge status={selected.status} />
+            <PriorityBadge priority={selected.priority} />
+            <span className="text-xs text-gray-400">#{selected.tid} · {selected.deptname}</span>
+          </div>
+        </div>
+
+        {newReplyBanner && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm font-medium">
+            <I.Bell />New reply from support! Scroll down to read it.
+          </motion.div>
+        )}
+
+        {/* Conversation thread */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-5 min-h-[120px]">
           {ticketLoading ? <Skeleton className="h-32" /> :
-           !ticketData ? <p className="text-gray-400 text-sm">Could not load replies.</p> :
-           ticketData.replies.length === 0 ? <p className="text-gray-400 text-sm">No replies yet.</p> :
-           ticketData.replies.map(r => (
-            <div key={r.id} className={`flex gap-3 ${r.type === "staff" ? "flex-row-reverse" : ""}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${r.type === "staff" ? "bg-[#6B21A8]" : "bg-gray-400"}`}>
-                {r.name.charAt(0).toUpperCase()}
-              </div>
-              <div className={`max-w-lg rounded-2xl px-4 py-3 ${r.type === "staff" ? "bg-[#6B21A8]/10 text-gray-900" : "bg-gray-100 text-gray-900"}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-semibold">{r.name}</span>
-                  <span className="text-xs text-gray-400">{r.date}</span>
-                </div>
-                <p className="text-sm whitespace-pre-wrap">{r.message}</p>
-              </div>
-            </div>
-           ))
-          }
+           !ticketData  ? <p className="text-sm text-gray-400">Could not load conversation.</p> :
+           ticketData.replies.length === 0 ? <p className="text-sm text-gray-400">No messages yet.</p> :
+           ticketData.replies.map((r, i) => {
+             const isClient = r.type === "client";
+             return (
+               <div key={r.id || i} className={`flex gap-3 ${isClient ? "flex-row-reverse ml-auto" : ""} max-w-[85%]`}>
+                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${isClient ? "bg-gray-400" : "bg-[#6B21A8]"}`}>
+                   {(r.name || "?").charAt(0).toUpperCase()}
+                 </div>
+                 <div className={`rounded-2xl px-4 py-3 min-w-0 ${isClient ? "bg-gray-100" : "bg-[#6B21A8]/10 border border-[#6B21A8]/20"}`}>
+                   <div className={`flex items-center gap-2 mb-1 ${isClient ? "flex-row-reverse" : ""}`}>
+                     <span className={`text-xs font-semibold ${isClient ? "text-gray-600" : "text-[#6B21A8]"}`}>
+                       {isClient ? "You" : `${r.name} · Support`}
+                     </span>
+                     <span className="text-xs text-gray-400">{r.date}</span>
+                   </div>
+                   <p className="text-sm whitespace-pre-wrap text-gray-900">{r.message}</p>
+                 </div>
+               </div>
+             );
+           })}
         </div>
 
+        {/* Reply box */}
         {selected.status !== "Closed" && (
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <h3 className="font-semibold text-gray-900 mb-3">Reply</h3>
-            <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={4} placeholder="Type your reply…"
+            <h3 className="font-semibold text-gray-900 text-sm mb-3">Add Reply</h3>
+            <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={4}
+              placeholder="Type your reply…"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
             <button onClick={submitReply} disabled={replying || !replyText.trim()}
               className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
@@ -905,6 +971,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
     );
   }
 
+  /* ── Ticket list ── */
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -927,29 +994,32 @@ function SupportSection({ client }: { client: ClientDetails }) {
       {successId && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-3 px-5 py-3 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm">
-          <I.Check />Ticket <span className="font-semibold">#{successId}</span> submitted successfully. We&apos;ll get back to you shortly.
+          <I.Check />Ticket <span className="font-semibold">#{successId}</span> submitted. We&apos;ll get back to you shortly.
         </motion.div>
       )}
 
       {error ? <ErrorState onRetry={load} /> :
        loading ? <Skeleton className="h-48" /> :
-       filtered.length === 0 ? <EmptyState icon={<I.Headset />} title="No tickets" desc="Open a support ticket and we'll get back to you quickly." /> : (
+       filtered.length === 0 ? (
+        <EmptyState icon={<I.Headset />} title="No tickets" desc="Open a support ticket and we'll get back to you quickly." />
+       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="divide-y divide-gray-50">
             {filtered.map(t => (
-              <button key={t.id} onClick={() => openTicket(t)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left">
+              <button key={t.id} onClick={() => viewTicket(t)}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 truncate">{t.title}</p>
                   <p className="text-xs text-gray-400 mt-0.5">#{t.tid} · {t.deptname} · {t.date}</p>
                 </div>
                 <PriorityBadge priority={t.priority} />
-                <StatusBadge status={t.status} />
+                <TicketStatusBadge status={t.status} />
                 <I.ChevronR />
               </button>
             ))}
           </div>
         </div>
-      )}
+       )}
 
       {/* New ticket modal */}
       <AnimatePresence>

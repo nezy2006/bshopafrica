@@ -347,6 +347,16 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
     date: String(r.date ?? ""), message: String(r.message ?? ""),
     type: (r.userid ? "client" : "staff") as "client" | "staff",
   }));
+  // Prepend the original ticket body as the first client message if not already present
+  const originalMsg = String(data.message ?? "").trim();
+  if (originalMsg && !replies.some(r => r.type === "client" && r.message.trim() === originalMsg)) {
+    replies.unshift({
+      id: 0, userid: Number(data.userid ?? 0),
+      name: String(data.name ?? "You"), email: String(data.email ?? ""),
+      date: String(data.date ?? ""), message: originalMsg,
+      type: "client",
+    });
+  }
   return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies };
 }
 
