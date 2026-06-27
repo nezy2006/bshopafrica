@@ -351,10 +351,15 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
 }
 
 export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string; name?: string; email?: string }): Promise<{ ticketId: number; tid: string }> {
-  const extra: Record<string, string | number> = {};
-  if (params.name)  extra.name  = params.name;
-  if (params.email) extra.email = params.email;
-  const data = await callWhmcs("OpenSupportTicket", { clientid: params.clientId, subject: params.subject, message: params.message, deptid: params.deptId, priority: params.priority, ...extra });
+  const data = await callWhmcs("OpenTicket", {
+    clientid: String(params.clientId),
+    deptid:   String(params.deptId || 1),
+    subject:  params.subject,
+    message:  params.message,
+    priority: params.priority || "Medium",
+    ...(params.name  ? { name:  params.name  } : {}),
+    ...(params.email ? { email: params.email } : {}),
+  });
   return { ticketId: Number(data.id ?? 0), tid: String(data.tid ?? "") };
 }
 
