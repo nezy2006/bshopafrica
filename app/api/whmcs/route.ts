@@ -114,7 +114,14 @@ export async function POST(req: NextRequest) {
       }
       case "addOrder":       data = await addOrder(n("clientId"), (params.items as Record<string, string | number>) ?? {}); break;
 
-      case "getClientDetails":  data = await getClientDetails(n("clientId")); break;
+      case "getClientDetails": {
+        console.log("getClientDetails params:", JSON.stringify(params));
+        const clientId = Number(params.clientId ?? params.clientid ?? params.client_id ?? 0);
+        const email    = params.email ? String(params.email) : undefined;
+        if (!clientId && !email) return NextResponse.json({ success: false, error: "clientId or email required" });
+        data = await getClientDetails(clientId, email);
+        break;
+      }
       case "getClientProducts": data = await getClientProducts(n("clientId")); break;
       case "getClientDomains":  data = await getClientDomains(n("clientId")); break;
       case "getInvoices":       data = await getInvoices(n("clientId")); break;

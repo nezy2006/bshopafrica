@@ -191,8 +191,9 @@ export async function addOrder(clientId: number, items: Record<string, string | 
   return { orderId: Number(data.orderid ?? 0), invoiceId: Number(data.invoiceid ?? 0) };
 }
 
-export async function getClientDetails(clientId: number): Promise<ClientDetails> {
-  const data = await callWhmcs("GetClientsDetails", { clientid: clientId });
+export async function getClientDetails(clientId: number, email?: string): Promise<ClientDetails> {
+  const lookup: Record<string, string | number | boolean> = email && !clientId ? { email } : { clientid: clientId };
+  const data = await callWhmcs("GetClientsDetails", lookup);
   const c = (data.client ?? data) as Record<string, unknown>;
   return { id: Number(c.id ?? clientId), firstname: String(c.firstname ?? ""), lastname: String(c.lastname ?? ""), email: String(c.email ?? ""), phonenumber: String(c.phonenumber ?? ""), status: String(c.status ?? ""), datecreated: String(c.datecreated ?? "") };
 }
