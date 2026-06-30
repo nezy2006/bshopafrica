@@ -333,14 +333,16 @@ export async function getClientOrders(clientId: number): Promise<ClientOrder[]> 
 export async function getTickets(clientId: number): Promise<SupportTicket[]> {
   try {
     const data = await callWhmcs("GetSupportTickets", { clientid: clientId, limitnum: 50 });
-    const raw = (data.tickets as { ticket: WhmcsRaw[] } | undefined)?.ticket ?? [];
+    const ticketData = (data.tickets as { ticket: WhmcsRaw | WhmcsRaw[] } | undefined)?.ticket ?? [];
+    const raw = Array.isArray(ticketData) ? ticketData : [ticketData];
     return raw.map(t => ({ id: Number(t.id ?? 0), tid: String(t.tid ?? ""), title: String(t.title ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), deptname: String(t.deptname ?? ""), date: String(t.date ?? ""), lastreply: String(t.lastreply ?? "") }));
   } catch { return []; }
 }
 
 export async function getTicket(ticketId: number): Promise<SupportTicket & { replies: TicketReply[] }> {
   const data = await callWhmcs("GetSupportTicket", { ticketid: ticketId });
-  const raw = (data.replies as { reply: WhmcsRaw[] } | undefined)?.reply ?? [];
+  const replyData = (data.replies as { reply: WhmcsRaw | WhmcsRaw[] } | undefined)?.reply ?? [];
+  const raw = Array.isArray(replyData) ? replyData : [replyData];
   const replies: TicketReply[] = raw.map(r => ({
     id: Number(r.id ?? 0), userid: Number(r.userid ?? 0),
     name: String(r.name ?? r.admin ?? "Staff"), email: String(r.email ?? ""),
