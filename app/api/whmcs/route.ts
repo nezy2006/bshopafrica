@@ -67,8 +67,18 @@ export async function POST(req: NextRequest) {
 
   try {
     let data: unknown;
-    const n = (k: string, fb = 0) => Number(params[k] ?? fb);
-    const s = (k: string, fb = "") => String(params[k] ?? fb);
+    // Accept camelCase / lowercase / snake_case for every param key so callers
+    // can't accidentally send the wrong casing (clientId / clientid / client_id).
+    const n = (k: string, fb = 0) => {
+      const lo = k.toLowerCase();
+      const sn = k.replace(/[A-Z]/g, m => `_${m.toLowerCase()}`);
+      return Number(params[k] ?? params[lo] ?? params[sn] ?? fb);
+    };
+    const s = (k: string, fb = "") => {
+      const lo = k.toLowerCase();
+      const sn = k.replace(/[A-Z]/g, m => `_${m.toLowerCase()}`);
+      return String(params[k] ?? params[lo] ?? params[sn] ?? fb);
+    };
 
     switch (action) {
       case "checkDomain":    data = await checkDomain(s("domain"), s("tld", ".com")); break;
@@ -130,7 +140,12 @@ export async function POST(req: NextRequest) {
       case "getInvoicePDFUrl": data = getInvoicePDFUrl(n("invoiceId")); break;
       case "getPaymentUrl":    data = getPaymentUrl(n("invoiceId")); break;
 
-      case "getTickets":     data = await getTickets(n("clientId")); break;
+      case "getTickets": {
+        const clientId = Number(params.clientId ?? params.clientid ?? params.client_id ?? 0);
+        if (!clientId) return NextResponse.json({ success: false, error: "clientId required" });
+        data = await getTickets(clientId);
+        break;
+      }
       case "getTicket":      data = await getTicket(n("ticketId")); break;
       case "openTicket":     data = await openTicket({ clientId: n("clientId"), subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium"), name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined }); break;
       case "addTicketReply": await addTicketReply(n("ticketId"), n("clientId"), s("message")); data = { ok: true }; break;
