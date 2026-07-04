@@ -333,11 +333,16 @@ export async function getClientOrders(clientId: number): Promise<ClientOrder[]> 
 
 export async function getTickets(clientId: number): Promise<SupportTicket[]> {
   try {
+    console.log("[whmcs.getTickets] calling WHMCS with clientid:", clientId);
     const data = await callWhmcs("GetSupportTickets", { clientid: clientId, limitnum: 50 });
+    console.log("[whmcs.getTickets] raw WHMCS response:", JSON.stringify(data).substring(0, 500));
     const ticketData = (data.tickets as { ticket: WhmcsRaw | WhmcsRaw[] } | undefined)?.ticket ?? [];
     const raw = Array.isArray(ticketData) ? ticketData : [ticketData];
     return raw.map(t => ({ id: Number(t.id ?? 0), tid: String(t.tid ?? ""), title: String(t.title ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), deptname: String(t.deptname ?? ""), date: String(t.date ?? ""), lastreply: String(t.lastreply ?? "") }));
-  } catch { return []; }
+  } catch (e) {
+    console.log("[whmcs.getTickets] error:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 export async function getTicket(ticketId: number): Promise<SupportTicket & { replies: TicketReply[] }> {

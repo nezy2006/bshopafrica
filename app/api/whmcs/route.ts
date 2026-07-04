@@ -142,8 +142,12 @@ export async function POST(req: NextRequest) {
 
       case "getTickets": {
         const clientId = Number(params.clientId ?? params.clientid ?? params.client_id ?? 0);
+        console.log("[getTickets] received params:", JSON.stringify(params));
+        console.log("[getTickets] resolved clientId:", clientId);
         if (!clientId) return NextResponse.json({ success: false, error: "clientId required" });
-        data = await getTickets(clientId);
+        const result = await getTickets(clientId);
+        console.log("[getTickets] result:", JSON.stringify(result));
+        data = result;
         break;
       }
       case "getTicket":      data = await getTicket(n("ticketId")); break;
