@@ -81,7 +81,11 @@ async function callWhmcs(action: string, params: Record<string, string | number 
   console.log("[callWhmcs] body params:", JSON.stringify(params));
   const body = new URLSearchParams({ identifier, secret, action, responsetype: "json", ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
   const res = await fetch(`${url}/includes/api.php`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString(), cache: "no-store" });
-  if (!res.ok) throw new Error(`WHMCS HTTP error: ${res.status}`);
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "(unreadable)");
+    console.log("[callWhmcs] non-OK status:", res.status, "body:", errBody.substring(0, 500));
+    throw new Error(`WHMCS HTTP error: ${res.status}`);
+  }
   const data = (await res.json()) as WhmcsRaw;
   if (data.result === "error") throw new Error(typeof data.message === "string" ? data.message : "WHMCS API error");
   return data;
