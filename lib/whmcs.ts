@@ -341,7 +341,7 @@ export async function getClientOrders(clientId: number): Promise<ClientOrder[]> 
 export async function getTickets(clientId: number): Promise<SupportTicket[]> {
   try {
     console.log("[whmcs.getTickets] calling WHMCS with clientid:", clientId);
-    const data = await callWhmcs("GetSupportTickets", { clientid: clientId, limitnum: 50 });
+    const data = await callWhmcs("GetTickets", { clientid: clientId, limitnum: 50 });
     console.log("[whmcs.getTickets] raw WHMCS response:", JSON.stringify(data).substring(0, 500));
     const ticketData = (data.tickets as { ticket: WhmcsRaw | WhmcsRaw[] } | undefined)?.ticket ?? [];
     const raw = Array.isArray(ticketData) ? ticketData : [ticketData];
