@@ -76,6 +76,9 @@ function getCredentials() {
 
 async function callWhmcs(action: string, params: Record<string, string | number | boolean> = {}): Promise<WhmcsRaw> {
   const { url, identifier, secret } = getCredentials();
+  console.log("[callWhmcs] action:", action);
+  console.log("[callWhmcs] url:", `${url}/includes/api.php`);
+  console.log("[callWhmcs] body params:", JSON.stringify(params));
   const body = new URLSearchParams({ identifier, secret, action, responsetype: "json", ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
   const res = await fetch(`${url}/includes/api.php`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString(), cache: "no-store" });
   if (!res.ok) throw new Error(`WHMCS HTTP error: ${res.status}`);
