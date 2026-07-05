@@ -353,7 +353,7 @@ export async function getTickets(clientId: number): Promise<SupportTicket[]> {
 }
 
 export async function getTicket(ticketId: number): Promise<SupportTicket & { replies: TicketReply[] }> {
-  const data = await callWhmcs("GetSupportTicket", { ticketid: ticketId });
+  const data = await callWhmcs("GetTicket", { ticketid: ticketId });
   const replyData = (data.replies as { reply: WhmcsRaw | WhmcsRaw[] } | undefined)?.reply ?? [];
   const raw = Array.isArray(replyData) ? replyData : [replyData];
   const replies: TicketReply[] = raw.map(r => ({
@@ -404,7 +404,7 @@ export async function addTicketReply(ticketId: number, clientId: number, message
 }
 
 export async function closeTicket(ticketId: number): Promise<void> {
-  await callWhmcs("UpdateSupportTicket", { ticketid: ticketId, status: "Closed" });
+  await callWhmcs("UpdateTicket", { ticketid: ticketId, status: "Closed" });
 }
 
 export async function updateClientDetails(clientId: number, updates: Record<string, string>): Promise<void> {
