@@ -318,9 +318,12 @@ export interface ClientOrder {
   id: number; date: string; total: string; status: string; currencycode: string;
 }
 
+export interface TicketAttachment { filename: string; index: string; }
+
 export interface TicketReply {
   id: number; userid: number; name: string; email: string;
   date: string; message: string; type: "client" | "staff";
+  attachments: TicketAttachment[];
 }
 
 export interface SupportTicket {
@@ -345,7 +348,7 @@ export async function getTickets(clientId: number): Promise<SupportTicket[]> {
     console.log("[whmcs.getTickets] raw WHMCS response:", JSON.stringify(data).substring(0, 500));
     const ticketData = (data.tickets as { ticket: WhmcsRaw | WhmcsRaw[] } | undefined)?.ticket ?? [];
     const raw = Array.isArray(ticketData) ? ticketData : [ticketData];
-    return raw.map(t => ({ id: Number(t.id ?? 0), tid: String(t.tid ?? ""), title: String(t.title ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), deptname: String(t.deptname ?? ""), date: String(t.date ?? ""), lastreply: String(t.lastreply ?? "") }));
+    return raw.map(t => ({ id: Number(t.id ?? 0), tid: String(t.tid ?? ""), title: String(t.subject ?? t.title ?? "No Subject"), status: String(t.status ?? ""), priority: String(t.priority ?? ""), deptname: String(t.deptname ?? ""), date: String(t.date ?? ""), lastreply: String(t.lastreply ?? "") }));
   } catch (e) {
     console.log("[whmcs.getTickets] error:", e instanceof Error ? e.message : e);
     return [];
@@ -356,12 +359,18 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
   const data = await callWhmcs("GetTicket", { ticketid: ticketId });
   const replyData = (data.replies as { reply: WhmcsRaw | WhmcsRaw[] } | undefined)?.reply ?? [];
   const raw = Array.isArray(replyData) ? replyData : [replyData];
-  const replies: TicketReply[] = raw.map(r => ({
-    id: Number(r.id ?? 0), userid: Number(r.userid ?? 0),
-    name: String(r.name ?? r.admin ?? "Staff"), email: String(r.email ?? ""),
-    date: String(r.date ?? ""), message: String(r.message ?? ""),
-    type: (r.userid ? "client" : "staff") as "client" | "staff",
-  }));
+  const replies: TicketReply[] = raw.map(r => {
+    const attData = (r.attachments as { attachment?: WhmcsRaw | WhmcsRaw[] } | undefined)?.attachment;
+    const attArr  = attData ? (Array.isArray(attData) ? attData : [attData]) : [];
+    return {
+      id: Number(r.id ?? 0), userid: Number(r.userid ?? 0),
+      name: r.userid ? String(r.name ?? "You") : "Support Team",
+      email: String(r.email ?? ""),
+      date: String(r.date ?? ""), message: String(r.message ?? ""),
+      type: (r.userid ? "client" : "staff") as "client" | "staff",
+      attachments: attArr.map(a => ({ filename: String(a.filename ?? ""), index: String(a.index ?? "0") })),
+    };
+  });
   // Prepend the original ticket body as the first client message if not already present
   const originalMsg = String(data.message ?? "").trim();
   if (originalMsg && !replies.some(r => r.type === "client" && r.message.trim() === originalMsg)) {
@@ -369,13 +378,18 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
       id: 0, userid: Number(data.userid ?? 0),
       name: String(data.name ?? "You"), email: String(data.email ?? ""),
       date: String(data.date ?? ""), message: originalMsg,
-      type: "client",
+      type: "client", attachments: [],
     });
   }
   return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies };
 }
 
-export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string; name?: string; email?: string }): Promise<{ ticketId: number; tid: string }> {
+export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string; name?: string; email?: string; attachments?: Array<{ filename: string; data: string }> }): Promise<{ ticketId: number; tid: string }> {
+  const attachmentParams: Record<string, string> = {};
+  params.attachments?.forEach((att, i) => {
+    attachmentParams[`attachments[${i}][filename]`] = att.filename;
+    attachmentParams[`attachments[${i}][data]`]     = att.data;
+  });
   const data = await callWhmcs("OpenTicket", {
     clientid: String(params.clientId),
     deptid:   String(params.deptId || 1),
@@ -384,6 +398,7 @@ export async function openTicket(params: { clientId: number; subject: string; me
     priority: params.priority || "Medium",
     ...(params.name  ? { name:  params.name  } : {}),
     ...(params.email ? { email: params.email } : {}),
+    ...attachmentParams,
   });
   return { ticketId: Number(data.id ?? 0), tid: String(data.tid ?? "") };
 }
@@ -399,8 +414,13 @@ export async function updateClientPassword(clientId: number, newPassword: string
   await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
 }
 
-export async function addTicketReply(ticketId: number, clientId: number, message: string): Promise<void> {
-  await callWhmcs("AddTicketReply", { ticketid: ticketId, clientid: clientId, message });
+export async function addTicketReply(ticketId: number, clientId: number, message: string, attachments?: Array<{ filename: string; data: string }>): Promise<void> {
+  const attachmentParams: Record<string, string> = {};
+  attachments?.forEach((att, i) => {
+    attachmentParams[`attachments[${i}][filename]`] = att.filename;
+    attachmentParams[`attachments[${i}][data]`]     = att.data;
+  });
+  await callWhmcs("AddTicketReply", { ticketid: ticketId, clientid: clientId, message, ...attachmentParams });
 }
 
 export async function closeTicket(ticketId: number): Promise<void> {

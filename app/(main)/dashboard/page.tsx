@@ -35,7 +35,8 @@ interface DomainNameservers { ns1: string; ns2: string; ns3: string; ns4: string
 interface ClientInvoice { id: number; date: string; duedate: string; total: string; status: string; }
 interface ClientOrder   { id: number; date: string; total: string; status: string; currencycode: string; }
 interface SupportTicket { id: number; tid: string; title: string; status: string; priority: string; deptname: string; date: string; lastreply: string; replies?: TicketReply[]; }
-interface TicketReply   { id: number; userid: number; name: string; email: string; date: string; message: string; type: "client" | "staff"; }
+interface TicketAttachment { filename: string; index: string; }
+interface TicketReply   { id: number; userid: number; name: string; email: string; date: string; message: string; type: "client" | "staff"; attachments: TicketAttachment[]; }
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
 const I = {
@@ -59,6 +60,7 @@ const I = {
   Download:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   Send:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
   Refresh:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  Paperclip: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
 };
 
 /* ─── Shared UI ──────────────────────────────────────────────────────────── */
@@ -809,8 +811,11 @@ function SupportSection({ client }: { client: ClientDetails }) {
   const [submitting,     setSubmitting]     = useState(false);
   const [successId,      setSuccessId]      = useState("");
   const [newReplyBanner, setNewReplyBanner] = useState(false);
+  const [attachFiles,    setAttachFiles]    = useState<File[]>([]);
+  const [replyFiles,     setReplyFiles]     = useState<File[]>([]);
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevStatus = useRef("");
+  const bottomRef  = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -845,17 +850,39 @@ function SupportSection({ client }: { client: ClientDetails }) {
     }
     prevStatus.current = selected.status;
     const snap = { ...selected };
-    pollRef.current = setInterval(() => viewTicket(snap, true), 30_000);
+    pollRef.current = setInterval(() => viewTicket(snap, true), 5_000);
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
+
+  // Auto-scroll to bottom when new replies arrive
+  useEffect(() => {
+    if (ticketData && bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketData?.replies?.length]);
+
+  async function toBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve((reader.result as string).split(",")[1] ?? "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
 
   async function submitReply() {
     if (!selected || !replyText.trim()) return;
     setReplying(true);
     try {
-      await whmcs("addTicketReply", { ticketId: selected.id, clientId: client.id, message: replyText });
+      const attachments = await Promise.all(replyFiles.map(async f => ({ filename: f.name, data: await toBase64(f) })));
+      await whmcs("addTicketReply", {
+        ticketId: selected.id, clientId: client.id, message: replyText,
+        ...(attachments.length ? { attachments } : {}),
+      });
       setReplyText("");
+      setReplyFiles([]);
       viewTicket(selected);
     } catch { /* ignore */ }
     finally { setReplying(false); }
@@ -876,12 +903,14 @@ function SupportSection({ client }: { client: ClientDetails }) {
     try {
       const name  = localStorage.getItem("bshop_client_name")  ?? `${client.firstname} ${client.lastname}`.trim();
       const email = localStorage.getItem("bshop_client_email") ?? client.email;
-      const message = `${form.message}\n\n---\nNote: This ticket auto-closes after 48 hours of no response.`;
+      const attachments = await Promise.all(attachFiles.map(async f => ({ filename: f.name, data: await toBase64(f) })));
       const { tid } = await whmcs<{ ticketId: number; tid: string }>("openTicket", {
-        clientId: client.id, subject: form.subject, message,
+        clientId: client.id, subject: form.subject, message: form.message,
         deptId: Number(form.dept), priority: form.priority, name, email,
+        ...(attachments.length ? { attachments } : {}),
       });
       setForm({ subject: "", message: "", dept: "1", priority: "Medium" });
+      setAttachFiles([]);
       setNewTicket(false);
       setSuccessId(tid);
       setTimeout(() => setSuccessId(""), 6000);
@@ -929,29 +958,43 @@ function SupportSection({ client }: { client: ClientDetails }) {
         )}
 
         {/* Conversation thread */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-5 min-h-[120px]">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4 min-h-[120px]">
           {ticketLoading ? <Skeleton className="h-32" /> :
            !ticketData  ? <p className="text-sm text-gray-400">Could not load conversation.</p> :
            ticketData.replies.length === 0 ? <p className="text-sm text-gray-400">No messages yet.</p> :
-           ticketData.replies.map((r, i) => {
+           <>
+           {ticketData.replies.map((r, i) => {
              const isClient = r.type === "client";
              return (
-               <div key={r.id || i} className={`flex gap-3 ${isClient ? "flex-row-reverse ml-auto" : ""} max-w-[85%]`}>
-                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${isClient ? "bg-gray-400" : "bg-[#6B21A8]"}`}>
-                   {(r.name || "?").charAt(0).toUpperCase()}
-                 </div>
-                 <div className={`rounded-2xl px-4 py-3 min-w-0 ${isClient ? "bg-gray-100" : "bg-[#6B21A8]/10 border border-[#6B21A8]/20"}`}>
-                   <div className={`flex items-center gap-2 mb-1 ${isClient ? "flex-row-reverse" : ""}`}>
-                     <span className={`text-xs font-semibold ${isClient ? "text-gray-600" : "text-[#6B21A8]"}`}>
-                       {isClient ? "You" : `${r.name} · Support`}
-                     </span>
-                     <span className="text-xs text-gray-400">{r.date}</span>
+               <div key={r.id || i} className={`flex ${isClient ? "justify-end" : "justify-start"}`}>
+                 <div className={`flex gap-3 ${isClient ? "flex-row-reverse" : ""} max-w-[85%]`}>
+                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${isClient ? "bg-[#6B21A8]" : "bg-gray-400"}`}>
+                     {isClient ? "Y" : "S"}
                    </div>
-                   <p className="text-sm whitespace-pre-wrap text-gray-900">{r.message}</p>
+                   <div className={`rounded-2xl px-4 py-3 min-w-0 ${isClient ? "bg-[#6B21A8] text-white" : "bg-gray-100 border border-gray-200"}`}>
+                     <div className={`flex items-center gap-2 mb-1 ${isClient ? "flex-row-reverse" : ""}`}>
+                       <span className={`text-xs font-semibold ${isClient ? "text-purple-200" : "text-gray-500"}`}>
+                         {isClient ? "You" : "Support Team"}
+                       </span>
+                       <span className={`text-xs ${isClient ? "text-purple-300" : "text-gray-400"}`}>{r.date}</span>
+                     </div>
+                     <p className={`text-sm whitespace-pre-wrap ${isClient ? "text-white" : "text-gray-900"}`}>{r.message}</p>
+                     {r.attachments?.length > 0 && (
+                       <div className="mt-2 flex flex-wrap gap-1.5">
+                         {r.attachments.map((a, ai) => (
+                           <span key={ai} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${isClient ? "bg-purple-700 text-purple-100" : "bg-gray-200 text-gray-600"}`}>
+                             📎 {a.filename}
+                           </span>
+                         ))}
+                       </div>
+                     )}
+                   </div>
                  </div>
                </div>
              );
            })}
+           <div ref={bottomRef} />
+           </>}
         </div>
 
         {/* Reply box */}
@@ -961,6 +1004,21 @@ function SupportSection({ client }: { client: ClientDetails }) {
             <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={4}
               placeholder="Type your reply…"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
+            <label className="mt-2 inline-flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
+              <I.Paperclip /><span>Attach files</span>
+              <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt"
+                onChange={e => setReplyFiles(Array.from(e.target.files ?? []))} />
+            </label>
+            {replyFiles.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-2">
+                {replyFiles.map((f, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
+                    📎 {f.name}
+                    <button type="button" onClick={() => setReplyFiles(fs => fs.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
             <button onClick={submitReply} disabled={replying || !replyText.trim()}
               className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
               <I.Send />{replying ? "Sending…" : "Send Reply"}
@@ -1050,6 +1108,21 @@ function SupportSection({ client }: { client: ClientDetails }) {
                 </div>
                 <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={5} placeholder="Describe your issue…"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
+                  <I.Paperclip /><span>Attach files</span>
+                  <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt"
+                    onChange={e => setAttachFiles(Array.from(e.target.files ?? []))} />
+                </label>
+                {attachFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {attachFiles.map((f, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
+                        📎 {f.name}
+                        <button type="button" onClick={() => setAttachFiles(fs => fs.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex gap-3 mt-5">
                 <button onClick={() => setNewTicket(false)} className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm">Cancel</button>
