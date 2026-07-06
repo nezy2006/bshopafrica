@@ -796,6 +796,18 @@ function TicketStatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{status}</span>;
 }
 
+const ATTACHMENT_LINE = /\n*(?:📎\s*)?\[?Attachment\]?:\s*(\S+)/gi;
+const IMAGE_EXT        = /\.(jpe?g|png|gif|webp|svg)$/i;
+
+function parseMessage(message: string): { text: string; attachments: string[] } {
+  const attachments: string[] = [];
+  const text = message.replace(ATTACHMENT_LINE, (_match, url: string) => {
+    attachments.push(url);
+    return "";
+  }).trim();
+  return { text, attachments };
+}
+
 function SupportSection({ client }: { client: ClientDetails }) {
   const [tickets,        setTickets]        = useState<SupportTicket[]>([]);
   const [loading,        setLoading]        = useState(true);
@@ -863,23 +875,23 @@ function SupportSection({ client }: { client: ClientDetails }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketData?.replies?.length]);
 
-  async function toBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => resolve((reader.result as string).split(",")[1] ?? "");
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  async function uploadTicketFile(file: File): Promise<string> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/tickets/upload", { method: "POST", body: fd });
+    const json = (await res.json()) as { url?: string; error?: string };
+    if (!res.ok || !json.url) throw new Error(json.error ?? "Upload failed");
+    return json.url;
   }
 
   async function submitReply() {
     if (!selected || !replyText.trim()) return;
     setReplying(true);
     try {
-      const attachments = await Promise.all(replyFiles.map(async f => ({ filename: f.name, data: await toBase64(f) })));
+      const attachmentUrls = await Promise.all(replyFiles.map(uploadTicketFile));
       await whmcs("addTicketReply", {
         ticketId: selected.id, clientId: client.id, message: replyText,
-        ...(attachments.length ? { attachments } : {}),
+        ...(attachmentUrls.length ? { attachmentUrls } : {}),
       });
       setReplyText("");
       setReplyFiles([]);
@@ -903,11 +915,11 @@ function SupportSection({ client }: { client: ClientDetails }) {
     try {
       const name  = localStorage.getItem("bshop_client_name")  ?? `${client.firstname} ${client.lastname}`.trim();
       const email = localStorage.getItem("bshop_client_email") ?? client.email;
-      const attachments = await Promise.all(attachFiles.map(async f => ({ filename: f.name, data: await toBase64(f) })));
+      const attachmentUrls = await Promise.all(attachFiles.map(uploadTicketFile));
       const { tid } = await whmcs<{ ticketId: number; tid: string }>("openTicket", {
         clientId: client.id, subject: form.subject, message: form.message,
         deptId: Number(form.dept), priority: form.priority, name, email,
-        ...(attachments.length ? { attachments } : {}),
+        ...(attachmentUrls.length ? { attachmentUrls } : {}),
       });
       setForm({ subject: "", message: "", dept: "1", priority: "Medium" });
       setAttachFiles([]);
@@ -965,30 +977,45 @@ function SupportSection({ client }: { client: ClientDetails }) {
            <>
            {ticketData.replies.map((r, i) => {
              const isClient = r.type === "client";
+             const { text, attachments } = parseMessage(r.message);
              return (
                <div key={r.id || i} className={`flex ${isClient ? "justify-end" : "justify-start"}`}>
-                 <div className={`flex gap-3 ${isClient ? "flex-row-reverse" : ""} max-w-[85%]`}>
-                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${isClient ? "bg-[#6B21A8]" : "bg-gray-400"}`}>
-                     {isClient ? "Y" : "S"}
-                   </div>
-                   <div className={`rounded-2xl px-4 py-3 min-w-0 ${isClient ? "bg-[#6B21A8] text-white" : "bg-gray-100 border border-gray-200"}`}>
-                     <div className={`flex items-center gap-2 mb-1 ${isClient ? "flex-row-reverse" : ""}`}>
-                       <span className={`text-xs font-semibold ${isClient ? "text-purple-200" : "text-gray-500"}`}>
-                         {isClient ? "You" : "Support Team"}
-                       </span>
-                       <span className={`text-xs ${isClient ? "text-purple-300" : "text-gray-400"}`}>{r.date}</span>
+                 <div className={`max-w-[70%] rounded-2xl px-4 py-3 min-w-0 ${
+                   isClient
+                     ? "bg-[#6B21A8] text-white rounded-tr-none"
+                     : "bg-gray-100 text-gray-800 rounded-tl-none"
+                 }`}>
+                   <p className={`text-xs font-semibold mb-1 opacity-70 ${isClient ? "text-white" : "text-gray-500"}`}>
+                     {isClient ? "You" : "Support Team"}
+                   </p>
+                   {text && <p className="text-sm whitespace-pre-wrap">{text}</p>}
+                   {attachments.length > 0 && (
+                     <div className="mt-2 flex flex-col gap-2">
+                       {attachments.map((url, ai) =>
+                         IMAGE_EXT.test(url) ? (
+                           <a key={ai} href={url} target="_blank" rel="noopener noreferrer">
+                             {/* eslint-disable-next-line @next/next/no-img-element */}
+                             <img src={url} alt="Attachment" className="max-w-full max-h-64 rounded-lg border border-black/10 object-contain" />
+                           </a>
+                         ) : (
+                           <a key={ai} href={url} target="_blank" rel="noopener noreferrer"
+                             className={`inline-flex items-center gap-1 text-xs underline ${isClient ? "text-purple-100" : "text-gray-600"}`}>
+                             <I.Paperclip />Download attachment
+                           </a>
+                         )
+                       )}
                      </div>
-                     <p className={`text-sm whitespace-pre-wrap ${isClient ? "text-white" : "text-gray-900"}`}>{r.message}</p>
-                     {r.attachments?.length > 0 && (
-                       <div className="mt-2 flex flex-wrap gap-1.5">
-                         {r.attachments.map((a, ai) => (
-                           <span key={ai} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${isClient ? "bg-purple-700 text-purple-100" : "bg-gray-200 text-gray-600"}`}>
-                             📎 {a.filename}
-                           </span>
-                         ))}
-                       </div>
-                     )}
-                   </div>
+                   )}
+                   {r.attachments?.length > 0 && (
+                     <div className="mt-2 flex flex-wrap gap-1.5">
+                       {r.attachments.map((a, ai) => (
+                         <span key={ai} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${isClient ? "bg-purple-700 text-purple-100" : "bg-gray-200 text-gray-600"}`}>
+                           📎 {a.filename}
+                         </span>
+                       ))}
+                     </div>
+                   )}
+                   <p className={`text-xs opacity-50 mt-1 ${isClient ? "text-white text-right" : "text-gray-500 text-left"}`}>{r.date}</p>
                  </div>
                </div>
              );

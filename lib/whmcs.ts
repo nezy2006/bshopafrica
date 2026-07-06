@@ -384,21 +384,21 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
   return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies };
 }
 
-export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string; name?: string; email?: string; attachments?: Array<{ filename: string; data: string }> }): Promise<{ ticketId: number; tid: string }> {
-  const attachmentParams: Record<string, string> = {};
-  params.attachments?.forEach((att, i) => {
-    attachmentParams[`attachments[${i}][filename]`] = att.filename;
-    attachmentParams[`attachments[${i}][data]`]     = att.data;
-  });
+function appendAttachmentUrls(message: string, attachmentUrls?: string[]): string {
+  if (!attachmentUrls?.length) return message;
+  const lines = attachmentUrls.map(url => `\n\n📎 Attachment: ${config.appUrl}${url}`).join("");
+  return message + lines;
+}
+
+export async function openTicket(params: { clientId: number; subject: string; message: string; deptId: number; priority: string; name?: string; email?: string; attachmentUrls?: string[] }): Promise<{ ticketId: number; tid: string }> {
   const data = await callWhmcs("OpenTicket", {
     clientid: String(params.clientId),
     deptid:   String(params.deptId || 1),
     subject:  params.subject,
-    message:  params.message,
+    message:  appendAttachmentUrls(params.message, params.attachmentUrls),
     priority: params.priority || "Medium",
     ...(params.name  ? { name:  params.name  } : {}),
     ...(params.email ? { email: params.email } : {}),
-    ...attachmentParams,
   });
   return { ticketId: Number(data.id ?? 0), tid: String(data.tid ?? "") };
 }
@@ -414,13 +414,8 @@ export async function updateClientPassword(clientId: number, newPassword: string
   await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
 }
 
-export async function addTicketReply(ticketId: number, clientId: number, message: string, attachments?: Array<{ filename: string; data: string }>): Promise<void> {
-  const attachmentParams: Record<string, string> = {};
-  attachments?.forEach((att, i) => {
-    attachmentParams[`attachments[${i}][filename]`] = att.filename;
-    attachmentParams[`attachments[${i}][data]`]     = att.data;
-  });
-  await callWhmcs("AddTicketReply", { ticketid: ticketId, clientid: clientId, message, ...attachmentParams });
+export async function addTicketReply(ticketId: number, clientId: number, message: string, attachmentUrls?: string[]): Promise<void> {
+  await callWhmcs("AddTicketReply", { ticketid: ticketId, clientid: clientId, message: appendAttachmentUrls(message, attachmentUrls) });
 }
 
 export async function closeTicket(ticketId: number): Promise<void> {

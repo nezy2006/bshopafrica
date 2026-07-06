@@ -151,8 +151,8 @@ export async function POST(req: NextRequest) {
         break;
       }
       case "getTicket":      data = await getTicket(n("ticketId")); break;
-      case "openTicket":     data = await openTicket({ clientId: n("clientId"), subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium"), name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined, attachments: params.attachments as Array<{ filename: string; data: string }> | undefined }); break;
-      case "addTicketReply": await addTicketReply(n("ticketId"), n("clientId"), s("message"), params.attachments as Array<{ filename: string; data: string }> | undefined); data = { ok: true }; break;
+      case "openTicket":     data = await openTicket({ clientId: n("clientId"), subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium"), name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined, attachmentUrls: params.attachmentUrls as string[] | undefined }); break;
+      case "addTicketReply": await addTicketReply(n("ticketId"), n("clientId"), s("message"), params.attachmentUrls as string[] | undefined); data = { ok: true }; break;
       case "closeTicket":    await closeTicket(n("ticketId")); data = { ok: true }; break;
       case "updateClientDetails": await updateClientDetails(n("clientId"), params.updates as Record<string, string>); data = { ok: true }; break;
 
