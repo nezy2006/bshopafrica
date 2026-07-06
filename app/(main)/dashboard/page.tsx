@@ -36,7 +36,7 @@ interface ClientInvoice { id: number; date: string; duedate: string; total: stri
 interface ClientOrder   { id: number; date: string; total: string; status: string; currencycode: string; }
 interface SupportTicket { id: number; tid: string; title: string; status: string; priority: string; deptname: string; date: string; lastreply: string; replies?: TicketReply[]; }
 interface TicketAttachment { filename: string; index: string; }
-interface TicketReply   { id: number; userid: number; name: string; email: string; date: string; message: string; type: "client" | "staff"; attachments: TicketAttachment[]; }
+interface TicketReply   { id: number; userid: number; admin: string; name: string; email: string; date: string; message: string; type: "client" | "staff"; attachments: TicketAttachment[]; }
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
 const I = {
@@ -797,15 +797,25 @@ function TicketStatusBadge({ status }: { status: string }) {
 }
 
 const ATTACHMENT_LINE = /\n*(?:📎\s*)?\[?Attachment\]?:\s*(\S+)/gi;
+const AUTOCLOSE_NOTE  = /\n*---\nNote: This ticket auto-closes[\s\S]*$/;
 const IMAGE_EXT        = /\.(jpe?g|png|gif|webp|svg)$/i;
 
 function parseMessage(message: string): { text: string; attachments: string[] } {
   const attachments: string[] = [];
-  const text = message.replace(ATTACHMENT_LINE, (_match, url: string) => {
-    attachments.push(url);
-    return "";
-  }).trim();
+  const text = message
+    .replace(ATTACHMENT_LINE, (_match, url: string) => { attachments.push(url); return ""; })
+    .replace(AUTOCLOSE_NOTE, "")
+    .trim();
   return { text, attachments };
+}
+
+// WHMCS's `userid` is unreliable for distinguishing author (it can echo the
+// ticket-owning client's id on every reply) — the `admin` field is the source of truth.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function isClient(reply: TicketReply, clientId: string): boolean {
+  if (reply.admin && reply.admin !== "") return false; // admin reply
+  if (String(reply.userid) === "0" || reply.userid === 0) return false; // admin
+  return true; // client reply
 }
 
 function SupportSection({ client }: { client: ClientDetails }) {
@@ -976,17 +986,17 @@ function SupportSection({ client }: { client: ClientDetails }) {
            ticketData.replies.length === 0 ? <p className="text-sm text-gray-400">No messages yet.</p> :
            <>
            {ticketData.replies.map((r, i) => {
-             const isClient = r.type === "client";
+             const fromClient = isClient(r, String(client.id));
              const { text, attachments } = parseMessage(r.message);
              return (
-               <div key={r.id || i} className={`flex ${isClient ? "justify-end" : "justify-start"}`}>
+               <div key={r.id || i} className={`flex ${fromClient ? "justify-end" : "justify-start"}`}>
                  <div className={`max-w-[70%] rounded-2xl px-4 py-3 min-w-0 ${
-                   isClient
+                   fromClient
                      ? "bg-[#6B21A8] text-white rounded-tr-none"
                      : "bg-gray-100 text-gray-800 rounded-tl-none"
                  }`}>
-                   <p className={`text-xs font-semibold mb-1 opacity-70 ${isClient ? "text-white" : "text-gray-500"}`}>
-                     {isClient ? "You" : "Support Team"}
+                   <p className={`text-xs font-semibold mb-1 opacity-70 ${fromClient ? "text-white" : "text-gray-500"}`}>
+                     {fromClient ? "You" : "Support Team"}
                    </p>
                    {text && <p className="text-sm whitespace-pre-wrap">{text}</p>}
                    {attachments.length > 0 && (
@@ -999,7 +1009,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
                            </a>
                          ) : (
                            <a key={ai} href={url} target="_blank" rel="noopener noreferrer"
-                             className={`inline-flex items-center gap-1 text-xs underline ${isClient ? "text-purple-100" : "text-gray-600"}`}>
+                             className={`inline-flex items-center gap-1 text-xs underline ${fromClient ? "text-purple-100" : "text-gray-600"}`}>
                              <I.Paperclip />Download attachment
                            </a>
                          )
@@ -1009,13 +1019,13 @@ function SupportSection({ client }: { client: ClientDetails }) {
                    {r.attachments?.length > 0 && (
                      <div className="mt-2 flex flex-wrap gap-1.5">
                        {r.attachments.map((a, ai) => (
-                         <span key={ai} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${isClient ? "bg-purple-700 text-purple-100" : "bg-gray-200 text-gray-600"}`}>
+                         <span key={ai} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${fromClient ? "bg-purple-700 text-purple-100" : "bg-gray-200 text-gray-600"}`}>
                            📎 {a.filename}
                          </span>
                        ))}
                      </div>
                    )}
-                   <p className={`text-xs opacity-50 mt-1 ${isClient ? "text-white text-right" : "text-gray-500 text-left"}`}>{r.date}</p>
+                   <p className={`text-xs opacity-50 mt-1 ${fromClient ? "text-white text-right" : "text-gray-500 text-left"}`}>{r.date}</p>
                  </div>
                </div>
              );

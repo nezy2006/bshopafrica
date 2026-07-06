@@ -321,7 +321,7 @@ export interface ClientOrder {
 export interface TicketAttachment { filename: string; index: string; }
 
 export interface TicketReply {
-  id: number; userid: number; name: string; email: string;
+  id: number; userid: number; admin: string; name: string; email: string;
   date: string; message: string; type: "client" | "staff";
   attachments: TicketAttachment[];
 }
@@ -362,12 +362,16 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
   const replies: TicketReply[] = raw.map(r => {
     const attData = (r.attachments as { attachment?: WhmcsRaw | WhmcsRaw[] } | undefined)?.attachment;
     const attArr  = attData ? (Array.isArray(attData) ? attData : [attData]) : [];
+    const admin   = String(r.admin ?? "");
+    // A reply is from staff when it has a non-empty `admin` field, or userid is "0".
+    // `userid` alone isn't reliable — WHMCS may echo the ticket-owning client's id on every reply.
+    const fromStaff = admin !== "" || String(r.userid ?? "0") === "0";
     return {
-      id: Number(r.id ?? 0), userid: Number(r.userid ?? 0),
-      name: r.userid ? String(r.name ?? "You") : "Support Team",
+      id: Number(r.id ?? 0), userid: Number(r.userid ?? 0), admin,
+      name: fromStaff ? (admin || "Support Team") : String(r.name ?? "You"),
       email: String(r.email ?? ""),
       date: String(r.date ?? ""), message: String(r.message ?? ""),
-      type: (r.userid ? "client" : "staff") as "client" | "staff",
+      type: (fromStaff ? "staff" : "client") as "client" | "staff",
       attachments: attArr.map(a => ({ filename: String(a.filename ?? ""), index: String(a.index ?? "0") })),
     };
   });
@@ -375,7 +379,7 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
   const originalMsg = String(data.message ?? "").trim();
   if (originalMsg && !replies.some(r => r.type === "client" && r.message.trim() === originalMsg)) {
     replies.unshift({
-      id: 0, userid: Number(data.userid ?? 0),
+      id: 0, userid: Number(data.userid ?? 0), admin: "",
       name: String(data.name ?? "You"), email: String(data.email ?? ""),
       date: String(data.date ?? ""), message: originalMsg,
       type: "client", attachments: [],
