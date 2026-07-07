@@ -125,7 +125,7 @@ function daysUntil(dateStr: string): number {
 }
 
 /* ─── OVERVIEW ───────────────────────────────────────────────────────────── */
-function OverviewSection({ client }: { client: ClientDetails }) {
+function OverviewSection({ client, onNavigate }: { client: ClientDetails; onNavigate: (section: Section) => void }) {
   const [domains,  setDomains]  = useState<ClientDomain[]>([]);
   const [hosting,  setHosting]  = useState<ClientProduct[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
@@ -248,18 +248,26 @@ function OverviewSection({ client }: { client: ClientDetails }) {
       <div className="bg-white rounded-2xl border border-gray-200 p-5">
         <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Register Domain",  href: "/domains",   icon: <I.Globe /> },
-            { label: "Add Hosting",      href: "/hosting",   icon: <I.Server /> },
-            { label: "Open Ticket",      href: "#",          icon: <I.Headset />, onClick: "support" },
-            { label: "Pay Invoices",     href: "#",          icon: <I.FileText />, onClick: "invoices" },
-          ].map(a => (
-            <Link key={a.label} href={a.href}
-              className="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent rounded-xl text-center transition-all group">
-              <span className="text-gray-400 group-hover:text-[#6B21A8] transition-colors">{a.icon}</span>
-              <span className="text-xs font-medium text-gray-600 group-hover:text-[#6B21A8]">{a.label}</span>
-            </Link>
-          ))}
+          {([
+            { label: "Register Domain",  href: "/domains" as const, section: null },
+            { label: "Add Hosting",      href: "/hosting" as const, section: null },
+            { label: "Open Ticket",      href: null, section: "support" as const },
+            { label: "Pay Invoices",     href: null, section: "invoices" as const },
+          ] satisfies { label: string; href: string | null; section: Section | null }[]).map(a => {
+            const icon = a.label === "Register Domain" ? <I.Globe /> : a.label === "Add Hosting" ? <I.Server /> : a.label === "Open Ticket" ? <I.Headset /> : <I.FileText />;
+            const cardClass = "flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent rounded-xl text-center transition-all group";
+            const content = (
+              <>
+                <span className="text-gray-400 group-hover:text-[#6B21A8] transition-colors">{icon}</span>
+                <span className="text-xs font-medium text-gray-600 group-hover:text-[#6B21A8]">{a.label}</span>
+              </>
+            );
+            return a.section ? (
+              <button key={a.label} onClick={() => onNavigate(a.section as Section)} className={cardClass}>{content}</button>
+            ) : (
+              <Link key={a.label} href={a.href!} className={cardClass}>{content}</Link>
+            );
+          })}
         </div>
       </div>
 
@@ -1199,7 +1207,9 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
       setPwSuccess(true);
       setPwForm({ current: "", newPw: "", confirm: "" });
       setTimeout(() => setPwSuccess(false), 4000);
-    } catch { setPwError("Failed to update password. Please try again."); }
+    } catch (err) {
+      setPwError(err instanceof Error && err.message ? err.message : "Failed to update password. Please try again.");
+    }
     finally { setPwSaving(false); }
   }
 
@@ -1603,7 +1613,7 @@ function DashboardInner() {
             <motion.div key={section}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2, ease: EASE }}>
-              {section === "overview"      && <OverviewSection client={client} />}
+              {section === "overview"      && <OverviewSection client={client} onNavigate={setSection} />}
               {section === "domains"       && <DomainsSection clientId={client.id} />}
               {section === "hosting"       && <HostingSection clientId={client.id} />}
               {section === "orders"        && <OrdersSection clientId={client.id} />}

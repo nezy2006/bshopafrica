@@ -410,12 +410,18 @@ export async function openTicket(params: { clientId: number; subject: string; me
 export async function validateLogin(email: string, password: string): Promise<boolean> {
   try {
     const data = await callWhmcs("ValidateLogin", { email, password2: password });
+    console.log("[whmcs.validateLogin] result for", email, ":", JSON.stringify(data).substring(0, 200));
     return Number(data.userid ?? 0) > 0;
-  } catch { return false; }
+  } catch (e) {
+    console.log("[whmcs.validateLogin] error for", email, ":", e instanceof Error ? e.message : e);
+    return false;
+  }
 }
 
 export async function updateClientPassword(clientId: number, newPassword: string): Promise<void> {
-  await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
+  console.log("[whmcs.updateClientPassword] clientId:", clientId);
+  const data = await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
+  console.log("[whmcs.updateClientPassword] result:", JSON.stringify(data).substring(0, 200));
 }
 
 export async function addTicketReply(ticketId: number, clientId: number, message: string, attachmentUrls?: string[]): Promise<void> {

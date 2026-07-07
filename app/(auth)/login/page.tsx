@@ -191,7 +191,7 @@ export default function LoginPage() {
         return;
       }
       setPendingClient(json.data);
-      const code = await sendOtp(json.data.email || email, json.data.clientId);
+      const code = await sendOtp(json.data.email || email, json.data.clientId, json.data.firstname);
       setDevCode(code ?? null);
       setStep("otp");
       setResendCooldown(30);
@@ -202,11 +202,11 @@ export default function LoginPage() {
     }
   };
 
-  const sendOtp = async (emailAddr: string, clientId: number): Promise<string | undefined> => {
+  const sendOtp = async (emailAddr: string, clientId: number, firstname?: string): Promise<string | undefined> => {
     const res  = await fetch("/api/auth/send-otp", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email: emailAddr, clientId }),
+      body:    JSON.stringify({ email: emailAddr, clientId, firstname }),
     });
     const json = (await res.json()) as { success: boolean; devCode?: string };
     return json.devCode;
@@ -268,7 +268,7 @@ export default function LoginPage() {
     if (!pendingClient || resendCooldown > 0) return;
     setOtpError(null);
     setOtp(["", "", "", "", "", ""]);
-    const code = await sendOtp(pendingClient.email || email, pendingClient.clientId);
+    const code = await sendOtp(pendingClient.email || email, pendingClient.clientId, pendingClient.firstname);
     setDevCode(code ?? null);
     setResendCooldown(30);
     otpRefs.current[0]?.focus();
