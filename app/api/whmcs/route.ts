@@ -177,7 +177,18 @@ export async function POST(req: NextRequest) {
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
       case "addPayment":            await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId")); data = { ok: true }; break;
       case "validateLogin":         data = { valid: await validateLogin(s("email"), s("password")) }; break;
-      case "updateClientPassword":  await updateClientPassword(n("clientId"), s("password")); data = { ok: true }; break;
+      case "updateClientPassword": {
+        console.log("[updateClientPassword] params:", JSON.stringify(params));
+        const clientId = params.clientId ?? params.clientid;
+        const password = params.password ?? params.password2 ?? params.newPassword;
+        console.log("[updateClientPassword] clientId:", clientId, "password set:", !!password);
+        if (!clientId || !password) {
+          return NextResponse.json({ success: false, error: "clientId and password are required" }, { status: 400 });
+        }
+        await updateClientPassword(Number(clientId), String(password));
+        data = { ok: true };
+        break;
+      }
 
       default:
         return NextResponse.json({ success: false, error: `Unknown action: "${action}"` }, { status: 400 });

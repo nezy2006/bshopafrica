@@ -5,37 +5,36 @@ import { otpStore } from "@/lib/otp-store";
 
 /* ─── Email template ─────────────────────────────────────────────────────── */
 function buildEmailHtml(code: string, firstname: string) {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8" /></head>
-<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:15px;line-height:1.6;">
-  <p>Hi ${firstname},</p>
-  <p>Here is your login code for bshopafrica.com:</p>
-  <p style="font-size:26px;font-weight:bold;letter-spacing:4px;">${code}</p>
-  <p>This code expires in 10 minutes.</p>
-  <p>If you didn't request this, please ignore this email.</p>
-  <p>The B.Shop Africa Team</p>
-</body>
-</html>`;
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <img src="https://bshopafrica.com/logo.png" alt="The B.Shop Africa" style="height: 40px; margin-bottom: 24px;" />
+      <p style="font-size: 16px; color: #333;">Hi ${firstname || ""},</p>
+      <p style="font-size: 14px; color: #555;">Your login verification code for B.Shop Africa is:</p>
+      <div style="background: #f3eafa; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+        <span style="font-size: 32px; font-weight: bold; color: #6B21A8; letter-spacing: 8px;">${code}</span>
+      </div>
+      <p style="font-size: 14px; color: #555;">This code expires in <strong>10 minutes</strong>.</p>
+      <p style="font-size: 13px; color: #999;">If you did not request this code, please ignore this email.</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #999;">The B.Shop Africa · bshopafrica.com · admin@bshopafrica.com</p>
+    </div>
+  `;
 }
 
-function buildEmailText(code: string, firstname: string) {
-  return (
-    `Hi ${firstname},\n\n` +
-    `Here is your login code for bshopafrica.com:\n\n` +
-    `${code}\n\n` +
-    `This code expires in 10 minutes.\n\n` +
-    `If you didn't request this, please ignore this email.\n\n` +
-    `The B.Shop Africa Team`
-  );
+function buildEmailText(code: string) {
+  return `Your B.Shop Africa login code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, please ignore this email.\n\nThe B.Shop Africa Team\nbshopafrica.com`;
+}
+
+function buildEmailSubject(code: string) {
+  return `${code} is your B.Shop login code`;
 }
 
 /* ─── WHMCS SendEmail ────────────────────────────────────────────────────── */
-async function sendViaWhmcs(clientId: number, code: string, firstname: string): Promise<boolean> {
-  const messageBody = buildEmailText(code, firstname);
+async function sendViaWhmcs(clientId: number, code: string): Promise<boolean> {
+  const messageBody = buildEmailText(code);
 
   const customvars = Buffer.from(
-    `subject=Login code for bshopafrica.com&message=${messageBody}`
+    `subject=${buildEmailSubject(code)}&message=${messageBody}`
   ).toString("base64");
 
   const params = new URLSearchParams({
@@ -78,15 +77,16 @@ async function sendViaSmtp(email: string, code: string, firstname: string): Prom
       auth:   { user: config.smtpUser, pass: config.smtpPass },
     });
 
-    const info = await transporter.sendMail({
-      from:      "The B.Shop Africa <admin@bshopafrica.com>",
-      to:        email,
-      replyTo:   "admin@bshopafrica.com",
-      subject:   "Login code for bshopafrica.com",
-      text:      buildEmailText(code, firstname),
-      html:      buildEmailHtml(code, firstname),
-      messageId: `<otp-${Date.now()}@bshopafrica.com>`,
-    });
+    const mailOptions = {
+      from:    "The B.Shop Africa <admin@bshopafrica.com>",
+      to:      email,
+      replyTo: "admin@bshopafrica.com",
+      subject: buildEmailSubject(code),
+      text:    buildEmailText(code),
+      html:    buildEmailHtml(code, firstname),
+    };
+
+    const info = await transporter.sendMail(mailOptions);
     console.log("[OTP] SMTP sent:", info.messageId);
     return true;
   } catch (err) {
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     // Method 1 — WHMCS SendEmail
     console.log("[OTP] Trying WHMCS SendEmail...");
-    const whmcsOk = await sendViaWhmcs(clientId, code, name);
+    const whmcsOk = await sendViaWhmcs(clientId, code);
 
     let emailSent = whmcsOk;
 
