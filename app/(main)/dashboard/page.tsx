@@ -833,8 +833,6 @@ function SupportSection({ client }: { client: ClientDetails }) {
   const [submitting,     setSubmitting]     = useState(false);
   const [successId,      setSuccessId]      = useState("");
   const [newReplyBanner, setNewReplyBanner] = useState(false);
-  const [attachFiles,    setAttachFiles]    = useState<File[]>([]);
-  const [replyFiles,     setReplyFiles]     = useState<File[]>([]);
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevStatus = useRef("");
   const bottomRef  = useRef<HTMLDivElement>(null);
@@ -885,26 +883,14 @@ function SupportSection({ client }: { client: ClientDetails }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketData?.replies?.length]);
 
-  async function uploadTicketFile(file: File): Promise<string> {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/tickets/upload", { method: "POST", body: fd });
-    const json = (await res.json()) as { url?: string; error?: string };
-    if (!res.ok || !json.url) throw new Error(json.error ?? "Upload failed");
-    return json.url;
-  }
-
   async function submitReply() {
     if (!selected || !replyText.trim()) return;
     setReplying(true);
     try {
-      const attachmentUrls = await Promise.all(replyFiles.map(uploadTicketFile));
       await whmcs("addTicketReply", {
         ticketId: selected.id, clientId: client.id, message: replyText,
-        ...(attachmentUrls.length ? { attachmentUrls } : {}),
       });
       setReplyText("");
-      setReplyFiles([]);
       viewTicket(selected);
     } catch { /* ignore */ }
     finally { setReplying(false); }
@@ -925,14 +911,11 @@ function SupportSection({ client }: { client: ClientDetails }) {
     try {
       const name  = localStorage.getItem("bshop_client_name")  ?? `${client.firstname} ${client.lastname}`.trim();
       const email = localStorage.getItem("bshop_client_email") ?? client.email;
-      const attachmentUrls = await Promise.all(attachFiles.map(uploadTicketFile));
       const { tid } = await whmcs<{ ticketId: number; tid: string }>("openTicket", {
         clientId: client.id, subject: form.subject, message: form.message,
         deptId: Number(form.dept), priority: form.priority, name, email,
-        ...(attachmentUrls.length ? { attachmentUrls } : {}),
       });
       setForm({ subject: "", message: "", dept: "1", priority: "Medium" });
-      setAttachFiles([]);
       setNewTicket(false);
       setSuccessId(tid);
       setTimeout(() => setSuccessId(""), 6000);
@@ -1041,21 +1024,6 @@ function SupportSection({ client }: { client: ClientDetails }) {
             <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={4}
               placeholder="Type your reply…"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
-            <label className="mt-2 inline-flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
-              <I.Paperclip /><span>Attach files</span>
-              <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt"
-                onChange={e => setReplyFiles(Array.from(e.target.files ?? []))} />
-            </label>
-            {replyFiles.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-2">
-                {replyFiles.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                    📎 {f.name}
-                    <button type="button" onClick={() => setReplyFiles(fs => fs.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5">×</button>
-                  </span>
-                ))}
-              </div>
-            )}
             <button onClick={submitReply} disabled={replying || !replyText.trim()}
               className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
               <I.Send />{replying ? "Sending…" : "Send Reply"}
@@ -1145,21 +1113,6 @@ function SupportSection({ client }: { client: ClientDetails }) {
                 </div>
                 <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={5} placeholder="Describe your issue…"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
-                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-[#6B21A8] transition-colors">
-                  <I.Paperclip /><span>Attach files</span>
-                  <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt"
-                    onChange={e => setAttachFiles(Array.from(e.target.files ?? []))} />
-                </label>
-                {attachFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {attachFiles.map((f, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                        📎 {f.name}
-                        <button type="button" onClick={() => setAttachFiles(fs => fs.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5">×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
               <div className="flex gap-3 mt-5">
                 <button onClick={() => setNewTicket(false)} className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm">Cancel</button>
