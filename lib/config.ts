@@ -6,7 +6,7 @@ export const config = {
   pawapayEnvironment: process.env.PAWAPAY_ENVIRONMENT || 'production',
   adminPassword: process.env.ADMIN_PASSWORD || 'admin123',
   databaseUrl: process.env.DATABASE_URL || 'mysql://bshopafrica_cms_admin:qLinT{aOE%fS@localhost:3306/bshopafrica_cms',
-  appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://test.bshopafrica.com',
+  appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://bshopafrica.com',
   websiteBuilderProductId: process.env.WEBSITE_BUILDER_PRODUCT_ID || '34',
   smtpHost: process.env.SMTP_HOST || 'mail.bshopafrica.com',
   smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
