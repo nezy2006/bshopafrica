@@ -10,6 +10,7 @@ import {
   getNotifications, markAllRead, markRead, startNotificationPolling, stopNotificationPolling,
   getUnreadCount, type AppNotification,
 } from "@/lib/notifications";
+import { clearAuth } from "@/lib/auth";
 
 type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
@@ -1186,19 +1187,50 @@ function NotificationsSection() {
   );
 }
 
+/* ─── PASSWORD STRENGTH ──────────────────────────────────────────────────── */
+interface PasswordStrength {
+  score: number;
+  label: string;
+  color: string;
+  checks: { label: string; met: boolean }[];
+}
+
+function getPasswordStrength(pw: string): PasswordStrength {
+  const checks = [
+    { label: "At least 8 characters", met: pw.length >= 8 },
+    { label: "Uppercase letter",      met: /[A-Z]/.test(pw) },
+    { label: "Lowercase letter",      met: /[a-z]/.test(pw) },
+    { label: "Number",                met: /[0-9]/.test(pw) },
+    { label: "Special character",     met: /[!@#$%^&*]/.test(pw) },
+  ];
+  const score = checks.filter(c => c.met).length;
+  const meta = [
+    { label: "Weak",   color: "bg-red-500"    },
+    { label: "Weak",   color: "bg-red-500"    },
+    { label: "Fair",   color: "bg-orange-500" },
+    { label: "Good",   color: "bg-blue-500"   },
+    { label: "Strong", color: "bg-green-500"  },
+  ][Math.max(score - 1, 0)];
+  return { score, label: score === 0 ? "" : meta.label, color: meta.color, checks };
+}
+
 /* ─── ACCOUNT SETTINGS ───────────────────────────────────────────────────── */
 function AccountSettingsSection({ client }: { client: ClientDetails }) {
+  const router = useRouter();
   const [tab,       setTab]       = useState<"security" | "billing">("security");
   const [pwForm,    setPwForm]    = useState({ current: "", newPw: "", confirm: "" });
   const [pwSaving,  setPwSaving]  = useState(false);
   const [pwError,   setPwError]   = useState("");
   const [pwSuccess, setPwSuccess] = useState(false);
 
+  const strength = getPasswordStrength(pwForm.newPw);
+  const strengthOk = pwForm.newPw.length === 0 || strength.score >= 3;
+
   async function changePassword() {
     setPwError(""); setPwSuccess(false);
     if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) { setPwError("All fields are required."); return; }
     if (pwForm.newPw !== pwForm.confirm) { setPwError("New passwords do not match."); return; }
-    if (pwForm.newPw.length < 8) { setPwError("Password must be at least 8 characters."); return; }
+    if (strength.score < 3) { setPwError("Please choose a stronger password (at least Fair)."); return; }
     setPwSaving(true);
     try {
       const { valid } = await whmcs<{ valid: boolean }>("validateLogin", { email: client.email, password: pwForm.current });
@@ -1206,7 +1238,10 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
       await whmcs("updateClientPassword", { clientId: client.id, password: pwForm.newPw });
       setPwSuccess(true);
       setPwForm({ current: "", newPw: "", confirm: "" });
-      setTimeout(() => setPwSuccess(false), 4000);
+      setTimeout(() => {
+        clearAuth();
+        router.push("/login");
+      }, 3000);
     } catch (err) {
       setPwError(err instanceof Error && err.message ? err.message : "Failed to update password. Please try again.");
     }
@@ -1228,16 +1263,45 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
       {tab === "security" && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-lg">
           <h3 className="font-semibold text-gray-900">Change Password</h3>
-          {([["current","Current Password"],["newPw","New Password"],["confirm","Confirm New Password"]] as const).map(([k, label]) => (
-            <div key={k}>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
-              <input type="password" value={pwForm[k]} onChange={e => setPwForm(f => ({ ...f, [k]: e.target.value }))}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
-            </div>
-          ))}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Current Password</label>
+            <input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">New Password</label>
+            <input type="password" value={pwForm.newPw} onChange={e => setPwForm(f => ({ ...f, newPw: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+            {pwForm.newPw && (
+              <div className="mt-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden flex gap-0.5">
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <div key={i} className={`flex-1 h-full rounded-full transition-colors ${i < strength.score ? strength.color : "bg-gray-100"}`} />
+                    ))}
+                  </div>
+                  <span className={`text-xs font-medium w-12 text-right ${
+                    strength.score <= 2 ? "text-red-600" : strength.score === 3 ? "text-orange-600" : strength.score === 4 ? "text-blue-600" : "text-green-600"
+                  }`}>{strength.label}</span>
+                </div>
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  {strength.checks.map(c => (
+                    <li key={c.label} className={`text-xs flex items-center gap-1.5 ${c.met ? "text-green-600" : "text-gray-400"}`}>
+                      <span>{c.met ? "✓" : "✗"}</span>{c.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Confirm New Password</label>
+            <input type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+          </div>
           {pwError   && <p className="text-sm text-red-600 flex items-center gap-1.5"><I.Alert />{pwError}</p>}
-          {pwSuccess && <p className="text-sm text-green-600 flex items-center gap-1.5"><I.Check />Password updated successfully.</p>}
-          <button onClick={changePassword} disabled={pwSaving}
+          {pwSuccess && <p className="text-sm text-green-600 flex items-center gap-1.5"><I.Check />Password updated successfully. Please log in again with your new password.</p>}
+          <button onClick={changePassword} disabled={pwSaving || !strengthOk}
             className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
             {pwSaving ? "Updating…" : "Update Password"}
           </button>
