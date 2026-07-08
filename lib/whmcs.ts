@@ -5,6 +5,7 @@
 
 import crypto from "crypto";
 import { config } from "@/lib/config";
+import { whmcsDbEnabled, updatePasswordDirect, validatePasswordDirect } from "@/lib/whmcs-db";
 
 export const BSHOP_NAMESERVERS = {
   ns1: "ns1.mysecurecloudhost.com",
@@ -410,18 +411,51 @@ export async function openTicket(params: { clientId: number; subject: string; me
 export async function validateLogin(email: string, password: string): Promise<boolean> {
   try {
     const data = await callWhmcs("ValidateLogin", { email, password2: password });
-    console.log("[whmcs.validateLogin] result for", email, ":", JSON.stringify(data).substring(0, 200));
-    return Number(data.userid ?? 0) > 0;
+    console.log("[whmcs.validateLogin] API result for", email, ":", JSON.stringify(data).substring(0, 200));
+    if (Number(data.userid ?? 0) > 0) return true;
   } catch (e) {
-    console.log("[whmcs.validateLogin] error for", email, ":", e instanceof Error ? e.message : e);
+    console.log("[whmcs.validateLogin] API error for", email, ":", e instanceof Error ? e.message : e);
+  }
+
+  // Fallback: the API's view of tblusers isn't reliable on this install — check the
+  // bcrypt hash directly. No-op (returns false) unless WHMCS_DB_URL is configured.
+  if (!whmcsDbEnabled()) return false;
+  try {
+    const ok = await validatePasswordDirect(email, password);
+    console.log("[whmcs.validateLogin] DB fallback for", email, ":", ok);
+    return ok;
+  } catch (e) {
+    console.log("[whmcs.validateLogin] DB fallback error for", email, ":", e instanceof Error ? e.message : e);
     return false;
   }
 }
 
 export async function updateClientPassword(clientId: number, newPassword: string): Promise<void> {
   console.log("[whmcs.updateClientPassword] clientId:", clientId);
-  const data = await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
-  console.log("[whmcs.updateClientPassword] result:", JSON.stringify(data).substring(0, 200));
+  let apiOk = false;
+  try {
+    const data = await callWhmcs("UpdateClient", { clientid: clientId, password2: newPassword });
+    console.log("[whmcs.updateClientPassword] API result:", JSON.stringify(data).substring(0, 200));
+    apiOk = true;
+  } catch (e) {
+    console.log("[whmcs.updateClientPassword] API error:", e instanceof Error ? e.message : e);
+  }
+
+  // Fallback: guarantee tblusers actually reflects the new password. Best-effort when
+  // the API already succeeded (extra safety net); required when it didn't.
+  if (!whmcsDbEnabled()) {
+    if (!apiOk) throw new Error("Failed to update password");
+    return;
+  }
+  try {
+    const details = await getClientDetails(clientId);
+    if (!details.email) throw new Error("Client email not found for DB fallback");
+    await updatePasswordDirect(details.email, newPassword);
+    console.log("[whmcs.updateClientPassword] DB fallback applied for", details.email);
+  } catch (e) {
+    console.error("[whmcs.updateClientPassword] DB fallback failed:", e instanceof Error ? e.message : e);
+    if (!apiOk) throw new Error("Failed to update password");
+  }
 }
 
 export async function addTicketReply(ticketId: number, clientId: number, message: string, attachmentUrls?: string[]): Promise<void> {

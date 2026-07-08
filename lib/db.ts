@@ -1,7 +1,7 @@
 // Direct mysql2 connection — used because Prisma 7 has no MySQL adapter yet.
 import mysql from "mysql2/promise";
 
-function parseDbUrl(url: string) {
+export function parseDbUrl(url: string) {
   // mysql://user:password@host:port/database
   // Use regex so special chars in password ({, %, etc.) are preserved verbatim.
   const m = url.match(/^mysql:\/\/([^:]+):(.+)@([^/:]+):?(\d*)\/(.+)$/);

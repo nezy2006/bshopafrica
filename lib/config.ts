@@ -6,6 +6,10 @@ export const config = {
   pawapayEnvironment: process.env.PAWAPAY_ENVIRONMENT || 'production',
   adminPassword: process.env.ADMIN_PASSWORD || 'admin123',
   databaseUrl: process.env.DATABASE_URL || 'mysql://bshopafrica_cms_admin:qLinT{aOE%fS@localhost:3306/bshopafrica_cms',
+  // Direct WHMCS database fallback for password read/write (lib/whmcs-db.ts).
+  // Unset by default — feature is a no-op until this is explicitly configured.
+  // NEVER hardcode a fallback value here; this is production DB credentials.
+  whmcsDbUrl: process.env.WHMCS_DB_URL || '',
   appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://bshopafrica.com',
   websiteBuilderProductId: process.env.WEBSITE_BUILDER_PRODUCT_ID || '34',
   smtpHost: process.env.SMTP_HOST || 'mail.bshopafrica.com',
