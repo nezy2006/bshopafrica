@@ -1480,7 +1480,7 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
   const strength = getPasswordStrength(pwForm.newPw);
   const strengthOk = pwForm.newPw.length === 0 || strength.score >= 3;
 
-  async function changePassword() {
+  async function handlePasswordChange() {
     setPwError(""); setPwSuccess(false);
     if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) { setPwError("All fields are required."); return; }
     if (pwForm.newPw !== pwForm.confirm) { setPwError("New passwords do not match."); return; }
@@ -1489,13 +1489,13 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
     try {
       const { valid } = await whmcs<{ valid: boolean }>("validateLogin", { email: client.email, password: pwForm.current });
       if (!valid) { setPwError("Current password is incorrect."); return; }
-      await whmcs("updateClientPassword", { clientId: client.id, password: pwForm.newPw });
+      await whmcs("updateClientPassword", { clientId: client.id, newPassword: pwForm.newPw });
       setPwSuccess(true);
       setPwForm({ current: "", newPw: "", confirm: "" });
       setTimeout(() => {
         clearAuth();
         router.push("/login");
-      }, 3000);
+      }, 2000);
     } catch (err) {
       setPwError(err instanceof Error && err.message ? err.message : "Failed to update password. Please try again.");
     }
@@ -1554,8 +1554,8 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
           </div>
           {pwError   && <p className="text-sm text-red-600 flex items-center gap-1.5"><I.Alert />{pwError}</p>}
-          {pwSuccess && <p className="text-sm text-green-600 flex items-center gap-1.5"><I.Check />Password updated successfully. Please log in again with your new password.</p>}
-          <button onClick={changePassword} disabled={pwSaving || !strengthOk}
+          {pwSuccess && <p className="text-sm text-green-600 flex items-center gap-1.5"><I.Check />Password updated! Logging you out…</p>}
+          <button onClick={handlePasswordChange} disabled={pwSaving || !strengthOk}
             className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
             {pwSaving ? "Updating…" : "Update Password"}
           </button>
