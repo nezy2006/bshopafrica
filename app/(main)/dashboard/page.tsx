@@ -34,6 +34,7 @@ interface ClientProduct { id: number; name: string; status: string; nextduedate:
 interface ClientDomain  { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; }
 interface DomainNameservers { ns1: string; ns2: string; ns3: string; ns4: string; ns5: string; }
 interface ClientInvoice { id: number; date: string; duedate: string; total: string; status: string; }
+interface TLDPriceEntry { register: number | null; renewal: number | null; transfer: number | null; }
 interface ClientOrder   { id: number; date: string; total: string; status: string; currencycode: string; }
 interface SupportTicket { id: number; tid: string; title: string; status: string; priority: string; deptname: string; date: string; lastreply: string; replies?: TicketReply[]; }
 interface TicketAttachment { filename: string; index: string; }
@@ -309,6 +310,9 @@ function DomainsSection({ clientId }: { clientId: number }) {
   const [error,   setError]   = useState(false);
   const [search,  setSearch]  = useState("");
   const [dnsDomain, setDnsDomain] = useState<ClientDomain | null>(null);
+  const [tldPricing, setTldPricing] = useState<Record<string, TLDPriceEntry>>({});
+  const [renewingId, setRenewingId] = useState<number | null>(null);
+  const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -318,6 +322,24 @@ function DomainsSection({ clientId }: { clientId: number }) {
   }, [clientId]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { whmcs<Record<string, TLDPriceEntry>>("getTLDPricing").then(setTldPricing).catch(() => {}); }, []);
+
+  async function handleRenew(d: ClientDomain) {
+    setRenewingId(d.id);
+    try {
+      const tld = "." + d.domainname.split(".").slice(1).join(".");
+      const amount = tldPricing[tld]?.renewal ?? 0;
+      const { invoiceId } = await whmcs<{ invoiceId: number }>("createInvoice", {
+        clientId, description: `Domain Renewal - ${d.domainname} (1 year)`, amount,
+      });
+      if (!invoiceId) throw new Error("No invoice returned");
+      setPayTarget({ invoiceId, amountUSD: amount });
+    } catch {
+      alert("Could not start renewal right now. Please try again or contact support.");
+    } finally {
+      setRenewingId(null);
+    }
+  }
 
   const filtered = domains.filter(d => d.domainname.toLowerCase().includes(search.toLowerCase()));
 
@@ -358,7 +380,10 @@ function DomainsSection({ clientId }: { clientId: number }) {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
                           {days <= 30 && (
-                            <button className="text-xs px-2.5 py-1 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
+                            <button onClick={() => handleRenew(d)} disabled={renewingId === d.id}
+                              className="text-xs px-2.5 py-1 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 disabled:opacity-60 transition-colors">
+                              {renewingId === d.id ? "Preparing…" : "Renew"}
+                            </button>
                           )}
                           <button onClick={() => setDnsDomain(d)}
                             className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">DNS</button>
@@ -375,6 +400,12 @@ function DomainsSection({ clientId }: { clientId: number }) {
 
       <AnimatePresence>
         {dnsDomain && <DnsModal domain={dnsDomain} clientId={clientId} onClose={() => setDnsDomain(null)} />}
+        {payTarget && (
+          <PaymentModal invoiceId={payTarget.invoiceId} amountUSD={payTarget.amountUSD}
+            clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
+            onClose={() => setPayTarget(null)}
+            onPaid={() => { setPayTarget(null); load(); }} />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -502,6 +533,189 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
   );
 }
 
+/* ─── PAYMENT MODAL (mobile money + PayPal) ─────────────────────────────── */
+const USD_TO_RWF = 1400; // fixed rate, matches checkout flow
+
+type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
+
+function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
+  invoiceId: number; amountUSD: number; clientEmail: string;
+  onClose: () => void; onPaid: () => void;
+}) {
+  const [method, setMethod]   = useState<"choose" | "mtn">("choose");
+  const [phone,  setPhone]    = useState("");
+  const [predicted, setPredicted] = useState<{ provider: string; phoneNumber: string } | null>(null);
+  const [predictLoading, setPredictLoading] = useState(false);
+  const [mmStep,  setMmStep]  = useState<MmStep>("input");
+  const [mmError, setMmError] = useState("");
+  const [depositId, setDepositId] = useState("");
+  const [countdown, setCountdown] = useState(120);
+  const [paypalLoading, setPaypalLoading] = useState(false);
+
+  const rwfTotal   = Math.round(amountUSD * USD_TO_RWF);
+  const cleanPhone = phone.replace(/\D/g, "");
+
+  // Predict operator as the user types (debounced)
+  useEffect(() => {
+    if (cleanPhone.length < 9) { setPredicted(null); setPredictLoading(false); return; }
+    const intl = cleanPhone.startsWith("250") ? cleanPhone : cleanPhone.startsWith("0") ? "250" + cleanPhone.slice(1) : "250" + cleanPhone;
+    setPredictLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res  = await fetch("/api/pawapay/predict-provider", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phoneNumber: intl }),
+        });
+        const json = (await res.json()) as { success: boolean; provider?: string; phoneNumber?: string };
+        setPredicted(json.success && json.provider ? { provider: json.provider, phoneNumber: json.phoneNumber ?? intl } : null);
+      } catch { setPredicted(null); }
+      setPredictLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [cleanPhone]);
+
+  // Poll deposit status
+  useEffect(() => {
+    if (mmStep !== "waiting" || !depositId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const res  = await fetch(`/api/pawapay/status?depositId=${depositId}`);
+        const json = (await res.json()) as { success: boolean; status: string };
+        if (!active) return;
+        if (json.status === "COMPLETED") {
+          setMmStep("success");
+          setTimeout(onPaid, 1500);
+        } else if (["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"].includes(json.status)) {
+          setMmStep("failed");
+          setMmError("Payment was declined. Please try again.");
+        }
+      } catch { /* retry on next tick */ }
+    };
+    const interval = setInterval(poll, 5000);
+    poll();
+    return () => { active = false; clearInterval(interval); };
+  }, [mmStep, depositId, onPaid]);
+
+  // Countdown while waiting for USSD approval
+  useEffect(() => {
+    if (mmStep !== "waiting") return;
+    if (countdown <= 0) { setMmStep("failed"); setMmError("Payment timed out. Please try again."); return; }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [mmStep, countdown]);
+
+  async function payMobileMoney() {
+    if (!predicted) return;
+    setMmStep("sending"); setMmError("");
+    try {
+      const clientId = typeof window !== "undefined" ? localStorage.getItem("bshop_client_id") : null;
+      const res = await fetch("/api/pawapay/initiate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: rwfTotal, currency: "RWF", phone: predicted.phoneNumber, operator: predicted.provider,
+          clientId, clientEmail, invoiceId, totalUSD: amountUSD, totalRWF: rwfTotal,
+        }),
+      });
+      const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
+      if (!json.success || !json.depositId) throw new Error(json.error ?? "Failed to initiate payment");
+      setDepositId(json.depositId);
+      setMmStep("waiting"); setCountdown(120);
+    } catch (e) {
+      setMmStep("failed");
+      setMmError(e instanceof Error ? e.message : "Payment initiation failed");
+    }
+  }
+
+  async function payWithPaypal() {
+    setPaypalLoading(true);
+    try {
+      const url = await whmcs<string>("getPaymentUrl", { invoiceId });
+      window.location.href = url;
+    } catch {
+      alert("Could not open PayPal right now. Please try again.");
+      setPaypalLoading(false);
+    }
+  }
+
+  return (
+    <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2, ease: EASE }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Pay Invoice #{invoiceId}</h3>
+            <p className="text-sm text-gray-500">${amountUSD.toFixed(2)} <span className="text-gray-400">≈</span> RWF {rwfTotal.toLocaleString()}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><I.X /></button>
+        </div>
+
+        {method === "choose" && (
+          <div className="space-y-3">
+            <button onClick={() => setMethod("mtn")}
+              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
+              <span className="w-10 h-10 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center text-lg">📱</span>
+              <div><p className="font-semibold text-gray-900 text-sm">MTN / Airtel Mobile Money</p><p className="text-xs text-gray-500">Pay via PawaPay</p></div>
+            </button>
+            <button onClick={payWithPaypal} disabled={paypalLoading}
+              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left disabled:opacity-60">
+              <span className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg">💳</span>
+              <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">{paypalLoading ? "Redirecting…" : "Pay securely with PayPal or card"}</p></div>
+            </button>
+          </div>
+        )}
+
+        {method === "mtn" && mmStep === "input" && (
+          <div className="space-y-4">
+            <button onClick={() => setMethod("choose")} className="text-xs text-gray-500 hover:text-gray-700">← Back</button>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Phone Number</label>
+              <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="07XXXXXXXX"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+              {predictLoading && <p className="text-xs text-gray-400 mt-1.5">Detecting operator…</p>}
+              {predicted && <p className="text-xs text-green-600 mt-1.5">Detected: {predicted.provider.split("_")[0]}</p>}
+              {!predictLoading && cleanPhone.length >= 9 && !predicted && <p className="text-xs text-red-500 mt-1.5">Operator not supported for this number.</p>}
+            </div>
+            {mmError && <p className="text-sm text-red-600">{mmError}</p>}
+            <button onClick={payMobileMoney} disabled={!predicted}
+              className="w-full py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-40 hover:bg-[#581c87] transition-colors">
+              Pay RWF {rwfTotal.toLocaleString()}
+            </button>
+          </div>
+        )}
+
+        {method === "mtn" && mmStep === "sending" && (
+          <p className="text-center text-sm text-gray-500 py-8">Sending payment request…</p>
+        )}
+
+        {method === "mtn" && mmStep === "waiting" && (
+          <div className="text-center py-6 space-y-3">
+            <div className="w-12 h-12 border-4 border-purple-200 border-t-[#6B21A8] rounded-full animate-spin mx-auto" />
+            <p className="text-sm font-medium text-gray-900">Check your phone</p>
+            <p className="text-xs text-gray-500">Approve the USSD prompt to complete payment. Expires in {countdown}s.</p>
+          </div>
+        )}
+
+        {method === "mtn" && mmStep === "success" && (
+          <div className="text-center py-6 space-y-2">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600"><I.Check /></div>
+            <p className="text-sm font-semibold text-gray-900">Payment received!</p>
+          </div>
+        )}
+
+        {method === "mtn" && mmStep === "failed" && (
+          <div className="text-center py-6 space-y-3">
+            <p className="text-sm text-red-600">{mmError}</p>
+            <button onClick={() => { setMmStep("input"); setMmError(""); }} className="text-sm text-[#6B21A8] font-semibold hover:underline">Try again</button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ─── WHM helpers ────────────────────────────────────────────────────────── */
 interface WhmAccount { user: string; domain: string; diskused: string; disklimit: string; suspended: boolean; }
 
@@ -557,6 +771,8 @@ function HostingSection({ clientId }: { clientId: number }) {
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(false);
   const [cpanelLoading, setCpanelLoading] = useState<Record<number, boolean>>({});
+  const [renewingId, setRenewingId] = useState<number | null>(null);
+  const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -571,6 +787,22 @@ function HostingSection({ clientId }: { clientId: number }) {
   }, [clientId]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleRenew(p: ClientProduct) {
+    setRenewingId(p.id);
+    try {
+      const amount = parseFloat(p.amount) || 0;
+      const { invoiceId } = await whmcs<{ invoiceId: number }>("createInvoice", {
+        clientId, description: `Hosting Renewal - ${p.domain || p.name} (${p.billingcycle})`, amount,
+      });
+      if (!invoiceId) throw new Error("No invoice returned");
+      setPayTarget({ invoiceId, amountUSD: amount });
+    } catch {
+      alert("Could not start renewal right now. Please try again or contact support.");
+    } finally {
+      setRenewingId(null);
+    }
+  }
 
   async function handleCpanelLogin(p: ClientProduct) {
     setCpanelLoading(prev => ({ ...prev, [p.id]: true }));
@@ -633,7 +865,10 @@ function HostingSection({ clientId }: { clientId: number }) {
                   </button>
                   <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
                   {daysUntil(p.nextduedate) <= 30 && (
-                    <button className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors">Renew</button>
+                    <button onClick={() => handleRenew(p)} disabled={renewingId === p.id}
+                      className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 disabled:opacity-60 transition-colors">
+                      {renewingId === p.id ? "Preparing…" : "Renew"}
+                    </button>
                   )}
                 </div>
               </div>
@@ -641,6 +876,15 @@ function HostingSection({ clientId }: { clientId: number }) {
           })}
         </div>
       )}
+
+      <AnimatePresence>
+        {payTarget && (
+          <PaymentModal invoiceId={payTarget.invoiceId} amountUSD={payTarget.amountUSD}
+            clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
+            onClose={() => setPayTarget(null)}
+            onPaid={() => { setPayTarget(null); load(); }} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -724,6 +968,7 @@ function InvoicesSection({ clientId }: { clientId: number }) {
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(false);
   const [filter,   setFilter]   = useState("All");
+  const [payInvoice, setPayInvoice] = useState<ClientInvoice | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -768,10 +1013,10 @@ function InvoicesSection({ clientId }: { clientId: number }) {
                     <td className="px-5 py-4">
                       <div className="flex gap-2">
                         {(inv.status === "Unpaid" || inv.status === "Overdue") && (
-                          <a href={`https://bshopafrica.com/billing/viewinvoice.php?id=${inv.id}`} target="_blank" rel="noopener noreferrer"
+                          <button onClick={() => setPayInvoice(inv)}
                             className="text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] transition-colors flex items-center gap-1">
                             Pay Now
-                          </a>
+                          </button>
                         )}
                         {inv.status === "Paid" && (
                           <a href={`/api/invoices/${inv.id}/pdf`} download={`invoice-${inv.id}.pdf`}
@@ -788,6 +1033,15 @@ function InvoicesSection({ clientId }: { clientId: number }) {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {payInvoice && (
+          <PaymentModal invoiceId={payInvoice.id} amountUSD={parseFloat(payInvoice.total) || 0}
+            clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
+            onClose={() => setPayInvoice(null)}
+            onPaid={() => { setPayInvoice(null); load(); }} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

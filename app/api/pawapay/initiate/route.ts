@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     cartItems?:   unknown[];
     totalUSD?:    number;
     totalRWF?:    number;
+    invoiceId?:   number;
   };
 
   const {
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
     cartItems   = [],
     totalUSD    = 0,
     totalRWF    = amount,
+    invoiceId,
   } = body;
   const currency  = body.currency ?? "RWF";
   const depositId = randomUUID();
@@ -117,6 +119,7 @@ export async function POST(req: NextRequest) {
     cartItems,
     totalUSD,
     totalRWF,
+    ...(invoiceId ? { invoiceId } : {}),
     createdAt:   Date.now(),
   });
 

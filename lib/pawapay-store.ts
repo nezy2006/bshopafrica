@@ -8,6 +8,7 @@ export interface DepositRecord {
   cartItems:   unknown[]; // CartItem[] serialised to plain objects
   totalUSD:    number;
   totalRWF:    number;
+  invoiceId?:  number;    // set for direct invoice payments (renewals) — callback skips order creation
   createdAt:   number;   // Date.now()
 }
 

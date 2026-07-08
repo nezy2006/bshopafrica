@@ -10,7 +10,7 @@ import {
   getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
   createSsoToken, getDomainNameservers, updateDomainNameservers,
   getDomainLockingStatus, updateDomainLockingStatus,
-  validateLogin, updateClientPassword,
+  validateLogin, updateClientPassword, createInvoice,
 } from "@/lib/whmcs";
 
 type Params = Record<string, unknown>;
@@ -177,6 +177,9 @@ export async function POST(req: NextRequest) {
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
       case "addPayment":            await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId")); data = { ok: true }; break;
       case "validateLogin":         data = { valid: await validateLogin(s("email"), s("password")) }; break;
+      case "createInvoice":
+        data = { invoiceId: await createInvoice(n("clientId"), s("description"), Number(params.amount ?? 0)) };
+        break;
       case "updateClientPassword": {
         console.log("[updateClientPassword] params:", JSON.stringify(params));
         const clientId = params.clientId ?? params.clientid;

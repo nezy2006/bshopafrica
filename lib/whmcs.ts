@@ -474,6 +474,25 @@ export async function addPaymentToInvoice(
   });
 }
 
+/** Ad-hoc invoice for a manual renewal request. Not linked to a service (no relid),
+ *  so paying it does not itself extend a domain/hosting due date — that still relies
+ *  on WHMCS's own auto-generated renewal invoice / registrar automation. */
+export async function createInvoice(
+  clientId:    number,
+  description: string,
+  amount:      number,
+): Promise<number> {
+  const today = new Date().toISOString().split("T")[0];
+  const data = await callWhmcs("CreateInvoice", {
+    userid:           clientId,
+    date:             today,
+    duedate:          today,
+    itemdescription1: description,
+    itemamount1:      amount.toFixed(2),
+  });
+  return Number(data.invoiceid ?? 0);
+}
+
 /* ─── PawaPay automated order creation ───────────────────────────────────── */
 // PawaPay gateway setup in WHMCS:
 //   Admin → Setup → Payment Gateways → Manage Existing Gateways

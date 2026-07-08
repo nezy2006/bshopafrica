@@ -35,6 +35,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    // ── Direct invoice payment (renewal) — just mark the existing invoice paid ──
+    if (stored.invoiceId) {
+      try {
+        await addPaymentToInvoice(
+          stored.invoiceId,
+          stored.totalUSD,
+          depositId,
+          process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer",
+        );
+        console.log("[pawapay/callback] ✅ invoice paid directly", { invoiceId: stored.invoiceId, depositId });
+        depositStore.delete(depositId);
+      } catch (e) {
+        console.error("[pawapay/callback] ❌ direct invoice payment failed for", depositId, e);
+      }
+      return NextResponse.json({ success: true });
+    }
+
     const clientId = Number(stored.clientId);
     if (!clientId) {
       console.error("[pawapay/callback] invalid clientId stored for:", depositId);
