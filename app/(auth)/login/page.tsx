@@ -25,10 +25,11 @@ const fadeUp  = {
 type LoginStep = "credentials" | "otp";
 
 interface PendingClient {
-  clientId:  number;
-  firstname: string;
-  lastname:  string;
-  email:     string;
+  clientId:     number;
+  firstname:    string;
+  lastname:     string;
+  email:        string;
+  sessionToken: string;
 }
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
@@ -253,7 +254,7 @@ export default function LoginPage() {
         setOtpError(json.error ?? "Invalid code. Please try again.");
         return;
       }
-      setAuth(pendingClient.clientId, pendingClient.firstname, pendingClient.lastname, pendingClient.email || email);
+      setAuth(pendingClient.clientId, pendingClient.firstname, pendingClient.lastname, pendingClient.email || email, pendingClient.sessionToken);
       window.dispatchEvent(new Event("bshop_cart_update"));
       router.push("/dashboard");
     } catch {

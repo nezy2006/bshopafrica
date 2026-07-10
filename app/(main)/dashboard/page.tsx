@@ -10,7 +10,7 @@ import {
   getNotifications, markAllRead, markRead, startNotificationPolling, stopNotificationPolling,
   getUnreadCount, type AppNotification,
 } from "@/lib/notifications";
-import { clearAuth } from "@/lib/auth";
+import { clearAuth, authHeaders } from "@/lib/auth";
 
 type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
@@ -20,9 +20,17 @@ const EASE: Ease = [0.22, 1, 0.36, 1];
 async function whmcs<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   const res = await fetch("/api/whmcs", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ action, params }),
   });
+  // Sessions are server-side and short-lived (2h) — a 401 here means the
+  // stored session token is missing/expired (including accounts that logged
+  // in before this session system existed), so force a clean re-login.
+  if (res.status === 401) {
+    clearAuth();
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
   const json = (await res.json()) as { success: boolean; data?: T; error?: string };
   if (!json.success) throw new Error(json.error ?? "API error");
   return json.data as T;

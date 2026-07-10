@@ -356,7 +356,7 @@ export async function getTickets(clientId: number): Promise<SupportTicket[]> {
   }
 }
 
-export async function getTicket(ticketId: number): Promise<SupportTicket & { replies: TicketReply[] }> {
+export async function getTicket(ticketId: number): Promise<SupportTicket & { replies: TicketReply[]; userid: number }> {
   const data = await callWhmcs("GetTicket", { ticketid: ticketId });
   const replyData = (data.replies as { reply: WhmcsRaw | WhmcsRaw[] } | undefined)?.reply ?? [];
   const raw = Array.isArray(replyData) ? replyData : [replyData];
@@ -386,7 +386,7 @@ export async function getTicket(ticketId: number): Promise<SupportTicket & { rep
       type: "client", attachments: [],
     });
   }
-  return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies };
+  return { id: Number(data.id ?? 0), tid: String(data.tid ?? ""), title: String(data.subject ?? ""), status: String(data.status ?? ""), priority: String(data.priority ?? ""), deptname: String(data.deptname ?? ""), date: String(data.date ?? ""), lastreply: String(data.lastreply ?? ""), replies, userid: Number(data.userid ?? 0) };
 }
 
 function appendAttachmentUrls(message: string, attachmentUrls?: string[]): string {

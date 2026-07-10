@@ -8,7 +8,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { User } from "lucide-react";
 import { getCartCount } from "@/lib/cart";
 import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
-import { isSessionExpired, clearAuth, refreshSession } from "@/lib/auth";
+import { isSessionExpired, clearAuth, refreshSession, authHeaders } from "@/lib/auth";
 
 // Primary links — always shown on md+ screens
 const PRIMARY_NAV = [
@@ -164,8 +164,8 @@ export default function Header() {
     if (!clientId) return;
     fetch("/api/whmcs", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getClientDetails", params: { clientId: Number(clientId) } }),
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ action: "getClientDetails", params: {} }),
     })
       .then(r => r.json())
       .then((json: { success: boolean; data?: { firstname?: string; lastname?: string; email?: string } }) => {

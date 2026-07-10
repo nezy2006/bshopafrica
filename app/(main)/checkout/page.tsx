@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
+import { AUTH_KEYS } from "@/lib/auth";
 // CartTransfer and CartWebsiteBuilder used in type guards within StepPayment
 import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 
@@ -192,16 +193,17 @@ function StepAccount({ onDone }: { onDone: () => void }) {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ action: "loginClient", params: { email, password } }),
       });
-      const json = (await res.json()) as { success: boolean; data?: { clientId: number; firstname: string; lastname: string; email: string }; error?: string };
+      const json = (await res.json()) as { success: boolean; data?: { clientId: number; firstname: string; lastname: string; email: string; sessionToken: string }; error?: string };
       if (!json.success || !json.data?.clientId) {
         setError(json.error ?? "Invalid email or password.");
         return;
       }
-      const { clientId, firstname, lastname, email: clientEmail } = json.data;
+      const { clientId, firstname, lastname, email: clientEmail, sessionToken } = json.data;
       localStorage.setItem("bshop_client_id",        String(clientId));
       localStorage.setItem("bshop_client_firstname", firstname ?? "");
       localStorage.setItem("bshop_client_name",      `${firstname ?? ""} ${lastname ?? ""}`.trim());
       localStorage.setItem("bshop_client_email",     clientEmail || email);
+      if (sessionToken) localStorage.setItem(AUTH_KEYS.sessionToken, sessionToken);
       window.dispatchEvent(new Event("bshop_cart_update"));
       onDone();
     } catch { setError("Something went wrong. Please try again."); }
@@ -240,7 +242,7 @@ function StepAccount({ onDone }: { onDone: () => void }) {
           },
         }),
       });
-      const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
+      const json = (await res.json()) as { success: boolean; data?: { clientId: number; sessionToken: string }; error?: string };
       if (!json.success || !json.data?.clientId) {
         setError(json.error ?? "Registration failed. Please try again.");
         return;
@@ -249,6 +251,7 @@ function StepAccount({ onDone }: { onDone: () => void }) {
       localStorage.setItem("bshop_client_firstname", firstName);
       localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
       localStorage.setItem("bshop_client_email",     email);
+      if (json.data.sessionToken) localStorage.setItem(AUTH_KEYS.sessionToken, json.data.sessionToken);
       window.dispatchEvent(new Event("bshop_cart_update"));
       setSuccess(true);
       setTimeout(() => onDone(), 1500);

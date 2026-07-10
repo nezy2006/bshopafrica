@@ -1,9 +1,10 @@
 export const AUTH_KEYS = {
-  clientId:    "bshop_client_id",
-  clientName:  "bshop_client_name",
-  clientEmail: "bshop_client_email",
-  clientFirst: "bshop_client_firstname",
-  loginTime:   "bshop_login_time",
+  clientId:     "bshop_client_id",
+  clientName:   "bshop_client_name",
+  clientEmail:  "bshop_client_email",
+  clientFirst:  "bshop_client_firstname",
+  loginTime:    "bshop_login_time",
+  sessionToken: "bshop_session_token",
 } as const;
 
 const TWO_HOURS = 2 * 60 * 60 * 1000;
@@ -24,13 +25,14 @@ export function refreshSession(): void {
   }
 }
 
-export function setAuth(clientId: number | string, firstname: string, lastname: string, email: string): void {
+export function setAuth(clientId: number | string, firstname: string, lastname: string, email: string, sessionToken?: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(AUTH_KEYS.clientId,    String(clientId));
   localStorage.setItem(AUTH_KEYS.clientFirst,  firstname);
   localStorage.setItem(AUTH_KEYS.clientName,   `${firstname} ${lastname}`.trim());
   localStorage.setItem(AUTH_KEYS.clientEmail,  email);
   localStorage.setItem(AUTH_KEYS.loginTime,    Date.now().toString());
+  if (sessionToken) localStorage.setItem(AUTH_KEYS.sessionToken, sessionToken);
 }
 
 export function clearAuth(): void {
@@ -41,6 +43,17 @@ export function clearAuth(): void {
 export function isLoggedIn(): boolean {
   if (typeof window === "undefined") return false;
   return !!localStorage.getItem(AUTH_KEYS.clientId);
+}
+
+export function getSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(AUTH_KEYS.sessionToken);
+}
+
+/** Spread into a fetch() headers object for any call to /api/whmcs that touches client data. */
+export function authHeaders(): Record<string, string> {
+  const token = getSessionToken();
+  return token ? { "x-session-token": token } : {};
 }
 
 export function sanitizeInput(input: string): string {
