@@ -10,7 +10,7 @@ import {
   getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
   createSsoToken, getDomainNameservers, updateDomainNameservers,
   getDomainLockingStatus, updateDomainLockingStatus,
-  validateLogin, updateClientPassword, createInvoice,
+  validateLogin, updateClientPassword, createInvoice, getInvoice,
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
 
@@ -36,6 +36,23 @@ function isUnauthorized(x: unknown): x is NextResponse {
 async function ownsDomain(clientId: number, domainId: number): Promise<boolean> {
   const domains = await getClientDomains(clientId);
   return domains.some(d => d.id === domainId);
+}
+
+/** Looks for an existing unpaid invoice whose line items mention `matchText`
+ *  (e.g. a domain or hosting service name) so renewal clicks don't spawn a
+ *  fresh duplicate invoice every time. */
+async function findUnpaidInvoiceForItem(clientId: number, matchText: string): Promise<{ invoiceId: number; amount: number } | null> {
+  const invoices = await getInvoices(clientId);
+  const unpaid = invoices.filter(i => i.status === "Unpaid");
+  for (const inv of unpaid) {
+    try {
+      const details = await getInvoice(inv.id);
+      if (details.userid === clientId && details.items.some(it => it.description.includes(matchText))) {
+        return { invoiceId: inv.id, amount: parseFloat(details.total) || 0 };
+      }
+    } catch { /* skip unreadable invoice, keep searching */ }
+  }
+  return null;
 }
 
 /* ─── Brute-force rate limiter (in-memory, per-IP) ──────────────────────── */
@@ -294,9 +311,30 @@ export async function POST(req: NextRequest) {
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
       case "addPayment":            await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId")); data = { ok: true }; break;
       case "validateLogin":         data = { valid: await validateLogin(s("email"), s("password")) }; break;
-      case "createInvoice":
-        data = { invoiceId: await createInvoice(n("clientId"), s("description"), Number(params.amount ?? 0)) };
+      case "createInvoice": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        data = { invoiceId: await createInvoice(session.clientId, s("description"), Number(params.amount ?? 0)) };
         break;
+      }
+      case "findOrCreateRenewalInvoice": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        const matchText   = s("matchText");
+        const description = s("description");
+        const amount       = Number(params.amount ?? 0);
+        if (!matchText || !description || !amount) {
+          return NextResponse.json({ success: false, error: "matchText, description, and amount are required" }, { status: 400 });
+        }
+        const existing = await findUnpaidInvoiceForItem(session.clientId, matchText);
+        if (existing) {
+          data = existing;
+        } else {
+          const invoiceId = await createInvoice(session.clientId, description, amount);
+          data = { invoiceId, amount };
+        }
+        break;
+      }
       case "updateClientPassword": {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;

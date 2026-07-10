@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AUTH_KEYS } from "@/lib/auth";
 
 type SsoClient = { id: number; email: string; firstname: string; fullname: string };
+type SsoResponse = { success: boolean; client?: SsoClient; sessionToken?: string; error?: string };
 type Status = "loading" | "unauthorized" | "error";
 
 function ImpersonateInner() {
@@ -33,17 +34,18 @@ function ImpersonateInner() {
         });
         if (res.status === 401) { setStatus("unauthorized"); return; }
 
-        const json = await res.json() as { success: boolean; client?: SsoClient; error?: string };
-        if (!json.success || !json.client) { setStatus("error"); return; }
+        const json = await res.json() as SsoResponse;
+        if (!json.success || !json.client || !json.sessionToken) { setStatus("error"); return; }
 
         const { id, email, firstname, fullname } = json.client;
         setName(fullname || firstname || "client");
 
-        localStorage.setItem(AUTH_KEYS.clientId,    String(id));
-        localStorage.setItem(AUTH_KEYS.clientEmail, email);
-        localStorage.setItem(AUTH_KEYS.clientName,  fullname);
-        localStorage.setItem(AUTH_KEYS.clientFirst, firstname);
-        localStorage.setItem(AUTH_KEYS.loginTime,   Date.now().toString());
+        localStorage.setItem(AUTH_KEYS.clientId,     String(id));
+        localStorage.setItem(AUTH_KEYS.clientEmail,  email);
+        localStorage.setItem(AUTH_KEYS.clientName,   fullname);
+        localStorage.setItem(AUTH_KEYS.clientFirst,  firstname);
+        localStorage.setItem(AUTH_KEYS.loginTime,    Date.now().toString());
+        localStorage.setItem(AUTH_KEYS.sessionToken, json.sessionToken);
 
         setTimeout(() => router.replace("/dashboard"), 1000);
       } catch {

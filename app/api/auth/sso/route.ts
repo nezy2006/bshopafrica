@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClientDetails, generateImpersonateToken, verifyImpersonateToken } from "@/lib/whmcs";
 import { config } from "@/lib/config";
+import { createSession } from "@/lib/session-store";
 
 /* ─── GET — admin mints a short-lived impersonation token ───────────────── */
 export async function GET(req: NextRequest) {
@@ -37,8 +38,13 @@ export async function POST(req: NextRequest) {
     }
 
     const client = await getClientDetails(Number(clientId));
+    // Impersonation used to only ever populate localStorage — now that /api/whmcs
+    // requires a server-side session, mint one here too so the dashboard's API
+    // calls (which resolve clientId from the session, never from the client) work.
+    const sessionToken = createSession(client.id, client.email);
     return NextResponse.json({
       success: true,
+      sessionToken,
       client: {
         id:        client.id,
         email:     client.email,

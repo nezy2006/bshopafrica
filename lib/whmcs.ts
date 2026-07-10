@@ -707,7 +707,7 @@ export async function createPaypalOrder(
 /* ─── Invoice lookup ─────────────────────────────────────────────────────── */
 export interface InvoiceItem    { description: string; amount: string; }
 export interface InvoiceDetails {
-  id: number; status: string; date: string; duedate: string;
+  id: number; userid: number; status: string; date: string; duedate: string;
   total: string; subtotal: string; items: InvoiceItem[];
 }
 
@@ -717,6 +717,7 @@ export async function getInvoice(invoiceId: number): Promise<InvoiceDetails> {
   const items = raw.map(i => ({ description: String(i.description ?? ""), amount: String(i.amount ?? "0.00") }));
   return {
     id:       Number(data.invoiceid ?? 0),
+    userid:   Number(data.userid ?? 0),
     status:   String(data.status   ?? ""),
     date:     String(data.date     ?? ""),
     duedate:  String(data.duedate  ?? ""),

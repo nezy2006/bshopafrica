@@ -188,7 +188,8 @@ function OverviewSection({ client, onNavigate }: { client: ClientDetails; onNavi
                 <span className="font-semibold">{item.name}</span>
                 <span className="text-sm ml-2">({item.type}) expires in {item.days} day{item.days !== 1 ? "s" : ""}</span>
               </div>
-              <Link href="/hosting" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/60 hover:bg-white transition-colors">Renew Now →</Link>
+              <button onClick={() => onNavigate(item.type === "Domain" ? "domains" : "hosting")}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/60 hover:bg-white transition-colors">Renew Now →</button>
             </motion.div>
           ))}
         </div>
@@ -337,11 +338,11 @@ function DomainsSection({ clientId }: { clientId: number }) {
     try {
       const tld = "." + d.domainname.split(".").slice(1).join(".");
       const amount = tldPricing[tld]?.renewal ?? 0;
-      const { invoiceId } = await whmcs<{ invoiceId: number }>("createInvoice", {
-        clientId, description: `Domain Renewal - ${d.domainname} (1 year)`, amount,
+      const { invoiceId, amount: invoiceAmount } = await whmcs<{ invoiceId: number; amount: number }>("findOrCreateRenewalInvoice", {
+        matchText: d.domainname, description: `Domain Renewal - ${d.domainname} (1 year)`, amount,
       });
       if (!invoiceId) throw new Error("No invoice returned");
-      setPayTarget({ invoiceId, amountUSD: amount });
+      setPayTarget({ invoiceId, amountUSD: invoiceAmount || amount });
     } catch {
       alert("Could not start renewal right now. Please try again or contact support.");
     } finally {
@@ -800,11 +801,12 @@ function HostingSection({ clientId }: { clientId: number }) {
     setRenewingId(p.id);
     try {
       const amount = parseFloat(p.amount) || 0;
-      const { invoiceId } = await whmcs<{ invoiceId: number }>("createInvoice", {
-        clientId, description: `Hosting Renewal - ${p.domain || p.name} (${p.billingcycle})`, amount,
+      const matchText = p.domain || p.name;
+      const { invoiceId, amount: invoiceAmount } = await whmcs<{ invoiceId: number; amount: number }>("findOrCreateRenewalInvoice", {
+        matchText, description: `Hosting Renewal - ${matchText} (${p.billingcycle})`, amount,
       });
       if (!invoiceId) throw new Error("No invoice returned");
-      setPayTarget({ invoiceId, amountUSD: amount });
+      setPayTarget({ invoiceId, amountUSD: invoiceAmount || amount });
     } catch {
       alert("Could not start renewal right now. Please try again or contact support.");
     } finally {
