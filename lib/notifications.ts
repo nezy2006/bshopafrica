@@ -36,106 +36,48 @@ export function markRead(id: string): void {
   save(getNotifications().map(n => (n.id === id ? { ...n, read: true } : n)));
 }
 
-export function addNotification(notif: Omit<AppNotification, "id" | "read">): void {
+export function addNotification(notif: Omit<AppNotification, "id" | "read"> & { id?: string }): void {
   const notifs = getNotifications();
   if (notifs.some(n => n.message === notif.message)) return;
   notifs.unshift({
     ...notif,
-    id:   `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    id:   notif.id ?? `${Date.now()}_${Math.random().toString(36).slice(2)}`,
     read: false,
   });
   save(notifs.slice(0, 50));
 }
 
-function daysUntil(dateStr: string): number {
-  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000);
+/** Wipes the cached notification feed. Must be called on logout/session-switch —
+ *  otherwise a second client logging in on the same browser would briefly see
+ *  the previous client's cached notifications until enough new ones supersede them. */
+export function clearNotifications(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(KEY);
+  localStorage.removeItem(POLL_KEY);
 }
 
-async function poll(clientId: number): Promise<void> {
+// clientId is intentionally NOT passed here — the server resolves it from the
+// x-session-token header via the server-side session, never from the client.
+async function poll(sessionToken: string | null): Promise<void> {
+  if (!sessionToken) return;
   try {
-    const post = (action: string, params: Record<string, unknown>) =>
-      fetch("/api/whmcs", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ action, params }),
-      }).then(r => r.json());
-
-    const [domRes, invRes, hostRes, tickRes] = await Promise.all([
-      post("getClientDomains",  { clientId }),
-      post("getInvoices",       { clientId }),
-      post("getClientProducts", { clientId }),
-      post("getTickets",        { clientId }),
-    ]);
-
-    if (domRes.success && Array.isArray(domRes.data)) {
-      for (const d of domRes.data as { domainname: string; expirydate: string; nextduedate: string }[]) {
-        const days = daysUntil(d.expirydate || d.nextduedate);
-        if (days > 0 && days <= 30) {
-          addNotification({
-            type:    "domain_expiring",
-            message: `${d.domainname} expires in ${days} day${days === 1 ? "" : "s"}`,
-            date:    new Date().toISOString(),
-            link:    "/dashboard",
-          });
-        }
-      }
+    const res  = await fetch("/api/notifications", { headers: { "x-session-token": sessionToken } });
+    if (res.status === 401) return;
+    const json = (await res.json()) as { success: boolean; data?: AppNotification[] };
+    if (json.success && Array.isArray(json.data)) {
+      for (const n of json.data) addNotification(n);
     }
-
-    if (invRes.success && Array.isArray(invRes.data)) {
-      for (const inv of invRes.data as { id: number; total: string; duedate: string; status: string }[]) {
-        if (inv.status === "Unpaid") {
-          const days = daysUntil(inv.duedate);
-          if (days <= 7) {
-            addNotification({
-              type:    "invoice_due",
-              message: `Invoice #${inv.id} ($${inv.total}) due in ${Math.max(0, days)} day${days === 1 ? "" : "s"}`,
-              date:    new Date().toISOString(),
-              link:    "/dashboard",
-            });
-          }
-        }
-      }
-    }
-
-    if (hostRes.success && Array.isArray(hostRes.data)) {
-      for (const p of hostRes.data as { name: string; domain: string; nextduedate: string; status: string }[]) {
-        if (p.status !== "Active") continue;
-        const days = daysUntil(p.nextduedate);
-        if (days > 0 && days <= 30) {
-          addNotification({
-            type:    "domain_expiring",
-            message: `Hosting for ${p.domain || p.name} renews in ${days} day${days === 1 ? "" : "s"}`,
-            date:    new Date().toISOString(),
-            link:    "/dashboard",
-          });
-        }
-      }
-    }
-
-    if (tickRes.success && Array.isArray(tickRes.data)) {
-      for (const t of tickRes.data as { tid: string; title: string; status: string }[]) {
-        if (t.status === "Answered") {
-          addNotification({
-            type:    "ticket_replied",
-            message: `Support ticket #${t.tid} has a new reply: ${t.title}`,
-            date:    new Date().toISOString(),
-            link:    "/dashboard",
-          });
-        }
-      }
-    }
-
     localStorage.setItem(POLL_KEY, Date.now().toString());
   } catch { /* silent */ }
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
-export function startNotificationPolling(clientId: number): void {
-  if (typeof window === "undefined") return;
-  poll(clientId);
+export function startNotificationPolling(sessionToken: string | null): void {
+  if (typeof window === "undefined" || !sessionToken) return;
+  poll(sessionToken);
   if (timer) clearInterval(timer);
-  timer = setInterval(() => poll(clientId), 60_000);
+  timer = setInterval(() => poll(sessionToken), 60_000);
 }
 
 export function stopNotificationPolling(): void {

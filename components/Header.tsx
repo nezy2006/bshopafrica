@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { User } from "lucide-react";
 import { getCartCount } from "@/lib/cart";
-import { getUnreadCount, getNotifications, markAllRead, type AppNotification } from "@/lib/notifications";
+import { getUnreadCount, getNotifications, markAllRead, clearNotifications, type AppNotification } from "@/lib/notifications";
 import { isSessionExpired, clearAuth, refreshSession, authHeaders } from "@/lib/auth";
 
 // Primary links — always shown on md+ screens
@@ -125,6 +125,7 @@ export default function Header() {
     // Session expiry check on mount
     if (isSessionExpired()) {
       clearAuth();
+      clearNotifications();
       router.push("/login");
       return;
     }
@@ -198,6 +199,7 @@ export default function Header() {
 
   function handleLogout() {
     clearAuth();
+    clearNotifications();
     setLoggedIn(false);
     setUserDropOpen(false);
     router.push("/");

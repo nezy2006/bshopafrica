@@ -70,11 +70,23 @@ export async function POST(req: NextRequest) {
 
   if (!predicted) {
     console.error("[pawapay/initiate] predict-provider failed for phone:", intlPhone);
-    // Fall back to client-supplied operator rather than blocking the payment
+    // Fall back to client-supplied operator (already validated client-side by the
+    // same predict-provider call) rather than blocking the payment outright.
   }
 
   const finalPhone    = predicted?.phoneNumber ?? intlPhone;
-  const finalProvider = predicted?.provider    ?? body.operator ?? "MTN_MOMO_RWA";
+  const finalProvider = predicted?.provider    ?? body.operator;
+
+  // Never guess a provider. A wrong network (e.g. an Airtel number routed as
+  // MTN_MOMO_RWA) gets synchronously REJECTED by PawaPay — no USSD is ever sent,
+  // but the old fallback of defaulting to "MTN_MOMO_RWA" masked that as if it
+  // had worked, so the UI showed a live 120s countdown for a dead request.
+  if (!finalProvider) {
+    return NextResponse.json({
+      success: false,
+      error:   "Could not detect a mobile money provider for this number. Please double-check it and try again.",
+    }, { status: 400 });
+  }
 
   console.log("[pawapay/initiate]", { finalPhone, finalProvider, totalUSD, totalRWF });
 
@@ -110,7 +122,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: "PawaPay request failed" }, { status: 502 });
   }
 
-  const data = (await res.json()) as { status?: string };
+  const data = (await res.json()) as {
+    status?:        string;
+    failureReason?: { failureCode?: string; failureMessage?: string };
+  };
+
+  // PawaPay can accept the HTTP request (200 OK) but still reject the deposit
+  // itself (e.g. failureCode "INVALID_PHONE_NUMBER") — no USSD prompt will ever
+  // be sent for it. Report that as a failure now instead of letting the UI show
+  // a 120s countdown for a deposit that's already dead.
+  if (data.status && data.status !== "ACCEPTED") {
+    console.error("[pawapay/initiate] deposit rejected:", data.status, data.failureReason);
+    return NextResponse.json({
+      success: false,
+      error:   data.failureReason?.failureMessage ?? "This mobile money provider declined the request. Please check the number and try again.",
+    }, { status: 400 });
+  }
 
   cleanupDeposits();
   depositStore.set(depositId, {

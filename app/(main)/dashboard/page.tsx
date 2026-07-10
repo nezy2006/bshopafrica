@@ -8,9 +8,10 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   getNotifications, markAllRead, markRead, startNotificationPolling, stopNotificationPolling,
-  getUnreadCount, type AppNotification,
+  getUnreadCount, clearNotifications, type AppNotification,
 } from "@/lib/notifications";
-import { clearAuth, authHeaders } from "@/lib/auth";
+import { clearAuth, authHeaders, getSessionToken } from "@/lib/auth";
+import { MobileMoneyLogo, PayPalLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 
 type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
@@ -28,6 +29,7 @@ async function whmcs<T>(action: string, params: Record<string, unknown> = {}): P
   // in before this session system existed), so force a clean re-login.
   if (res.status === 401) {
     clearAuth();
+    clearNotifications();
     window.location.href = "/login";
     throw new Error("Session expired");
   }
@@ -665,12 +667,12 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
           <div className="space-y-3">
             <button onClick={() => setMethod("mtn")}
               className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
-              <span className="w-10 h-10 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center text-lg">📱</span>
+              <span className="w-16 flex-shrink-0"><MobileMoneyLogo /></span>
               <div><p className="font-semibold text-gray-900 text-sm">MTN / Airtel Mobile Money</p><p className="text-xs text-gray-500">Pay via PawaPay</p></div>
             </button>
             <button onClick={payWithPaypal} disabled={paypalLoading}
               className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left disabled:opacity-60">
-              <span className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg">💳</span>
+              <span className="w-16 flex-shrink-0"><PayPalLogo /></span>
               <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">{paypalLoading ? "Redirecting…" : "Pay securely with PayPal or card"}</p></div>
             </button>
           </div>
@@ -684,7 +686,12 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
               <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="07XXXXXXXX"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
               {predictLoading && <p className="text-xs text-gray-400 mt-1.5">Detecting operator…</p>}
-              {predicted && <p className="text-xs text-green-600 mt-1.5">Detected: {predicted.provider.split("_")[0]}</p>}
+              {predicted && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="w-12 flex-shrink-0">{predicted.provider.startsWith("AIRTEL") ? <AirtelLogo /> : <MtnLogo />}</span>
+                  <p className="text-xs text-green-600">Detected</p>
+                </div>
+              )}
               {!predictLoading && cleanPhone.length >= 9 && !predicted && <p className="text-xs text-red-500 mt-1.5">Operator not supported for this number.</p>}
             </div>
             {mmError && <p className="text-sm text-red-600">{mmError}</p>}
@@ -1504,6 +1511,7 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
       setPwForm({ current: "", newPw: "", confirm: "" });
       setTimeout(() => {
         clearAuth();
+        clearNotifications();
         router.push("/login");
       }, 2000);
     } catch (err) {
@@ -1868,8 +1876,8 @@ function DashboardInner() {
     const clientId = Number(id);
     setAuthLoading(false);
 
-    // Start notification polling
-    startNotificationPolling(clientId);
+    // Start notification polling (server resolves clientId from the session token)
+    startNotificationPolling(getSessionToken());
 
     // Load client details
     whmcs<ClientDetails>("getClientDetails", { clientId })
