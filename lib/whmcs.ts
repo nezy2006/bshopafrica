@@ -475,7 +475,7 @@ export function getInvoicePDFUrl(invoiceId: number): string {
 }
 
 export function getPaymentUrl(invoiceId: number): string {
-  return `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}`;
+  return `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}&paynow=1`;
 }
 
 export async function initiateTransfer(clientId: number, domain: string, authCode: string): Promise<OrderResult> {
