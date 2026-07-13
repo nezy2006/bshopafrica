@@ -640,14 +640,16 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
     setMmStep("sending"); setMmError("");
     try {
       const clientId = typeof window !== "undefined" ? localStorage.getItem("bshop_client_id") : null;
+      console.log("[PawaPay] initiating payment for invoice:", invoiceId, "phone:", predicted.phoneNumber, "provider:", predicted.provider);
       const res = await fetch("/api/pawapay/initiate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           amount: rwfTotal, currency: "RWF", phone: predicted.phoneNumber, operator: predicted.provider,
           clientId, clientEmail, invoiceId, totalUSD: amountUSD, totalRWF: rwfTotal,
         }),
       });
       const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
+      console.log("[PawaPay] initiate response:", json);
       if (!json.success || !json.depositId) throw new Error(json.error ?? "Failed to initiate payment");
       setDepositId(json.depositId);
       setMmStep("waiting"); setCountdown(120);
@@ -659,10 +661,14 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
 
   async function payWithPaypalOrCard() {
     setPaypalLoading(true);
+    console.log("[PayPal] getting payment URL for invoice:", invoiceId);
     try {
       const url = await whmcs<string>("getPaymentUrl", { invoiceId });
+      console.log("[PayPal] payment URL:", url);
+      if (!url) throw new Error("No payment URL returned");
       window.location.href = url;
-    } catch {
+    } catch (e) {
+      console.error("[PayPal] failed to get payment URL:", e);
       alert("Could not open the secure checkout right now. Please try again.");
       setPaypalLoading(false);
     }

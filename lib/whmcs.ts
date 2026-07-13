@@ -7,6 +7,11 @@ import crypto from "crypto";
 import { config } from "@/lib/config";
 import { whmcsDbEnabled, updatePasswordDirect, validatePasswordDirect } from "@/lib/whmcs-db";
 
+// The "paypal" module name is a guess at your WHMCS's active PayPal gateway —
+// override with the real module system name (Admin → Setup → Payment Gateways
+// → Manage Existing Gateways) if AddOrder rejects it, e.g. "paypal_ppcpv".
+const WHMCS_PAYPAL_GATEWAY = process.env.WHMCS_PAYPAL_GATEWAY ?? "paypal";
+
 export const BSHOP_NAMESERVERS = {
   ns1: "ns1.mysecurecloudhost.com",
   ns2: "ns2.mysecurecloudhost.com",
@@ -195,7 +200,7 @@ export async function registerClient(clientData: Record<string, string>): Promis
 }
 
 export async function addOrder(clientId: number, items: Record<string, string | number>): Promise<OrderResult> {
-  const data = await callWhmcs("AddOrder", { clientid: clientId, paymentmethod: "paypal", ...items });
+  const data = await callWhmcs("AddOrder", { clientid: clientId, paymentmethod: WHMCS_PAYPAL_GATEWAY, ...items });
   return { orderId: Number(data.orderid ?? 0), invoiceId: Number(data.invoiceid ?? 0) };
 }
 
@@ -481,7 +486,7 @@ export function getPaymentUrl(invoiceId: number): string {
 export async function initiateTransfer(clientId: number, domain: string, authCode: string): Promise<OrderResult> {
   const data = await callWhmcs("AddOrder", {
     clientid:     clientId,
-    paymentmethod: "paypal",
+    paymentmethod: WHMCS_PAYPAL_GATEWAY,
     type:          "transfer",
     domain,
     eppcode:       authCode,
@@ -635,7 +640,7 @@ export async function createPaypalOrder(
   clientId:  number,
   cartItems: CartItemLike[],
 ): Promise<PawapayOrderResult> {
-  const baseParams = { clientid: clientId, paymentmethod: "paypal" };
+  const baseParams = { clientid: clientId, paymentmethod: WHMCS_PAYPAL_GATEWAY };
 
   const domain   = cartItems.find(i => i.type === "domain");
   const hosting  = cartItems.find(i => i.type === "hosting");

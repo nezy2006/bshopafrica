@@ -37,6 +37,12 @@ async function predictProvider(
 }
 
 export async function POST(req: NextRequest) {
+  // Not gated behind a session — this endpoint only ever starts a PawaPay
+  // deposit against a phone number/amount the caller supplies, it never reads
+  // another client's data, so a missing x-session-token cannot be "blocking"
+  // it. Logged here only to help correlate with server-session debugging.
+  console.log("[pawapay/initiate] x-session-token present:", !!req.headers.get("x-session-token"));
+
   const body = (await req.json()) as {
     amount:       number;
     currency?:    string;
@@ -49,6 +55,8 @@ export async function POST(req: NextRequest) {
     totalRWF?:    number;
     invoiceId?:   number;
   };
+
+  console.log("[pawapay/initiate] request body:", JSON.stringify(body));
 
   const {
     amount,
@@ -90,30 +98,33 @@ export async function POST(req: NextRequest) {
 
   console.log("[pawapay/initiate]", { finalPhone, finalProvider, totalUSD, totalRWF });
 
+  const pawapayRequest = {
+    depositId,
+    payer: {
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: finalPhone,
+        provider:    finalProvider,
+      },
+    },
+    amount:            String(amount),
+    currency,
+    clientReferenceId: orderId,
+    customerMessage:   "BShop Africa Payment",
+    metadata: [
+      { orderId },
+      { clientId: String(clientId ?? "") },
+    ],
+  };
+  console.log("[pawapay/initiate] sending to PawaPay:", JSON.stringify(pawapayRequest));
+
   const res = await fetch(`${BASE_URL}/v2/deposits`, {
     method:  "POST",
     headers: {
       Authorization:  `Bearer ${config.pawapayApiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      depositId,
-      payer: {
-        type: "MMO",
-        accountDetails: {
-          phoneNumber: finalPhone,
-          provider:    finalProvider,
-        },
-      },
-      amount:            String(amount),
-      currency,
-      clientReferenceId: orderId,
-      customerMessage:   "BShop Africa Payment",
-      metadata: [
-        { orderId },
-        { clientId: String(clientId ?? "") },
-      ],
-    }),
+    body: JSON.stringify(pawapayRequest),
   });
 
   if (!res.ok) {
@@ -126,6 +137,7 @@ export async function POST(req: NextRequest) {
     status?:        string;
     failureReason?: { failureCode?: string; failureMessage?: string };
   };
+  console.log("[pawapay/initiate] PawaPay response:", JSON.stringify(data));
 
   // PawaPay can accept the HTTP request (200 OK) but still reject the deposit
   // itself (e.g. failureCode "INVALID_PHONE_NUMBER") — no USSD prompt will ever

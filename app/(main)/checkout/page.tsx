@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
-import { AUTH_KEYS } from "@/lib/auth";
+import { AUTH_KEYS, authHeaders } from "@/lib/auth";
 // CartTransfer and CartWebsiteBuilder used in type guards within StepPayment
 import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 
@@ -608,9 +608,10 @@ function StepPayment({ cart }: { cart: Cart }) {
       const clientId    = typeof window !== "undefined" ? localStorage.getItem("bshop_client_id")    : null;
       const clientEmail = typeof window !== "undefined" ? localStorage.getItem("bshop_client_email") : null;
 
+      console.log("[Checkout][PawaPay] initiating payment, phone:", predictedProvider.phoneNumber, "provider:", predictedProvider.provider, "cartItems:", cartItems.length);
       const res = await fetch("/api/pawapay/initiate", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body:    JSON.stringify({
           amount:      rwfTotal,
           currency:    localCurrency,
@@ -624,6 +625,7 @@ function StepPayment({ cart }: { cart: Cart }) {
         }),
       });
       const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
+      console.log("[Checkout][PawaPay] initiate response:", json);
       if (!json.success || !json.depositId) throw new Error(json.error ?? "Failed to initiate payment");
       setMmDepositId(json.depositId);
       setMmStep("waiting");
@@ -642,12 +644,14 @@ function StepPayment({ cart }: { cart: Cart }) {
       const clientId  = localStorage.getItem("bshop_client_id");
       if (!clientId) { setError("Please log in to continue."); setLoading(false); return; }
 
+      console.log("[Checkout][PayPal/Card] creating order, clientId:", clientId, "cartItems:", cartItems.length);
       const res  = await fetch("/api/checkout/create-order", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body:    JSON.stringify({ clientId: Number(clientId), cartItems }),
       });
       const json = await res.json() as { success: boolean; invoiceId?: number; paymentUrl?: string; error?: string };
+      console.log("[Checkout][PayPal/Card] create-order response:", json);
 
       if (!json.success || !json.paymentUrl) {
         setError(json.error ?? "Failed to create order. Please try again.");

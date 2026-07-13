@@ -10,17 +10,21 @@ export async function POST(req: NextRequest) {
       cartItems: { type: string; [k: string]: unknown }[];
     };
 
+    console.log("[checkout/create-order] request:", { clientId, cartItems });
+
     if (!clientId || !Array.isArray(cartItems) || cartItems.length === 0) {
       return NextResponse.json({ success: false, error: "Invalid request" }, { status: 400 });
     }
 
     const { orderId, invoiceId } = await createPaypalOrder(clientId, cartItems);
+    console.log("[checkout/create-order] WHMCS order created:", { orderId, invoiceId });
 
     if (!invoiceId) {
       return NextResponse.json({ success: false, error: "Order created but no invoice returned" }, { status: 500 });
     }
 
     const paymentUrl = `${WHMCS_URL}/viewinvoice.php?id=${invoiceId}&paynow=1`;
+    console.log("[checkout/create-order] payment URL:", paymentUrl);
 
     return NextResponse.json({ success: true, orderId, invoiceId, paymentUrl });
   } catch (e) {
