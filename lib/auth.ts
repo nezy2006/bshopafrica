@@ -1,3 +1,5 @@
+import { clearNotifications } from "./notifications";
+
 export const AUTH_KEYS = {
   clientId:     "bshop_client_id",
   clientName:   "bshop_client_name",
@@ -27,6 +29,13 @@ export function refreshSession(): void {
 
 export function setAuth(clientId: number | string, firstname: string, lastname: string, email: string, sessionToken?: string): void {
   if (typeof window === "undefined") return;
+  // A different client may be logging in on the same browser without ever
+  // hitting "logout" (shared/public machine, previous session still valid) —
+  // wipe any cached notification feed from the prior client before this one
+  // starts polling, otherwise their tickets/invoices briefly show mixed in.
+  if (localStorage.getItem(AUTH_KEYS.clientId) !== String(clientId)) {
+    clearNotifications();
+  }
   localStorage.setItem(AUTH_KEYS.clientId,    String(clientId));
   localStorage.setItem(AUTH_KEYS.clientFirst,  firstname);
   localStorage.setItem(AUTH_KEYS.clientName,   `${firstname} ${lastname}`.trim());
