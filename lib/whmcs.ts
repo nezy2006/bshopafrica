@@ -7,10 +7,10 @@ import crypto from "crypto";
 import { config } from "@/lib/config";
 import { whmcsDbEnabled, updatePasswordDirect, validatePasswordDirect } from "@/lib/whmcs-db";
 
-// The "paypal" module name is a guess at your WHMCS's active PayPal gateway —
-// override with the real module system name (Admin → Setup → Payment Gateways
-// → Manage Existing Gateways) if AddOrder rejects it, e.g. "paypal_ppcpv".
-const WHMCS_PAYPAL_GATEWAY = process.env.WHMCS_PAYPAL_GATEWAY ?? "paypal";
+// WHMCS rejected AddOrder's "paypal" tag (confirmed via a live API error
+// listing valid gateway module names); "paypal_ppcpv" is the active module.
+// Override with WHMCS_PAYPAL_GATEWAY if that ever changes again.
+const WHMCS_PAYPAL_GATEWAY = process.env.WHMCS_PAYPAL_GATEWAY ?? "paypal_ppcpv";
 
 export const BSHOP_NAMESERVERS = {
   ns1: "ns1.mysecurecloudhost.com",
