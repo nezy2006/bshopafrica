@@ -202,7 +202,14 @@ export async function POST(req: NextRequest) {
       }
 
       case "getInvoicePDFUrl": data = getInvoicePDFUrl(n("invoiceId")); break;
-      case "getPaymentUrl":    data = getPaymentUrl(n("invoiceId")); break;
+      case "getPaymentUrl": {
+        // clientId for the SSO auto-login link is resolved from the session,
+        // never from params — trusting a client-supplied clientId here would
+        // let anyone mint a WHMCS auto-login link for someone else's account.
+        const session = requireSession(req);
+        data = await getPaymentUrl(n("invoiceId"), isUnauthorized(session) ? undefined : session.clientId);
+        break;
+      }
 
       case "getTickets": {
         const session = requireSession(req);

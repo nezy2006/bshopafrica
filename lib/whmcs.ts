@@ -479,8 +479,24 @@ export function getInvoicePDFUrl(invoiceId: number): string {
   return `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}&download=1`;
 }
 
-export function getPaymentUrl(invoiceId: number): string {
-  return `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}&paynow=1`;
+/** viewinvoice.php requires an active WHMCS clientarea login — a session
+ *  separate from this app's own session system, so a client authenticated
+ *  here has never actually logged into WHMCS itself and hits its login wall.
+ *  Mint a one-time SSO auto-login link (via the same CreateSsoToken flow
+ *  createSsoToken() already uses) that logs them in and lands on the
+ *  invoice's payment page. Falls back to the bare URL if SSO minting fails
+ *  or no clientId is available, so this never regresses below today's link. */
+export async function getPaymentUrl(invoiceId: number, clientId?: number): Promise<string> {
+  const directUrl = `${config.whmcsUrl}/viewinvoice.php?id=${invoiceId}&paynow=1`;
+  if (!clientId) return directUrl;
+  try {
+    const { redirectUrl } = await createSsoToken(clientId, "clientarea");
+    const goto = encodeURIComponent(`/billing/viewinvoice.php?id=${invoiceId}&paynow=1`);
+    return `${redirectUrl}${redirectUrl.includes("?") ? "&" : "?"}goto=${goto}`;
+  } catch (e) {
+    console.error("[getPaymentUrl] SSO token minting failed, falling back to direct invoice URL:", e);
+    return directUrl;
+  }
 }
 
 export async function initiateTransfer(clientId: number, domain: string, authCode: string): Promise<OrderResult> {
