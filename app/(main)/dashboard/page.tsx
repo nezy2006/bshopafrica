@@ -11,7 +11,7 @@ import {
   getUnreadCount, clearNotifications, type AppNotification,
 } from "@/lib/notifications";
 import { clearAuth, authHeaders, getSessionToken } from "@/lib/auth";
-import { PayPalLogo, MtnLogo, AirtelLogo, CardLogo } from "@/components/PaymentOptions";
+import { PayPalLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 import { getPawapayFailureMessage } from "@/lib/pawapay-errors";
 
@@ -665,7 +665,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
   return (
     <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-      <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+      <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto overscroll-contain"
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.2, ease: EASE }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
@@ -681,12 +681,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
             <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); }}
               className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
               <span className="w-16 flex-shrink-0"><PayPalLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">Pay securely with your PayPal account</p></div>
-            </button>
-            <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); }}
-              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
-              <span className="w-16 flex-shrink-0"><CardLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">Credit / Debit Card</p><p className="text-xs text-gray-500">Visa, Mastercard via secure checkout</p></div>
+              <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">Pay securely with your PayPal account or card</p></div>
             </button>
             <button onClick={() => { setMethod("mtn"); setPhone(""); setPredicted(null); setMmStep("input"); setMmError(""); }}
               className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">

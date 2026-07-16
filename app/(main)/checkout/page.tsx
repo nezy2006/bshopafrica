@@ -7,7 +7,7 @@ import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
 import { AUTH_KEYS, authHeaders } from "@/lib/auth";
 // CartTransfer and CartWebsiteBuilder used in type guards within StepPayment
-import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
+import { PaymentOptionCard, PayPalWordmark, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 import { getPawapayFailureMessage } from "@/lib/pawapay-errors";
 
@@ -28,7 +28,7 @@ function itemsToCart(items: CartItem[]): Cart {
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 type Step = 2 | 3;
-type PayMethod = "card" | "paypal" | "mtn" | "airtel";
+type PayMethod = "paypal" | "mtn" | "airtel";
 interface CouponState {
   code:     string;
   applied:  boolean;
@@ -664,20 +664,13 @@ function StepPayment({ cart }: { cart: Cart }) {
           {!inMmFlow && (
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <PaymentOptionCard
                   id="paypal" selected={method === "paypal"}
                   onSelect={() => { setMethod("paypal"); setError(null); resetMm(); }}
                   logo={<PayPalWordmark />}
                   title="PayPal"
                   subtitle="Pay securely with your PayPal account or card"
-                />
-                <PaymentOptionCard
-                  id="card" selected={method === "card"}
-                  onSelect={() => { setMethod("card"); setError(null); resetMm(); }}
-                  logo={<CardLogo />}
-                  title="Pay with Card"
-                  subtitle="Visa, Mastercard via PayPal"
                 />
                 <PaymentOptionCard
                   id="mtn" selected={method === "mtn"}
@@ -700,29 +693,11 @@ function StepPayment({ cart }: { cart: Cart }) {
           {/* ── Payment panel ── */}
           <AnimatePresence mode="wait">
 
-            {method === "card" && (
-              <motion.div key="card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-                className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center space-y-2">
-                <svg className="w-10 h-10 mx-auto text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                <p className="font-bold text-blue-900">Pay with Card via PayPal</p>
-                <p className="text-blue-700 text-sm">
-                  Enter your card details securely below via PayPal Checkout.
-                  We never handle or store card numbers directly.
-                </p>
-                <p className="text-xs text-blue-500 flex items-center justify-center gap-1.5">
-                  <LockIcon /> 256-bit SSL encrypted
-                </p>
-              </motion.div>
-            )}
-
             {method === "paypal" && (
               <motion.div key="paypal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
                 className="bg-[#FFC439] rounded-2xl p-6 text-center">
                 <p className="font-black text-[#003087] text-2xl mb-1">
                   <span className="text-[#003087]">Pay</span><span className="text-[#009CDE]">Pal</span>
-                </p>
-                <p className="text-[#003087]/80 text-sm mt-1">
-                  Complete your payment securely below — no redirect, no leaving this page.
                 </p>
               </motion.div>
             )}
@@ -929,7 +904,7 @@ function StepPayment({ cart }: { cart: Cart }) {
           )}
 
           {/* ── CTA buttons ── */}
-          {!inMmFlow && (method === "card" || method === "paypal") && (
+          {!inMmFlow && method === "paypal" && (
             paypalOrder ? (
               paypalPaid ? (
                 <div className="text-center py-6 space-y-2">
