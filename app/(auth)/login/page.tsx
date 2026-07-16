@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -22,9 +22,7 @@ const fadeUp  = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" as const } },
 };
 
-type LoginStep = "credentials" | "otp";
-
-interface PendingClient {
+interface LoggedInClient {
   clientId:     number;
   firstname:    string;
   lastname:     string;
@@ -141,29 +139,12 @@ function LeftPanel() {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [step,           setStep]           = useState<LoginStep>("credentials");
   const [email,          setEmail]          = useState("");
   const [password,       setPassword]       = useState("");
   const [showPw,         setShowPw]         = useState(false);
   const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState<string | null>(null);
   const [notFound,       setNotFound]       = useState(false);
-  const [pendingClient,  setPendingClient]  = useState<PendingClient | null>(null);
-
-  // OTP step
-  const [otp,            setOtp]            = useState(["", "", "", "", "", ""]);
-  const [otpLoading,     setOtpLoading]     = useState(false);
-  const [otpError,       setOtpError]       = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [devCode,        setDevCode]        = useState<string | null>(null);
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Cooldown timer
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
 
   /* ── Credentials step ── */
   const handleCredentials = async (e: React.FormEvent) => {
@@ -179,7 +160,7 @@ export default function LoginPage() {
       });
       const json = (await res.json()) as {
         success:    boolean;
-        data?:      PendingClient;
+        data?:      LoggedInClient;
         error?:     string;
         errorType?: "not_found" | "wrong_password";
       };
@@ -191,93 +172,16 @@ export default function LoginPage() {
         }
         return;
       }
-      setPendingClient(json.data);
-      const code = await sendOtp(json.data.email || email, json.data.clientId, json.data.firstname);
-      setDevCode(code ?? null);
-      setStep("otp");
-      setResendCooldown(30);
+      const client = json.data;
+      setAuth(client.clientId, client.firstname, client.lastname, client.email || email, client.sessionToken);
+      window.dispatchEvent(new Event("bshop_cart_update"));
+      router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  const sendOtp = async (emailAddr: string, clientId: number, firstname?: string): Promise<string | undefined> => {
-    const res  = await fetch("/api/auth/send-otp", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email: emailAddr, clientId, firstname }),
-    });
-    const json = (await res.json()) as { success: boolean; devCode?: string };
-    return json.devCode;
-  };
-
-  /* ── OTP digit input ── */
-  const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    const next = [...otp];
-    next[index] = value.slice(-1);
-    setOtp(next);
-    if (value && index < 5) otpRefs.current[index + 1]?.focus();
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (digits.length === 6) {
-      setOtp(digits.split(""));
-      setTimeout(() => otpRefs.current[5]?.focus(), 0);
-    }
-  };
-
-  /* ── Verify OTP ── */
-  const handleVerifyOtp = async () => {
-    if (!pendingClient) return;
-    const code = otp.join("");
-    if (code.length !== 6) { setOtpError("Please enter the 6-digit code."); return; }
-    setOtpLoading(true);
-    setOtpError(null);
-    try {
-      const res  = await fetch("/api/auth/verify-otp", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email: pendingClient.email || email, otp: code }),
-      });
-      const json = (await res.json()) as { success: boolean; error?: string };
-      if (!json.success) {
-        setOtpError(json.error ?? "Invalid code. Please try again.");
-        return;
-      }
-      setAuth(pendingClient.clientId, pendingClient.firstname, pendingClient.lastname, pendingClient.email || email, pendingClient.sessionToken);
-      window.dispatchEvent(new Event("bshop_cart_update"));
-      router.push("/dashboard");
-    } catch {
-      setOtpError("Something went wrong. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  /* ── Resend OTP ── */
-  const handleResend = async () => {
-    if (!pendingClient || resendCooldown > 0) return;
-    setOtpError(null);
-    setOtp(["", "", "", "", "", ""]);
-    const code = await sendOtp(pendingClient.email || email, pendingClient.clientId, pendingClient.firstname);
-    setDevCode(code ?? null);
-    setResendCooldown(30);
-    otpRefs.current[0]?.focus();
-  };
-
-  const maskedEmail = pendingClient
-    ? (pendingClient.email || email).replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + "*".repeat(Math.max(1, b.length)) + c)
-    : email;
 
   return (
     <div className="min-h-screen flex">
@@ -286,15 +190,14 @@ export default function LoginPage() {
       {/* Right — form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 bg-white">
         <AnimatePresence mode="wait">
-          {step === "credentials" ? (
-            <motion.div
-              key="credentials"
-              className="w-full max-w-md"
-              variants={stagger}
-              initial="hidden"
-              animate="visible"
-              exit={{ opacity: 0, x: -20 }}
-            >
+          <motion.div
+            key="credentials"
+            className="w-full max-w-md"
+            variants={stagger}
+            initial="hidden"
+            animate="visible"
+            exit={{ opacity: 0, x: -20 }}
+          >
               {/* mobile logo */}
               <motion.div variants={fadeUp} className="lg:hidden mb-10 flex justify-center">
                 <Image src="/logo.png" alt="The B.Shop" width={160} height={48} className="h-10 w-auto object-contain" />
@@ -411,103 +314,7 @@ export default function LoginPage() {
                   Sign up
                 </Link>
               </motion.p>
-            </motion.div>
-          ) : (
-            /* ── OTP Step ── */
-            <motion.div
-              key="otp"
-              className="w-full max-w-md"
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.4, ease: EASE }}
-            >
-              {/* mobile logo */}
-              <div className="lg:hidden mb-10 flex justify-center">
-                <Image src="/logo.png" alt="The B.Shop" width={160} height={48} className="h-10 w-auto object-contain" />
-              </div>
-
-              <div className="mb-8 text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-5 text-[#6B21A8]">
-                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                </div>
-                <h2 className="text-3xl font-black text-black mb-2">Check your email</h2>
-                <p className="text-gray-500 text-sm leading-relaxed">
-                  We sent a 6-digit code to<br />
-                  <span className="font-semibold text-gray-700">{maskedEmail}</span>
-                </p>
-              </div>
-
-              {/* Fallback: shown when WHMCS email delivery fails */}
-              {devCode && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-5 px-4 py-3.5 bg-yellow-50 border border-yellow-300 rounded-xl text-sm"
-                >
-                  <p className="font-semibold text-yellow-800 mb-1">Email delivery issue — use this code:</p>
-                  <p className="text-2xl font-black tracking-[0.3em] text-yellow-900">{devCode}</p>
-                </motion.div>
-              )}
-
-              {/* 6 OTP boxes */}
-              <div className="flex gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
-                {otp.map((digit, i) => (
-                  <input
-                    key={i}
-                    ref={el => { otpRefs.current[i] = el; }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={e => handleOtpChange(i, e.target.value)}
-                    onKeyDown={e => handleOtpKeyDown(i, e)}
-                    className="w-12 h-14 text-center text-xl font-bold rounded-xl border-2 border-gray-200 bg-gray-50 text-black outline-none transition-all duration-200 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] caret-transparent"
-                  />
-                ))}
-              </div>
-
-              {otpError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl"
-                >
-                  <span className="text-red-500">✕</span>
-                  <p className="text-sm text-red-600 font-medium">{otpError}</p>
-                </motion.div>
-              )}
-
-              <motion.button
-                onClick={handleVerifyOtp}
-                disabled={otpLoading || otp.join("").length < 6}
-                whileHover={!otpLoading ? { scale: 1.01 } : {}}
-                whileTap={!otpLoading ? { scale: 0.98 } : {}}
-                className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#6B21A8] text-white font-bold rounded-xl text-base transition-all duration-300 hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-50"
-              >
-                {otpLoading ? <><Spinner /><span>Verifying…</span></> : "Verify Code"}
-              </motion.button>
-
-              <div className="mt-5 text-center space-y-3">
-                <p className="text-sm text-gray-500">
-                  Didn&apos;t receive it?{" "}
-                  {resendCooldown > 0 ? (
-                    <span className="text-gray-400">Resend in {resendCooldown}s</span>
-                  ) : (
-                    <button onClick={handleResend} className="text-[#6B21A8] font-semibold hover:underline">
-                      Resend code
-                    </button>
-                  )}
-                </p>
-                <button
-                  onClick={() => { setStep("credentials"); setOtp(["","","","","",""]); setOtpError(null); setDevCode(null); }}
-                  className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  ← Back to login
-                </button>
-              </div>
-            </motion.div>
-          )}
+          </motion.div>
         </AnimatePresence>
       </div>
     </div>
