@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClientDetails, generateImpersonateToken, verifyImpersonateToken } from "@/lib/whmcs";
 import { config } from "@/lib/config";
 import { createSession } from "@/lib/session-store";
+import { getAdminBySession, logAdminActivity, getRequestIp } from "@/lib/admin-auth";
 
 /* ─── GET — admin mints a short-lived impersonation token ───────────────── */
 export async function GET(req: NextRequest) {
-  const adminPassword = req.headers.get("x-admin-password");
-  if (!adminPassword || adminPassword !== config.adminPassword) {
+  const legacyAuthorized = req.headers.get("x-admin-password") === config.adminPassword;
+  const admin = legacyAuthorized ? null : await getAdminBySession(req.headers.get("x-admin-token"));
+  if (!legacyAuthorized && !admin) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -14,6 +16,8 @@ export async function GET(req: NextRequest) {
   if (!clientId) {
     return NextResponse.json({ success: false, error: "Missing clientId" }, { status: 400 });
   }
+
+  if (admin) await logAdminActivity(admin.id, "impersonate_client", `clientId=${clientId}`, getRequestIp(req));
 
   const { token, expires } = generateImpersonateToken(clientId);
   return NextResponse.json({ success: true, token, expires });

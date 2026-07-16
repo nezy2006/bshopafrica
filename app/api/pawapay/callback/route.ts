@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { depositStore } from "@/lib/pawapay-store";
 import { createPawapayOrder, addPaymentToInvoice, acceptOrder, WHMCS_PAWAPAY_GATEWAY } from "@/lib/whmcs";
+import { recordPawapayTransaction } from "@/lib/pawapay-transactions";
 
 const TERMINAL_FAILED = new Set(["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"]);
 
@@ -40,6 +41,12 @@ export async function POST(req: NextRequest) {
       stored.status = status;
       stored.failureReason = extractFailureCode(body.failureReason);
       depositStore.set(depositId, stored);
+      await recordPawapayTransaction({
+        depositId, clientId: stored.clientId, clientEmail: stored.clientEmail,
+        phone: stored.phone, provider: stored.provider,
+        amountUSD: stored.totalUSD, amountLocal: stored.totalRWF, status,
+        failureReason: stored.failureReason, invoiceId: stored.invoiceId,
+      }).catch(e => console.error("[pawapay/callback] failed to record transaction", e));
     }
     return NextResponse.json({ success: true });
   }
@@ -62,6 +69,12 @@ export async function POST(req: NextRequest) {
           WHMCS_PAWAPAY_GATEWAY,
         );
         console.log("[pawapay/callback] ✅ invoice paid directly", { invoiceId: stored.invoiceId, depositId });
+        await recordPawapayTransaction({
+          depositId, clientId: stored.clientId, clientEmail: stored.clientEmail,
+          phone: stored.phone, provider: stored.provider,
+          amountUSD: stored.totalUSD, amountLocal: stored.totalRWF, status: "COMPLETED",
+          invoiceId: stored.invoiceId,
+        }).catch(e => console.error("[pawapay/callback] failed to record transaction", e));
         depositStore.delete(depositId);
       } catch (e) {
         console.error("[pawapay/callback] ❌ direct invoice payment failed for", depositId, e);
@@ -105,6 +118,13 @@ export async function POST(req: NextRequest) {
           console.log("[pawapay/callback] order accepted", oid);
         }
       }
+
+      await recordPawapayTransaction({
+        depositId, clientId: stored.clientId, clientEmail: stored.clientEmail,
+        phone: stored.phone, provider: stored.provider,
+        amountUSD: stored.totalUSD, amountLocal: stored.totalRWF, status: "COMPLETED",
+        invoiceId, orderIds: allOrderIds,
+      }).catch(e => console.error("[pawapay/callback] failed to record transaction", e));
 
       depositStore.delete(depositId);
       console.log("[pawapay/callback] ✅ provisioning complete for deposit", depositId);

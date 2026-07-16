@@ -2,12 +2,17 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import { adminHeaders } from "@/lib/admin-auth-client";
 
 /* ─── Shared whmcs fetch helper ──────────────────────────────────────────── */
 export async function whmcsAdmin<T>(action: string, params: Record<string, unknown> = {}): Promise<T | null> {
   try {
-    const res  = await fetch("/api/whmcs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, params }) });
-    const json = await res.json() as { success: boolean; data?: T };
+    const res  = await fetch("/api/whmcs", { method: "POST", headers: { "Content-Type": "application/json", ...adminHeaders() }, body: JSON.stringify({ action, params }) });
+    const json = await res.json() as { success: boolean; data?: T; error?: string };
+    if (!json.success && json.error === "Unauthorized" && typeof window !== "undefined") {
+      window.location.href = "/admin/login";
+      return null;
+    }
     return json.success ? json.data ?? null : null;
   } catch { return null; }
 }

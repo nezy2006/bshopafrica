@@ -158,6 +158,8 @@ export async function POST(req: NextRequest) {
     cartItems,
     totalUSD,
     totalRWF,
+    phone:       finalPhone,
+    provider:    finalProvider,
     ...(invoiceId ? { invoiceId } : {}),
     createdAt:   Date.now(),
   });

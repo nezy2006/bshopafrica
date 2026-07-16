@@ -447,6 +447,34 @@ function StepPayment({ cart }: { cart: Cart }) {
   const usdTotal   = Math.max(0, subtotal - bundleDisc - (coupon.applied ? coupon.discount : 0));
   const rwfTotal   = Math.round(usdTotal * 1400);
 
+  // A coupon validated on the cart page is handed off via localStorage —
+  // pick it up once and auto-apply so the discount is already reflected here.
+  useEffect(() => {
+    const pending = localStorage.getItem("bshop_coupon_code");
+    if (!pending || subtotal <= 0) return;
+    localStorage.removeItem("bshop_coupon_code");
+    setCoupon(c => ({ ...c, code: pending, loading: true }));
+    (async () => {
+      try {
+        const res  = await fetch("/api/whmcs", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "validateCoupon", params: { code: pending } }),
+        });
+        const json = (await res.json()) as { success: boolean; data?: { valid: boolean; type: "percentage" | "fixed"; value: number; message: string } };
+        const d = json.data;
+        if (!json.success || !d?.valid) {
+          setCoupon(c => ({ ...c, loading: false, applied: false, error: d?.message ?? "Invalid coupon" }));
+          return;
+        }
+        const discount = d.type === "percentage" ? Math.min(subtotal, subtotal * (d.value / 100)) : Math.min(subtotal, d.value);
+        setCoupon(c => ({ ...c, loading: false, applied: true, type: d.type, value: d.value, discount, message: d.message, error: "" }));
+      } catch {
+        setCoupon(c => ({ ...c, loading: false, error: "Could not validate coupon" }));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal]);
+
   const cleanPhone  = mmPhone.replace(/\D/g, "");
 
   // Provider classification using known provider sets

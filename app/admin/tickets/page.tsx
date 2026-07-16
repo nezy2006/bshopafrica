@@ -2,6 +2,7 @@
 import { MessageSquare } from "lucide-react";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
 import type { AdminTicket } from "@/lib/whmcs";
 
@@ -9,6 +10,7 @@ const PER = 20;
 const STATUSES = ["", "Open", "Answered", "Customer-Reply", "On Hold", "In Progress", "Closed"];
 
 export default function TicketsPage() {
+  const router = useRouter();
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
   const [total,   setTotal]   = useState(0);
   const [page,    setPage]    = useState(1);
@@ -50,7 +52,7 @@ export default function TicketsPage() {
         <THead cols={["Ticket #", "Subject", "Client", "Department", "Priority", "Date", "Status"]} />
         <tbody>
           {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon={<MessageSquare className="w-5 h-5" />} message="No tickets found" /> : filtered.map(t => (
-            <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+            <tr key={t.id} onClick={() => router.push(`/admin/tickets/${t.id}`)} className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{t.tid}</td>
               <td className="px-5 py-3.5 font-medium text-black max-w-xs truncate">{t.title}</td>
               <td className="px-5 py-3.5 text-gray-600">{t.firstname} {t.lastname}</td>

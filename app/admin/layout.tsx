@@ -5,21 +5,25 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { getAdminToken, getCurrentAdmin, adminHeaders, clearAdminAuth, type CurrentAdmin } from "@/lib/admin-auth-client";
 
 /* ─── Nav items ──────────────────────────────────────────────────────────── */
-type NavItem = { id: string; label: string; href: string; icon: React.FC<{ cls?: string }> };
+type NavItem = { id: string; label: string; href: string; icon: React.FC<{ cls?: string }>; roles?: CurrentAdmin["role"][] };
 
 const NAV: NavItem[] = [
-  { id: "dashboard",  label: "Dashboard",   href: "/admin/dashboard",  icon: DashIcon    },
-  { id: "orders",     label: "Orders",      href: "/admin/orders",     icon: CartIcon    },
-  { id: "clients",    label: "Clients",     href: "/admin/clients",    icon: UsersIcon   },
-  { id: "invoices",   label: "Invoices",    href: "/admin/invoices",   icon: FileIcon    },
-  { id: "domains",    label: "Domains",     href: "/admin/domains",    icon: GlobeIcon   },
-  { id: "hosting",    label: "Hosting",     href: "/admin/hosting",    icon: ServerIcon  },
-  { id: "tickets",    label: "Tickets",     href: "/admin/tickets",    icon: TicketIcon  },
-  { id: "blog",       label: "Blog",        href: "/admin/blog",       icon: EditIcon    },
-  { id: "newsletter", label: "Newsletter",  href: "/admin/newsletter", icon: MailIcon    },
-  { id: "settings",   label: "Settings",    href: "/admin/settings",   icon: GearIcon    },
+  { id: "dashboard",  label: "Overview",       href: "/admin/dashboard",  icon: DashIcon    },
+  { id: "clients",    label: "Clients",        href: "/admin/clients",    icon: UsersIcon   },
+  { id: "orders",     label: "Orders & Sales",  href: "/admin/orders",     icon: CartIcon    },
+  { id: "invoices",   label: "Billing & Payments", href: "/admin/invoices", icon: FileIcon  },
+  { id: "tickets",    label: "Support Tickets", href: "/admin/tickets",    icon: TicketIcon  },
+  { id: "domains",    label: "Domains",        href: "/admin/domains",    icon: GlobeIcon   },
+  { id: "hosting",    label: "Hosting",        href: "/admin/hosting",    icon: ServerIcon  },
+  { id: "reports",    label: "Reports & Analytics", href: "/admin/reports", icon: ChartIcon },
+  { id: "blog",       label: "Blog",           href: "/admin/blog",       icon: EditIcon    },
+  { id: "newsletter", label: "Newsletter",     href: "/admin/newsletter", icon: MailIcon    },
+  { id: "team",       label: "Team Management", href: "/admin/team",      icon: TeamIcon,    roles: ["super_admin"] },
+  { id: "activity",   label: "Activity Log",   href: "/admin/activity",   icon: ActivityIcon, roles: ["super_admin", "admin"] },
+  { id: "settings",   label: "Settings",       href: "/admin/settings",   icon: GearIcon    },
 ];
 
 /* ─── SVG icons ──────────────────────────────────────────────────────────── */
@@ -56,20 +60,31 @@ function GearIcon({ cls = "w-4 h-4" }: { cls?: string }) {
 function LogoutIcon({ cls = "w-4 h-4" }: { cls?: string }) {
   return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 }
+function ChartIcon({ cls = "w-4 h-4" }: { cls?: string }) {
+  return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+}
+function TeamIcon({ cls = "w-4 h-4" }: { cls?: string }) {
+  return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+}
+function ActivityIcon({ cls = "w-4 h-4" }: { cls?: string }) {
+  return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+}
 function MenuIcon() {
   return <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
-function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+function Sidebar({ open, onClose, admin }: { open: boolean; onClose: () => void; admin: CurrentAdmin | null }) {
   const pathname = usePathname();
   const router   = useRouter();
 
-  const handleLogout = () => {
-    localStorage.removeItem("bshop_admin_token");
-    localStorage.removeItem("bshop_admin_password");
+  const handleLogout = async () => {
+    try { await fetch("/api/admin/auth", { method: "DELETE", headers: adminHeaders() }); } catch { /* best-effort */ }
+    clearAdminAuth();
     router.replace("/admin/login");
   };
+
+  const visibleNav = NAV.filter(item => !item.roles || (admin && item.roles.includes(admin.role)));
 
   const content = (
     <div className="flex flex-col h-full">
@@ -81,7 +96,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ id, label, href, icon: Icon }) => {
+        {visibleNav.map(({ id, label, href, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link key={id} href={href} onClick={onClose}
@@ -96,8 +111,14 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 py-4 border-t border-white/10">
+      {/* Admin identity + logout */}
+      <div className="px-3 py-4 border-t border-white/10 space-y-2">
+        {admin && (
+          <div className="px-4 py-2">
+            <p className="text-sm font-semibold text-white truncate">{admin.name}</p>
+            <p className="text-[11px] text-purple-300 uppercase tracking-wide">{admin.role.replace(/_/g, " ")}</p>
+          </div>
+        )}
         <button onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-white/60 hover:bg-red-500/20 hover:text-white transition-all"
         >
@@ -140,13 +161,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router   = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [admin, setAdmin] = useState<CurrentAdmin | null>(null);
 
   const isLogin = pathname === "/admin/login";
 
-  const checkAuth = useCallback(() => {
-    if (!isLogin) {
-      const token = localStorage.getItem("bshop_admin_token");
-      if (!token) { router.replace("/admin/login"); return; }
+  const checkAuth = useCallback(async () => {
+    if (isLogin) { setChecked(true); return; }
+    const token = getAdminToken();
+    if (!token) { router.replace("/admin/login"); return; }
+    try {
+      const res  = await fetch("/api/admin/auth", { headers: adminHeaders() });
+      const json = await res.json() as { success: boolean; admin?: CurrentAdmin };
+      if (!json.success || !json.admin) { clearAdminAuth(); router.replace("/admin/login"); return; }
+      setAdmin(json.admin);
+    } catch {
+      setAdmin(getCurrentAdmin());
     }
     setChecked(true);
   }, [isLogin, router]);
@@ -162,7 +191,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} admin={admin} />
 
       <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
         {/* Mobile topbar */}

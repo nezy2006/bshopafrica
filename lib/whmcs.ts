@@ -34,7 +34,7 @@ export interface RegisterResult     { clientId: number; }
 export interface OrderResult        { orderId: number; invoiceId: number; }
 export interface ClientDetails      { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
 export interface ClientProduct      { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
-export interface ClientDomain       { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; }
+export interface ClientDomain       { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; autorenew: boolean; }
 export interface ClientInvoice      { id: number; date: string; duedate: string; total: string; status: string; }
 
 /* ─── Admin types ────────────────────────────────────────────────────────── */
@@ -226,8 +226,12 @@ export async function getClientDomains(clientId: number): Promise<ClientDomain[]
   try {
     const data = await callWhmcs("GetClientsDomains", { clientid: clientId });
     const raw = (data.domains as { domain: WhmcsRaw[] } | undefined)?.domain ?? [];
-    return raw.map(d => ({ id: Number(d.id ?? 0), domainname: String(d.domainname ?? ""), status: String(d.status ?? ""), nextduedate: String(d.nextduedate ?? ""), expirydate: String(d.expirydate ?? "") }));
+    return raw.map(d => ({ id: Number(d.id ?? 0), domainname: String(d.domainname ?? ""), status: String(d.status ?? ""), nextduedate: String(d.nextduedate ?? ""), expirydate: String(d.expirydate ?? ""), autorenew: String(d.donotrenew ?? "0") !== "1" }));
   } catch { return []; }
+}
+
+export async function updateDomainAutoRenew(domainId: number, autoRenew: boolean): Promise<void> {
+  await callWhmcs("UpdateClientDomain", { domainid: domainId, donotrenew: autoRenew ? 0 : 1 });
 }
 
 export async function getInvoices(clientId: number): Promise<ClientInvoice[]> {
@@ -284,6 +288,28 @@ export async function getAdminInvoices(status = "", limitstart = 0, limitnum = 2
   return {
     total: Number(data.totalresults ?? 0),
     invoices: raw.map(inv => ({ id: Number(inv.id ?? 0), userid: Number(inv.userid ?? 0), firstname: String(inv.firstname ?? ""), lastname: String(inv.lastname ?? ""), date: String(inv.date ?? ""), duedate: String(inv.duedate ?? ""), total: String(inv.total ?? "0.00"), status: String(inv.status ?? "") })),
+  };
+}
+
+export interface AdminTransaction {
+  id: number; userid: number; firstname: string; lastname: string;
+  date: string; description: string; amount: string; fees: string;
+  gateway: string; transid: string; invoiceid: number;
+}
+
+export async function getAdminTransactions(limitstart = 0, limitnum = 50): Promise<{ transactions: AdminTransaction[]; total: number }> {
+  const data = await callWhmcs("GetTransactions", { limitstart, limitnum });
+  const raw = (data.transactions as { transaction: WhmcsRaw[] } | undefined)?.transaction ?? [];
+  return {
+    total: Number(data.numreturned ?? raw.length ?? 0),
+    transactions: raw.map(t => ({
+      id: Number(t.id ?? 0), userid: Number(t.userid ?? 0),
+      firstname: String(t.firstname ?? ""), lastname: String(t.lastname ?? ""),
+      date: String(t.date ?? ""), description: String(t.description ?? ""),
+      amount: String(t.amountin ?? t.amount ?? "0.00"), fees: String(t.fees ?? "0.00"),
+      gateway: String(t.gateway ?? ""), transid: String(t.transid ?? ""),
+      invoiceid: Number(t.invoiceid ?? 0),
+    })),
   };
 }
 
@@ -476,8 +502,50 @@ export async function closeTicket(ticketId: number): Promise<void> {
   await callWhmcs("UpdateTicket", { ticketid: ticketId, status: "Closed" });
 }
 
+/* ─── Admin ticket workflow ──────────────────────────────────────────────── */
+export async function addAdminTicketReply(ticketId: number, adminName: string, message: string): Promise<void> {
+  await callWhmcs("AddTicketReply", { ticketid: ticketId, adminusername: adminName, message });
+}
+
+export async function addTicketNote(ticketId: number, adminName: string, message: string): Promise<void> {
+  await callWhmcs("AddTicketNote", { ticketid: ticketId, adminusername: adminName, message });
+}
+
+export async function updateTicketPriority(ticketId: number, priority: string): Promise<void> {
+  await callWhmcs("UpdateTicket", { ticketid: ticketId, priority });
+}
+
+export async function updateTicketDepartment(ticketId: number, deptId: number): Promise<void> {
+  await callWhmcs("UpdateTicket", { ticketid: ticketId, deptid: deptId });
+}
+
+export async function reopenTicket(ticketId: number): Promise<void> {
+  await callWhmcs("UpdateTicket", { ticketid: ticketId, status: "Customer-Reply" });
+}
+
+export interface TicketDepartment { id: number; name: string }
+export async function getTicketDepartments(): Promise<TicketDepartment[]> {
+  const data = await callWhmcs("GetSupportDepartments", {});
+  const raw = (data.departments as { department: WhmcsRaw[] } | undefined)?.department ?? [];
+  return raw.map(d => ({ id: Number(d.id ?? 0), name: String(d.name ?? "") }));
+}
+
 export async function updateClientDetails(clientId: number, updates: Record<string, string>): Promise<void> {
   await callWhmcs("UpdateClientDetails", { clientid: clientId, ...updates });
+}
+
+/* ─── Admin client management ────────────────────────────────────────────── */
+export async function updateClientStatus(clientId: number, status: "Active" | "Inactive"): Promise<void> {
+  await callWhmcs("UpdateClient", { clientid: clientId, status });
+}
+
+export async function addClientCredit(clientId: number, amount: number, description: string): Promise<void> {
+  await callWhmcs("AddCredit", { clientid: clientId, amount, description, notes: description });
+}
+
+export async function sendClientEmail(clientId: number, subject: string, message: string): Promise<void> {
+  const customvars = Buffer.from(`subject=${subject}&message=${message}`).toString("base64");
+  await callWhmcs("SendEmail", { messagename: "General Message", type: "client", id: clientId, customvars });
 }
 
 export function getInvoicePDFUrl(invoiceId: number): string {

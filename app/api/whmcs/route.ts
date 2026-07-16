@@ -11,8 +11,10 @@ import {
   createSsoToken, getDomainNameservers, updateDomainNameservers,
   getDomainLockingStatus, updateDomainLockingStatus,
   validateLogin, updateClientPassword, createInvoice, getInvoice,
+  updateClientStatus, addClientCredit, sendClientEmail, updateDomainAutoRenew,
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
+import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
 
 type Params = Record<string, unknown>;
 
@@ -263,18 +265,125 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case "adminGetStats":         data = await getAdminStats(); break;
-      case "adminGetClients":       data = await getAdminClients(n("limitstart"), n("limitnum", 20), s("search")); break;
-      case "adminGetOrders":        data = await getAdminOrders(n("limitstart"), n("limitnum", 20)); break;
-      case "adminGetInvoices":      data = await getAdminInvoices(s("status"), n("limitstart"), n("limitnum", 20)); break;
-      case "adminGetDomains":       data = await getAdminDomains(n("limitstart"), n("limitnum", 20)); break;
-      case "adminGetHosting":       data = await getAdminHosting(n("limitstart"), n("limitnum", 20)); break;
-      case "adminGetTickets":       data = await getAdminTickets(s("status"), n("limitstart"), n("limitnum", 20)); break;
-      case "adminAcceptOrder":      await acceptOrder(n("orderId")); data = { ok: true }; break;
-      case "adminCancelOrder":      await cancelOrder(n("orderId")); data = { ok: true }; break;
-      case "adminAddAnnouncement":  await addAnnouncement(s("subject"), s("message")); data = { ok: true }; break;
-      case "getAutoAuthUrl":        data = generateAutoAuthUrl(s("email"), s("destination", "clientarea.php")); break;
-      case "createSsoToken":        data = await createSsoToken(n("clientId"), s("destination", "clientarea"), params.serviceId ? n("serviceId") : undefined); break;
+      case "adminGetStats": {
+        const admin = await requireAdmin(req, "stats");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminStats();
+        break;
+      }
+      case "adminGetClients": {
+        const admin = await requireAdmin(req, "clients");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminClients(n("limitstart"), n("limitnum", 20), s("search"));
+        break;
+      }
+      case "adminGetOrders": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminOrders(n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminGetInvoices": {
+        const admin = await requireAdmin(req, "invoices");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminInvoices(s("status"), n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminGetDomains": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminDomains(n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminGetHosting": {
+        const admin = await requireAdmin(req, "hosting");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminHosting(n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminGetTickets": {
+        const admin = await requireAdmin(req, "tickets");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminTickets(s("status"), n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminAcceptOrder": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        await acceptOrder(n("orderId"));
+        await logAdminActivity(admin.id, "accept_order", `orderId=${n("orderId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminCancelOrder": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        await cancelOrder(n("orderId"));
+        await logAdminActivity(admin.id, "cancel_order", `orderId=${n("orderId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminAddAnnouncement": {
+        const admin = await requireAdmin(req, "settings");
+        if (isAdminUnauthorized(admin)) return admin;
+        await addAnnouncement(s("subject"), s("message"));
+        await logAdminActivity(admin.id, "add_announcement", s("subject"), getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminGetClientDetails": {
+        const admin = await requireAdmin(req, "clients");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        const [details, products, domains, orders, invoices] = await Promise.all([
+          getClientDetails(clientId), getClientProducts(clientId), getClientDomains(clientId),
+          getClientOrders(clientId), getInvoices(clientId),
+        ]);
+        data = { details, products, domains, orders, invoices };
+        break;
+      }
+      case "adminUpdateClientStatus": {
+        const admin = await requireAdmin(req, "clients");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        const newStatus = s("status") === "Inactive" ? "Inactive" : "Active";
+        await updateClientStatus(clientId, newStatus);
+        await logAdminActivity(admin.id, "update_client_status", `clientId=${clientId} status=${newStatus}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminAddCredit": {
+        const admin = await requireAdmin(req, "clients");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        const amount = Number(params.amount ?? 0);
+        const description = s("description", "Admin credit adjustment");
+        await addClientCredit(clientId, amount, description);
+        await logAdminActivity(admin.id, "add_client_credit", `clientId=${clientId} amount=${amount}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminSendClientEmail": {
+        const admin = await requireAdmin(req, "clients");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        await sendClientEmail(clientId, s("subject"), s("message"));
+        await logAdminActivity(admin.id, "send_client_email", `clientId=${clientId} subject=${s("subject")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "getAutoAuthUrl": {
+        const admin = await requireAdmin(req, "settings");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = generateAutoAuthUrl(s("email"), s("destination", "clientarea.php"));
+        break;
+      }
+      case "createSsoToken": {
+        const admin = await requireAdmin(req, "settings");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await createSsoToken(n("clientId"), s("destination", "clientarea"), params.serviceId ? n("serviceId") : undefined);
+        break;
+      }
       case "getDomainNameservers": {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;
@@ -313,10 +422,32 @@ export async function POST(req: NextRequest) {
         data = { ok: true };
         break;
       }
-      case "initiateTransfer":      data = await initiateTransfer(n("clientId"), s("domain"), s("authCode")); break;
+      case "updateDomainAutoRenew": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        if (!(await ownsDomain(session.clientId, n("domainId")))) {
+          return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+        }
+        await updateDomainAutoRenew(n("domainId"), Boolean(params.autoRenew));
+        data = { ok: true };
+        break;
+      }
+      case "initiateTransfer": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        data = await initiateTransfer(session.clientId, s("domain"), s("authCode"));
+        break;
+      }
       case "getTLDPricing":         data = await getTLDPricing(); break;
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
-      case "addPayment":            await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId")); data = { ok: true }; break;
+      case "addPayment": {
+        const admin = await requireAdmin(req, "invoices");
+        if (isAdminUnauthorized(admin)) return admin;
+        await addPaymentToInvoice(n("invoiceId"), Number(params.amount ?? 0), s("transactionId"));
+        await logAdminActivity(admin.id, "mark_invoice_paid", `invoiceId=${n("invoiceId")} amount=${Number(params.amount ?? 0)}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
       case "validateLogin":         data = { valid: await validateLogin(s("email"), s("password")) }; break;
       case "createInvoice": {
         const session = requireSession(req);

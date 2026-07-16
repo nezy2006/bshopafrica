@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { DomainCheckResult } from "@/lib/whmcs";
 import { addToCart } from "@/lib/cart";
 
-const TLDS = [".com", ".net", ".org", ".biz", ".xyz"];
+const TLDS = [".com", ".net", ".org", ".co", ".io", ".africa"];
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];

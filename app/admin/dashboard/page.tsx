@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
+import { Users, MessageSquare, BarChart3, ShieldCheck } from "lucide-react";
 import { whmcsAdmin, StatCard, BarChart, Badge, SkeletonRows, THead, TableCard } from "@/lib/admin-utils";
+import { adminHeaders, getCurrentAdmin } from "@/lib/admin-auth-client";
 import type { AdminStats, AdminOrder, AdminClient } from "@/lib/whmcs";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -11,21 +14,34 @@ function Icon({ d }: { d: string }) {
   return <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={d} strokeLinecap="round" strokeLinejoin="round"/></svg>;
 }
 
+interface ActivityEntry { id: number; admin_name: string; action: string; details: string | null; created_at: string }
+
+const QUICK_ACTIONS = [
+  { label: "Clients",   href: "/admin/clients",  icon: Users },
+  { label: "Tickets",   href: "/admin/tickets",  icon: MessageSquare },
+  { label: "Reports",   href: "/admin/reports",  icon: BarChart3 },
+  { label: "Team",      href: "/admin/team",     icon: ShieldCheck, roles: ["super_admin"] as const },
+];
+
 export default function AdminDashboard() {
   const [stats,   setStats]   = useState<AdminStats | null>(null);
   const [orders,  setOrders]  = useState<AdminOrder[]>([]);
   const [clients, setClients] = useState<AdminClient[]>([]);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const me = getCurrentAdmin();
 
   useEffect(() => {
     Promise.all([
       whmcsAdmin<AdminStats>("adminGetStats"),
       whmcsAdmin<{ orders: AdminOrder[] }>("adminGetOrders", { limitstart: 0, limitnum: 8 }),
       whmcsAdmin<{ clients: AdminClient[] }>("adminGetClients", { limitstart: 0, limitnum: 8 }),
-    ]).then(([s, o, c]) => {
+      fetch("/api/admin/activity?limit=10", { headers: adminHeaders() }).then(r => r.json()).catch(() => null),
+    ]).then(([s, o, c, a]) => {
       if (s) setStats(s);
       if (o) setOrders(o.orders);
       if (c) setClients(c.clients);
+      if (a?.success && a.data) setActivity(a.data);
       setLoading(false);
     });
   }, []);
@@ -47,6 +63,15 @@ export default function AdminDashboard() {
         <h1 className="text-2xl font-black text-black">Dashboard</h1>
         <p className="text-gray-400 text-sm mt-1">{now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
       </motion.div>
+
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-3 mb-8">
+        {QUICK_ACTIONS.filter(a => !("roles" in a) || !a.roles || (me && (a.roles as readonly string[]).includes(me.role))).map(({ label, href, icon: ActionIcon }) => (
+          <Link key={href} href={href} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-semibold text-gray-700 hover:border-[#6B21A8] hover:text-[#6B21A8] transition-colors">
+            <ActionIcon className="w-4 h-4" /> {label}
+          </Link>
+        ))}
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -115,6 +140,29 @@ export default function AdminDashboard() {
             </tbody>
           </TableCard>
         </div>
+      </div>
+
+      {/* Recent activity */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-black text-sm">Recent Activity</h2>
+          <a href="/admin/activity" className="text-xs text-[#6B21A8] font-semibold hover:underline">View all →</a>
+        </div>
+        <TableCard>
+          <THead cols={["Admin", "Action", "Details", "When"]} />
+          <tbody>
+            {loading ? <SkeletonRows cols={4} rows={5} /> : activity.length === 0 ? (
+              <tr><td colSpan={4} className="text-center py-8 text-gray-400 text-sm">No activity recorded yet</td></tr>
+            ) : activity.map(a => (
+              <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-3 font-semibold text-black">{a.admin_name}</td>
+                <td className="px-5 py-3 text-gray-700">{a.action.replace(/_/g, " ")}</td>
+                <td className="px-5 py-3 text-gray-400 text-xs max-w-xs truncate">{a.details || "—"}</td>
+                <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </TableCard>
       </div>
     </div>
   );

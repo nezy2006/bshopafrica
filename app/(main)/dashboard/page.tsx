@@ -43,7 +43,7 @@ async function whmcs<T>(action: string, params: Record<string, unknown> = {}): P
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 interface ClientDetails { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
 interface ClientProduct { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
-interface ClientDomain  { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; }
+interface ClientDomain  { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; autorenew: boolean; }
 interface DomainNameservers { ns1: string; ns2: string; ns3: string; ns4: string; ns5: string; }
 interface ClientInvoice { id: number; date: string; duedate: string; total: string; status: string; }
 interface TLDPriceEntry { register: number | null; renewal: number | null; transfer: number | null; }
@@ -336,6 +336,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
   const [tldPricing, setTldPricing] = useState<Record<string, TLDPriceEntry>>({});
   const [renewingId, setRenewingId] = useState<number | null>(null);
   const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number } | null>(null);
+  const [autoRenewBusyId, setAutoRenewBusyId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -361,6 +362,19 @@ function DomainsSection({ clientId }: { clientId: number }) {
       alert("Could not start renewal right now. Please try again or contact support.");
     } finally {
       setRenewingId(null);
+    }
+  }
+
+  async function toggleAutoRenew(d: ClientDomain) {
+    setAutoRenewBusyId(d.id);
+    const next = !d.autorenew;
+    try {
+      await whmcs("updateDomainAutoRenew", { domainId: d.id, autoRenew: next });
+      setDomains(ds => ds.map(x => x.id === d.id ? { ...x, autorenew: next } : x));
+    } catch {
+      alert("Could not update auto-renew right now. Please try again.");
+    } finally {
+      setAutoRenewBusyId(null);
     }
   }
 
@@ -399,7 +413,16 @@ function DomainsSection({ clientId }: { clientId: number }) {
                       <td className="px-5 py-4 font-medium text-gray-900">{d.domainname}</td>
                       <td className="px-5 py-4 text-gray-500">{d.expirydate || d.nextduedate}</td>
                       <td className="px-5 py-4"><StatusBadge status={effectiveStatus} /></td>
-                      <td className="px-5 py-4"><span className="text-green-600 text-xs font-semibold">Enabled</span></td>
+                      <td className="px-5 py-4">
+                        <button
+                          onClick={() => toggleAutoRenew(d)}
+                          disabled={autoRenewBusyId === d.id}
+                          title={d.autorenew ? "Auto-renew is on — click to disable" : "Auto-renew is off — click to enable"}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${d.autorenew ? "bg-green-500" : "bg-gray-300"}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${d.autorenew ? "translate-x-4" : "translate-x-1"}`} />
+                        </button>
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
                           {days <= 30 && (
@@ -1564,6 +1587,7 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
   const [pwSaving,  setPwSaving]  = useState(false);
   const [pwError,   setPwError]   = useState("");
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [showPw,    setShowPw]    = useState(false);
 
   const strength = getPasswordStrength(pwForm.newPw);
   const strengthOk = pwForm.newPw.length === 0 || strength.score >= 3;
@@ -1605,15 +1629,20 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
 
       {tab === "security" && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-lg">
-          <h3 className="font-semibold text-gray-900">Change Password</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Change Password</h3>
+            <button type="button" onClick={() => setShowPw(v => !v)} className="text-xs text-[#6B21A8] font-semibold hover:underline">
+              {showPw ? "Hide" : "Show"} passwords
+            </button>
+          </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Current Password</label>
-            <input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+            <input type={showPw ? "text" : "password"} value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">New Password</label>
-            <input type="password" value={pwForm.newPw} onChange={e => setPwForm(f => ({ ...f, newPw: e.target.value }))}
+            <input type={showPw ? "text" : "password"} value={pwForm.newPw} onChange={e => setPwForm(f => ({ ...f, newPw: e.target.value }))}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
             {pwForm.newPw && (
               <div className="mt-2.5 space-y-2">
@@ -1639,7 +1668,7 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Confirm New Password</label>
-            <input type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+            <input type={showPw ? "text" : "password"} value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
           </div>
           {pwError   && <p className="text-sm text-red-600 flex items-center gap-1.5"><I.Alert />{pwError}</p>}

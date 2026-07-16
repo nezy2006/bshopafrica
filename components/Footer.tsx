@@ -65,7 +65,7 @@ const FOOTER_LINKS = {
     { label: "Digital Campfire", href: "/digital-campfire" },
     { label: "Website Builder",  href: "/website-builder" },
     { label: "Contact Us",       href: "/contact" },
-    { label: "Privacy Policy",   href: "#" },
+    { label: "Privacy Policy",   href: "/privacy" },
   ],
 };
 
@@ -85,9 +85,9 @@ const TRUST: { icon: React.ReactNode; label: string }[] = [
   },
 ];
 const LEGAL   = [
-  { label: "Terms of Service", href: "#" },
-  { label: "Privacy Policy",   href: "#" },
-  { label: "Refund Policy",    href: "#" },
+  { label: "Terms of Service", href: "/terms" },
+  { label: "Privacy Policy",   href: "/privacy" },
+  { label: "Refund Policy",    href: "/refund" },
 ];
 
 const containerVariants = {

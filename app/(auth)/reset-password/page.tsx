@@ -116,6 +116,7 @@ function ResetPasswordInner() {
   const [step,     setStep]     = useState<"form" | "success">("form");
   const [newPw,    setNewPw]    = useState("");
   const [confirm,  setConfirm]  = useState("");
+  const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
@@ -183,9 +184,14 @@ function ResetPasswordInner() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <motion.div variants={fadeUp}>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-semibold text-gray-700">New Password</label>
+                <button type="button" onClick={() => setShowPw(v => !v)} className="text-xs font-semibold text-[#6B21A8] hover:underline">
+                  {showPw ? "Hide" : "Show"}
+                </button>
+              </div>
               <input
-                type="password" value={newPw} onChange={e => setNewPw(e.target.value)} required
+                type={showPw ? "text" : "password"} value={newPw} onChange={e => setNewPw(e.target.value)} required
                 className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
               />
               {newPw && (
@@ -208,7 +214,7 @@ function ResetPasswordInner() {
             <motion.div variants={fadeUp}>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
               <input
-                type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
+                type={showPw ? "text" : "password"} value={confirm} onChange={e => setConfirm(e.target.value)} required
                 className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-base text-black outline-none transition-all duration-300 hover:border-gray-300 focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)]"
               />
             </motion.div>

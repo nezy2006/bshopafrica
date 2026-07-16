@@ -386,6 +386,61 @@ function EmptyCart() {
   );
 }
 
+/* ─── Promo code ─────────────────────────────────────────────────────────── */
+function PromoCodeField() {
+  const [open,    setOpen]    = useState(false);
+  const [code,    setCode]    = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error,   setError]   = useState("");
+
+  const apply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setLoading(true); setError(""); setMessage("");
+    try {
+      const res  = await fetch("/api/whmcs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validateCoupon", params: { code: code.trim() } }),
+      });
+      const json = await res.json() as { success: boolean; data?: { valid: boolean; code: string; type: string; value: number; message: string } };
+      const result = json.data;
+      if (!result?.valid) { setError(result?.message ?? "Invalid coupon code"); setLoading(false); return; }
+      localStorage.setItem("bshop_coupon_code", result.code);
+      setMessage(`${result.message} — it'll be applied at checkout`);
+    } catch {
+      setError("Could not validate coupon — please try again");
+    }
+    setLoading(false);
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="text-sm text-[#6B21A8] font-semibold hover:underline mt-2">
+        Have a promo code?
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={apply} className="mt-2 space-y-1.5">
+      <div className="flex gap-2">
+        <input
+          value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+          placeholder="Enter code"
+          className="flex-1 px-3 py-2 text-sm rounded-lg border-2 border-gray-200 bg-gray-50 outline-none focus:border-[#6B21A8] uppercase tracking-widest"
+        />
+        <button type="submit" disabled={loading || !code.trim()}
+          className="px-4 py-2 bg-[#6B21A8] text-white text-sm font-bold rounded-lg hover:bg-[#581c87] transition-colors disabled:opacity-50">
+          {loading ? "…" : "Apply"}
+        </button>
+      </div>
+      {message && <p className="text-xs text-green-600 font-semibold">✓ {message}</p>}
+      {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+    </form>
+  );
+}
+
 /* ─── Main page ──────────────────────────────────────────────────────────── */
 export default function CartPage() {
   const router = useRouter();
@@ -564,6 +619,8 @@ export default function CartPage() {
                     </div>
                   </motion.div>
                 )}
+
+                <PromoCodeField />
 
                 {/* Total */}
                 <div className="border-t border-gray-100 mt-4 pt-4 flex justify-between font-bold text-gray-900 text-lg">
