@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { config } from "@/lib/config";
 
+// Must match initiate/status/callback's environment selection exactly — a mismatch here
+// silently sends predict-provider requests to the wrong PawaPay environment (e.g. sandbox
+// while deposits go to production), which can misclassify or reject real phone numbers.
 const BASE_URL =
-  process.env.PAWAPAY_ENVIRONMENT === "production"
+  config.pawapayEnvironment === "production"
     ? "https://api.pawapay.io"
     : "https://api.sandbox.pawapay.cloud";
 
@@ -13,7 +17,7 @@ export async function POST(req: NextRequest) {
   const res = await fetch(`${BASE_URL}/v2/predict-provider`, {
     method:  "POST",
     headers: {
-      Authorization:  `Bearer ${process.env.PAWAPAY_API_KEY}`,
+      Authorization:  `Bearer ${config.pawapayApiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ phoneNumber }),

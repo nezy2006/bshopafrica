@@ -10,7 +10,12 @@ import { whmcsDbEnabled, updatePasswordDirect, validatePasswordDirect } from "@/
 // WHMCS rejected AddOrder's "paypal" tag (confirmed via a live API error
 // listing valid gateway module names); "paypal_ppcpv" is the active module.
 // Override with WHMCS_PAYPAL_GATEWAY if that ever changes again.
-const WHMCS_PAYPAL_GATEWAY = process.env.WHMCS_PAYPAL_GATEWAY ?? "paypal_ppcpv";
+export const WHMCS_PAYPAL_GATEWAY = process.env.WHMCS_PAYPAL_GATEWAY ?? "paypal_ppcpv";
+
+// Gateway module name recorded against PawaPay-originated payments. Centralized
+// here (was previously inlined separately in createPawapayOrder and the
+// pawapay callback route, risking drift between the two).
+export const WHMCS_PAWAPAY_GATEWAY = process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer";
 
 export const BSHOP_NAMESERVERS = {
   ns1: "ns1.mysecurecloudhost.com",
@@ -566,8 +571,7 @@ export async function createPawapayOrder(
   clientId:  number,
   cartItems: CartItemLike[],
 ): Promise<PawapayOrderResult> {
-  const gateway    = process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer"; // intentionally not in config — set per-deployment
-  const baseParams = { clientid: clientId, paymentmethod: gateway };
+  const baseParams = { clientid: clientId, paymentmethod: WHMCS_PAWAPAY_GATEWAY };
 
   const domain   = cartItems.find(i => i.type === "domain");
   const hosting  = cartItems.find(i => i.type === "hosting");

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPaypalOrder } from "@/lib/whmcs";
 
-const WHMCS_URL = process.env.WHMCS_URL ?? "https://bshopafrica.com/billing";
-
 export async function POST(req: NextRequest) {
   try {
     const { clientId, cartItems } = await req.json() as {
@@ -16,17 +14,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request" }, { status: 400 });
     }
 
-    const { orderId, invoiceId } = await createPaypalOrder(clientId, cartItems);
-    console.log("[checkout/create-order] WHMCS order created:", { orderId, invoiceId });
+    const { orderId, invoiceId, allOrderIds } = await createPaypalOrder(clientId, cartItems);
+    console.log("[checkout/create-order] WHMCS order created:", { orderId, invoiceId, allOrderIds });
 
     if (!invoiceId) {
       return NextResponse.json({ success: false, error: "Order created but no invoice returned" }, { status: 500 });
     }
 
-    const paymentUrl = `${WHMCS_URL}/viewinvoice.php?id=${invoiceId}&paynow=1`;
-    console.log("[checkout/create-order] payment URL:", paymentUrl);
-
-    return NextResponse.json({ success: true, orderId, invoiceId, paymentUrl });
+    // Payment now happens on-site via the PayPal JS SDK (components/PayPalCheckoutButton) —
+    // no WHMCS invoice URL / redirect is generated here anymore.
+    return NextResponse.json({ success: true, orderId, invoiceId, allOrderIds });
   } catch (e) {
     console.error("[checkout/create-order]", e);
     return NextResponse.json(

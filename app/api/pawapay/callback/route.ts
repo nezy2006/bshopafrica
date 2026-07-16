@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { depositStore } from "@/lib/pawapay-store";
-import { createPawapayOrder, addPaymentToInvoice, acceptOrder } from "@/lib/whmcs";
+import { createPawapayOrder, addPaymentToInvoice, acceptOrder, WHMCS_PAWAPAY_GATEWAY } from "@/lib/whmcs";
 
 const TERMINAL_FAILED = new Set(["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"]);
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
           stored.invoiceId,
           stored.totalUSD,
           depositId,
-          process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer",
+          WHMCS_PAWAPAY_GATEWAY,
         );
         console.log("[pawapay/callback] ✅ invoice paid directly", { invoiceId: stored.invoiceId, depositId });
         depositStore.delete(depositId);

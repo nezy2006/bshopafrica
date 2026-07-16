@@ -19,4 +19,7 @@ export const config = {
   whmHost: process.env.WHM_HOST || 'https://s12759.usc1.stableserver.net:2087',
   whmUser: process.env.WHM_USER || 'bshopafrica',
   whmToken: process.env.WHM_TOKEN || 'GDFFJ2O94Q3EBRWM0I3EJIU9TRZ9GZL6',
+  paypalClientId: process.env.PAYPAL_CLIENT_ID || 'BAA0p9XJO6gvgll1226UD07h7JmurHzuLrprmda1iSzKBAmTHQzSkYH4LIjA7fJKsiYpL2kmP6dJTusa3M',
+  paypalClientSecret: process.env.PAYPAL_CLIENT_SECRET || 'EABPJfE9_Qnn9fFVUdC4us4_oT5TZzF4JA08GU0sQO7A0eoNAypbsap-HL_tM0MRAFKDD3j6E6HT3Do-',
+  paypalEnvironment: process.env.PAYPAL_ENVIRONMENT || 'live',
 }

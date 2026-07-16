@@ -12,6 +12,7 @@ import {
 } from "@/lib/notifications";
 import { clearAuth, authHeaders, getSessionToken } from "@/lib/auth";
 import { PayPalLogo, MtnLogo, AirtelLogo, CardLogo } from "@/components/PaymentOptions";
+import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 
 type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
@@ -563,7 +564,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
   invoiceId: number; amountUSD: number; clientEmail: string;
   onClose: () => void; onPaid: () => void;
 }) {
-  const [method, setMethod]   = useState<"choose" | "mtn" | "airtel">("choose");
+  const [method, setMethod]   = useState<"choose" | "mtn" | "airtel" | "paypal">("choose");
   const [phone,  setPhone]    = useState("");
   const [predicted, setPredicted] = useState<{ provider: string; phoneNumber: string } | null>(null);
   const [predictLoading, setPredictLoading] = useState(false);
@@ -571,7 +572,8 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
   const [mmError, setMmError] = useState("");
   const [depositId, setDepositId] = useState("");
   const [countdown, setCountdown] = useState(120);
-  const [paypalLoading, setPaypalLoading] = useState(false);
+  const [paypalError, setPaypalError] = useState("");
+  const [paypalPaid,  setPaypalPaid]  = useState(false);
 
   const rwfTotal   = Math.round(amountUSD * USD_TO_RWF);
   const cleanPhone = phone.replace(/\D/g, "");
@@ -659,21 +661,6 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
     }
   }
 
-  async function payWithPaypalOrCard() {
-    setPaypalLoading(true);
-    console.log("[PayPal] getting payment URL for invoice:", invoiceId);
-    try {
-      const url = await whmcs<string>("getPaymentUrl", { invoiceId });
-      console.log("[PayPal] payment URL:", url);
-      if (!url) throw new Error("No payment URL returned");
-      window.location.href = url;
-    } catch (e) {
-      console.error("[PayPal] failed to get payment URL:", e);
-      alert("Could not open the secure checkout right now. Please try again.");
-      setPaypalLoading(false);
-    }
-  }
-
   return (
     <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
@@ -690,15 +677,15 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
 
         {method === "choose" && (
           <div className="space-y-3">
-            <button onClick={payWithPaypalOrCard} disabled={paypalLoading}
-              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left disabled:opacity-60">
+            <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); }}
+              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
               <span className="w-16 flex-shrink-0"><PayPalLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">{paypalLoading ? "Redirecting…" : "Pay securely with your PayPal account"}</p></div>
+              <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">Pay securely with your PayPal account</p></div>
             </button>
-            <button onClick={payWithPaypalOrCard} disabled={paypalLoading}
-              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left disabled:opacity-60">
+            <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); }}
+              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
               <span className="w-16 flex-shrink-0"><CardLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">Credit / Debit Card</p><p className="text-xs text-gray-500">{paypalLoading ? "Redirecting…" : "Visa, Mastercard via secure checkout"}</p></div>
+              <div><p className="font-semibold text-gray-900 text-sm">Credit / Debit Card</p><p className="text-xs text-gray-500">Visa, Mastercard via secure checkout</p></div>
             </button>
             <button onClick={() => { setMethod("mtn"); setPhone(""); setPredicted(null); setMmStep("input"); setMmError(""); }}
               className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
@@ -710,6 +697,28 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
               <span className="w-16 flex-shrink-0"><AirtelLogo /></span>
               <div><p className="font-semibold text-gray-900 text-sm">Airtel Money</p><p className="text-xs text-gray-500">Pay with Airtel Money Rwanda</p></div>
             </button>
+          </div>
+        )}
+
+        {method === "paypal" && (
+          <div className="space-y-4">
+            <button onClick={() => setMethod("choose")} className="text-xs text-gray-500 hover:text-gray-700">← Back</button>
+            {paypalPaid ? (
+              <div className="text-center py-6 space-y-2">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600"><I.Check /></div>
+                <p className="text-sm font-semibold text-gray-900">Payment received!</p>
+              </div>
+            ) : (
+              <>
+                <PayPalCheckoutButton
+                  invoiceId={invoiceId}
+                  amountUSD={amountUSD}
+                  onSuccess={() => { setPaypalPaid(true); setTimeout(onPaid, 1200); }}
+                  onError={(msg) => setPaypalError(msg)}
+                />
+                {paypalError && <p className="text-sm text-red-600">{paypalError}</p>}
+              </>
+            )}
           </div>
         )}
 
@@ -753,6 +762,9 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
             <div className="w-12 h-12 border-4 border-purple-200 border-t-[#6B21A8] rounded-full animate-spin mx-auto" />
             <p className="text-sm font-medium text-gray-900">Check your phone</p>
             <p className="text-xs text-gray-500">Approve the USSD prompt to complete payment. Expires in {countdown}s.</p>
+            {countdown <= 90 && (
+              <p className="text-xs text-amber-600 font-medium">No prompt yet? Check your phone for a USSD popup, or try again.</p>
+            )}
           </div>
         )}
 

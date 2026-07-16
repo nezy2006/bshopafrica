@@ -8,6 +8,7 @@ import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, t
 import { AUTH_KEYS, authHeaders } from "@/lib/auth";
 // CartTransfer and CartWebsiteBuilder used in type guards within StepPayment
 import { PaymentOptionCard, PayPalWordmark, CardLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
+import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 
 // Legacy shape for checkout summary compat
 interface Cart {
@@ -410,46 +411,6 @@ const AIRTEL_PROVIDERS = new Set([
   "AIRTEL_KEN", "AIRTEL_MOZ", "AIRTEL_TZA", "AIRTEL_MDG", "AIRTEL_NGA",
 ]);
 
-/* ─── Invoice redirect countdown ────────────────────────────────────────── */
-function InvoiceRedirectBanner({ invoiceId, paymentUrl }: { invoiceId: number; paymentUrl: string }) {
-  const [count, setCount] = useState(3);
-  useEffect(() => {
-    if (count <= 0) { window.location.href = paymentUrl; return; }
-    const t = setTimeout(() => setCount(c => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [count, paymentUrl]);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="text-center py-10 space-y-5"
-    >
-      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-        <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-        </svg>
-      </div>
-      <div>
-        <p className="font-bold text-lg text-gray-900">Invoice #{invoiceId} has been created</p>
-        <p className="text-gray-500 text-sm mt-1">You will be redirected to complete payment in {count} second{count !== 1 ? "s" : ""}…</p>
-      </div>
-      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border-4 border-[#6B21A8] text-[#6B21A8] text-xl font-black">
-        {count}
-      </div>
-      <div>
-        <a href={paymentUrl}
-          className="text-sm text-[#6B21A8] font-semibold hover:underline">
-          Click here if you are not redirected automatically
-        </a>
-      </div>
-    </motion.div>
-  );
-}
-
 /* ─── Step 3: Payment ────────────────────────────────────────────────────── */
 type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
 
@@ -459,7 +420,8 @@ function StepPayment({ cart }: { cart: Cart }) {
   const [agreed,         setAgreed]         = useState(false);
   const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState<string | null>(null);
-  const [invoiceCreated, setInvoiceCreated] = useState<{ invoiceId: number; paymentUrl: string } | null>(null);
+  const [paypalOrder,    setPaypalOrder]    = useState<{ invoiceId: number; orderIds: number[] } | null>(null);
+  const [paypalPaid,     setPaypalPaid]     = useState(false);
 
   // Mobile money
   const [mmPhone,           setMmPhone]           = useState("");
@@ -650,10 +612,10 @@ function StepPayment({ cart }: { cart: Cart }) {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body:    JSON.stringify({ clientId: Number(clientId), cartItems }),
       });
-      const json = await res.json() as { success: boolean; invoiceId?: number; paymentUrl?: string; error?: string };
+      const json = await res.json() as { success: boolean; invoiceId?: number; orderId?: number; allOrderIds?: number[]; error?: string };
       console.log("[Checkout][PayPal/Card] create-order response:", json);
 
-      if (!json.success || !json.paymentUrl) {
+      if (!json.success || !json.invoiceId) {
         setError(json.error ?? "Failed to create order. Please try again.");
         setLoading(false);
         return;
@@ -661,21 +623,16 @@ function StepPayment({ cart }: { cart: Cart }) {
 
       // Store invoiceId so /checkout/complete can read it
       localStorage.setItem("bshop_pending_invoice", String(json.invoiceId));
-      clearCart();
-      // Show countdown banner before redirecting
-      setInvoiceCreated({ invoiceId: json.invoiceId!, paymentUrl: json.paymentUrl });
+      setPaypalOrder({ invoiceId: json.invoiceId, orderIds: json.allOrderIds ?? (json.orderId ? [json.orderId] : []) });
     } catch {
       setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
 
   const clientName  = typeof window !== "undefined" ? (localStorage.getItem("bshop_client_name") || localStorage.getItem("bshop_client_firstname")) : null;
   const clientEmail = typeof window !== "undefined" ? localStorage.getItem("bshop_client_email") : null;
-
-  if (invoiceCreated) {
-    return <InvoiceRedirectBanner invoiceId={invoiceCreated.invoiceId} paymentUrl={invoiceCreated.paymentUrl} />;
-  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}>
@@ -742,7 +699,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                 <svg className="w-10 h-10 mx-auto text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 <p className="font-bold text-blue-900">Pay with Card via PayPal</p>
                 <p className="text-blue-700 text-sm">
-                  You&apos;ll be securely redirected to WHMCS / PayPal Checkout to enter your card details.
+                  Enter your card details securely below via PayPal Checkout.
                   We never handle or store card numbers directly.
                 </p>
                 <p className="text-xs text-blue-500 flex items-center justify-center gap-1.5">
@@ -758,7 +715,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                   <span className="text-[#003087]">Pay</span><span className="text-[#009CDE]">Pal</span>
                 </p>
                 <p className="text-[#003087]/80 text-sm mt-1">
-                  You&apos;ll be redirected to PayPal to complete your payment securely.
+                  Complete your payment securely below — no redirect, no leaving this page.
                 </p>
               </motion.div>
             )}
@@ -845,6 +802,11 @@ function StepPayment({ cart }: { cart: Cart }) {
                         {Math.floor(mmCountdown / 60)}:{String(mmCountdown % 60).padStart(2, "0")}
                       </span>
                     </div>
+                    {mmCountdown <= 90 && (
+                      <p className="text-xs text-amber-600 font-medium">
+                        No prompt yet? Check your phone for a USSD popup, or try again.
+                      </p>
+                    )}
                     <button onClick={resetMm}
                       className="text-sm text-gray-400 hover:text-gray-600 underline transition-colors">
                       Cancel
@@ -951,12 +913,38 @@ function StepPayment({ cart }: { cart: Cart }) {
 
           {/* ── CTA buttons ── */}
           {!inMmFlow && (method === "card" || method === "paypal") && (
-            <button onClick={handlePaypalCardPay} disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70">
-              {loading
-                ? <><Spinner /><span>Creating order…</span></>
-                : <><LockIcon /><span>Proceed to Payment →</span></>}
-            </button>
+            paypalOrder ? (
+              paypalPaid ? (
+                <div className="text-center py-6 space-y-2">
+                  <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(34,197,94,0.35)]">
+                    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7">
+                      <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <p className="font-bold text-lg text-green-600">Payment received!</p>
+                  <p className="text-gray-400 text-sm">Finishing up…</p>
+                </div>
+              ) : (
+                <PayPalCheckoutButton
+                  invoiceId={paypalOrder.invoiceId}
+                  amountUSD={usdTotal}
+                  orderIds={paypalOrder.orderIds}
+                  onSuccess={() => {
+                    setPaypalPaid(true);
+                    clearCart();
+                    setTimeout(() => router.push(`/checkout/complete?method=paypal&invoiceId=${paypalOrder.invoiceId}`), 1200);
+                  }}
+                  onError={(msg) => setError(msg)}
+                />
+              )
+            ) : (
+              <button onClick={handlePaypalCardPay} disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-4 bg-[#6B21A8] text-white font-black rounded-xl text-base transition-all hover:bg-[#581c87] hover:shadow-[0_0_28px_rgba(107,33,168,0.45)] disabled:opacity-70">
+                {loading
+                  ? <><Spinner /><span>Creating order…</span></>
+                  : <><LockIcon /><span>Proceed to Payment →</span></>}
+              </button>
+            )
           )}
 
           {!inMmFlow && isMobileMethod && mmStep === "input" && (
