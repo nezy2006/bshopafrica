@@ -4,6 +4,17 @@ import { createPawapayOrder, addPaymentToInvoice, acceptOrder, WHMCS_PAWAPAY_GAT
 
 const TERMINAL_FAILED = new Set(["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"]);
 
+/** PawaPay's failureReason is either a plain string or a { failureCode, failureMessage }
+ *  object depending on endpoint/version — normalise to just the failure code. */
+function extractFailureCode(raw: unknown): string {
+  if (typeof raw === "string" && raw) return raw;
+  if (raw && typeof raw === "object") {
+    const code = (raw as Record<string, unknown>).failureCode;
+    if (typeof code === "string" && code) return code;
+  }
+  return "UNSPECIFIED_FAILURE";
+}
+
 export async function POST(req: NextRequest) {
   // PawaPay always expects HTTP 200 — never return an error status
   let body: Record<string, unknown>;
@@ -20,10 +31,16 @@ export async function POST(req: NextRequest) {
 
   if (!depositId || !status) return NextResponse.json({ success: true });
 
-  // ── Payment failed — clean up and move on ────────────────────────────────
+  // ── Payment failed — record the reason for status polling, then leave it
+  //    for cleanupDeposits() to purge after 24h rather than deleting now ────
   if (TERMINAL_FAILED.has(status)) {
     console.log("[pawapay/callback] payment not completed:", status, depositId);
-    depositStore.delete(depositId);
+    const stored = depositStore.get(depositId);
+    if (stored) {
+      stored.status = status;
+      stored.failureReason = extractFailureCode(body.failureReason);
+      depositStore.set(depositId, stored);
+    }
     return NextResponse.json({ success: true });
   }
 

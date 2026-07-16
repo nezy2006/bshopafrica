@@ -6,6 +6,17 @@ const BASE_URL =
     ? "https://api.pawapay.io"
     : "https://api.sandbox.pawapay.cloud";
 
+/** PawaPay's failureReason is either a plain string or a { failureCode, failureMessage }
+ *  object depending on endpoint/version — normalise to just the failure code. */
+function extractFailureCode(raw: unknown): string | null {
+  if (typeof raw === "string" && raw) return raw;
+  if (raw && typeof raw === "object") {
+    const code = (raw as Record<string, unknown>).failureCode;
+    if (typeof code === "string" && code) return code;
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const depositId = req.nextUrl.searchParams.get("depositId");
   if (!depositId)
@@ -24,9 +35,12 @@ export async function GET(req: NextRequest) {
     ? (data as Record<string, unknown>[])[0]
     : (data as Record<string, unknown>);
 
+  const status = String(deposit?.status ?? "PENDING");
+
   return NextResponse.json({
     success: true,
-    status:  String(deposit?.status ?? "PENDING"),
+    status,
+    failureReason: extractFailureCode(deposit?.failureReason),
     deposit,
   });
 }

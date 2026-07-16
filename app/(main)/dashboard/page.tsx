@@ -13,6 +13,7 @@ import {
 import { clearAuth, authHeaders, getSessionToken } from "@/lib/auth";
 import { PayPalLogo, MtnLogo, AirtelLogo, CardLogo } from "@/components/PaymentOptions";
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
+import { getPawapayFailureMessage } from "@/lib/pawapay-errors";
 
 type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
 type Ease = [number, number, number, number];
@@ -613,14 +614,14 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
     const poll = async () => {
       try {
         const res  = await fetch(`/api/pawapay/status?depositId=${depositId}`);
-        const json = (await res.json()) as { success: boolean; status: string };
+        const json = (await res.json()) as { success: boolean; status: string; failureReason?: string | null };
         if (!active) return;
         if (json.status === "COMPLETED") {
           setMmStep("success");
           setTimeout(onPaid, 1500);
         } else if (["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"].includes(json.status)) {
           setMmStep("failed");
-          setMmError("Payment was declined. Please try again.");
+          setMmError(getPawapayFailureMessage(json.failureReason));
         }
       } catch { /* retry on next tick */ }
     };
@@ -776,9 +777,30 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
         )}
 
         {(method === "mtn" || method === "airtel") && mmStep === "failed" && (
-          <div className="text-center py-6 space-y-3">
-            <p className="text-sm text-red-600">{mmError}</p>
-            <button onClick={() => { setMmStep("input"); setMmError(""); }} className="text-sm text-[#6B21A8] font-semibold hover:underline">Try again</button>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3 text-left">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                  <path d="M6 18L18 6M6 6l12 12" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-red-700 text-sm">Payment failed</p>
+                <p className="text-red-600 text-sm mt-1">
+                  {mmError || "Payment failed. Please try again or use a different payment method."}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setMmStep("input"); setMmError(""); }}
+                className="flex-1 px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl hover:bg-[#581c87] transition-colors text-sm">
+                Try Again
+              </button>
+              <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); setMmStep("input"); setMmError(""); setPhone(""); setPredicted(null); }}
+                className="flex-1 px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">
+                Use Different Payment Method
+              </button>
+            </div>
           </div>
         )}
       </motion.div>

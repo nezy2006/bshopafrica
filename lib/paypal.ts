@@ -5,19 +5,24 @@
 
 import { config } from "@/lib/config";
 
-const PAYPAL_API_BASE =
-  config.paypalEnvironment === "sandbox"
-    ? "https://api-m.sandbox.paypal.com"
-    : "https://api-m.paypal.com";
+const PAYPAL_CLIENT_ID     = config.paypalClientId;
+const PAYPAL_CLIENT_SECRET = config.paypalClientSecret;
+const PAYPAL_BASE_URL =
+  config.paypalEnvironment === "live"
+    ? "https://api.paypal.com"
+    : "https://api.sandbox.paypal.com";
 
 interface CachedToken { token: string; expiresAt: number; }
 let cachedToken: CachedToken | null = null;
 
 async function getAccessToken(): Promise<string> {
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    throw new Error("PayPal is not configured — set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET");
+  }
   if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.token;
 
-  const auth = Buffer.from(`${config.paypalClientId}:${config.paypalClientSecret}`).toString("base64");
-  const res = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString("base64");
+  const res = await fetch(`${PAYPAL_BASE_URL}/v1/oauth2/token`, {
     method:  "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
     body:    "grant_type=client_credentials",
@@ -37,7 +42,7 @@ async function getAccessToken(): Promise<string> {
  *  would reject a retry after a cancelled/failed attempt on the same invoice. */
 export async function createPaypalOrderForInvoice(invoiceId: number, amountUSD: number): Promise<string> {
   const token = await getAccessToken();
-  const res = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders`, {
+  const res = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
     method:  "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -61,7 +66,7 @@ export interface PaypalCaptureResult { captureId: string; amount: string; status
 
 export async function capturePaypalOrder(orderId: string): Promise<PaypalCaptureResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderId}/capture`, {
+  const res = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders/${orderId}/capture`, {
     method:  "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     cache:   "no-store",

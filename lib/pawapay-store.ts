@@ -3,13 +3,15 @@
 // Works in long-running Node.js deployments; not suitable for serverless edge functions.
 
 export interface DepositRecord {
-  clientId:    string;
-  clientEmail: string;
-  cartItems:   unknown[]; // CartItem[] serialised to plain objects
-  totalUSD:    number;
-  totalRWF:    number;
-  invoiceId?:  number;    // set for direct invoice payments (renewals) — callback skips order creation
-  createdAt:   number;   // Date.now()
+  clientId:      string;
+  clientEmail:   string;
+  cartItems:     unknown[]; // CartItem[] serialised to plain objects
+  totalUSD:      number;
+  totalRWF:      number;
+  invoiceId?:    number;    // set for direct invoice payments (renewals) — callback skips order creation
+  createdAt:     number;    // Date.now()
+  status?:       string;    // set by the callback route on terminal failure, for debugging/audit
+  failureReason?: string;   // PawaPay failureCode (e.g. NOT_ENOUGH_FUNDS) — status/route.ts reads this live from PawaPay instead, this is a secondary record
 }
 
 export const depositStore = new Map<string, DepositRecord>();
