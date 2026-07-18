@@ -9,19 +9,21 @@ import { Bell } from "lucide-react";
 import { getAdminToken, getCurrentAdmin, adminHeaders, clearAdminAuth, type CurrentAdmin } from "@/lib/admin-auth-client";
 
 /* ─── Nav items ──────────────────────────────────────────────────────────── */
-type NavItem = { id: string; label: string; href: string; icon: React.FC<{ cls?: string }>; roles?: CurrentAdmin["role"][] };
+type NavItem = { id: string; label: string; href: string; matchPrefix?: string; icon: React.FC<{ cls?: string }>; roles?: CurrentAdmin["role"][] };
 
 const NAV: NavItem[] = [
   { id: "dashboard",  label: "Overview",       href: "/admin/dashboard",  icon: DashIcon    },
   { id: "clients",    label: "Clients",        href: "/admin/clients",    icon: UsersIcon   },
-  { id: "orders",     label: "Orders & Sales",  href: "/admin/orders",     icon: CartIcon    },
-  { id: "invoices",   label: "Billing & Payments", href: "/admin/invoices", icon: FileIcon  },
-  { id: "tickets",    label: "Support Tickets", href: "/admin/tickets",    icon: TicketIcon  },
+  { id: "orders",     label: "Orders",         href: "/admin/orders",     icon: CartIcon    },
+  { id: "billing",    label: "Billing & Payments", href: "/admin/billing/invoices", matchPrefix: "/admin/billing", icon: FileIcon },
+  { id: "products",   label: "Products & Services", href: "/admin/products", icon: PackageIcon },
   { id: "domains",    label: "Domains",        href: "/admin/domains",    icon: GlobeIcon   },
   { id: "hosting",    label: "Hosting",        href: "/admin/hosting",    icon: ServerIcon  },
+  { id: "tickets",    label: "Support Tickets", href: "/admin/tickets",    icon: TicketIcon  },
+  { id: "emails",     label: "Email Management", href: "/admin/emails",   icon: MailIcon    },
   { id: "reports",    label: "Reports & Analytics", href: "/admin/reports", icon: ChartIcon },
   { id: "blog",       label: "Blog",           href: "/admin/blog",       icon: EditIcon    },
-  { id: "newsletter", label: "Newsletter",     href: "/admin/newsletter", icon: MailIcon    },
+  { id: "newsletter", label: "Newsletter",     href: "/admin/newsletter", icon: MegaphoneIcon },
   { id: "team",       label: "Team Management", href: "/admin/team",      icon: TeamIcon,    roles: ["super_admin"] },
   { id: "activity",   label: "Activity Log",   href: "/admin/activity",   icon: ActivityIcon, roles: ["super_admin", "admin"] },
   { id: "settings",   label: "Settings",       href: "/admin/settings",   icon: GearIcon    },
@@ -67,6 +69,12 @@ function ChartIcon({ cls = "w-4 h-4" }: { cls?: string }) {
 function TeamIcon({ cls = "w-4 h-4" }: { cls?: string }) {
   return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 }
+function PackageIcon({ cls = "w-4 h-4" }: { cls?: string }) {
+  return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
+}
+function MegaphoneIcon({ cls = "w-4 h-4" }: { cls?: string }) {
+  return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>;
+}
 function ActivityIcon({ cls = "w-4 h-4" }: { cls?: string }) {
   return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
 }
@@ -97,8 +105,8 @@ function Sidebar({ open, onClose, admin }: { open: boolean; onClose: () => void;
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {visibleNav.map(({ id, label, href, icon: Icon }) => {
-          const active = pathname.startsWith(href);
+        {visibleNav.map(({ id, label, href, matchPrefix, icon: Icon }) => {
+          const active = pathname.startsWith(matchPrefix ?? href);
           return (
             <Link key={id} href={href} onClick={onClose}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
