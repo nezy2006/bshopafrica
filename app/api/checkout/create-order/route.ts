@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPaypalOrder } from "@/lib/whmcs";
+import { pushAdminNotification } from "@/lib/admin-notifications";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
     if (!invoiceId) {
       return NextResponse.json({ success: false, error: "Order created but no invoice returned" }, { status: 500 });
     }
+
+    void pushAdminNotification("new_order", `New order #${orderId}`, `Invoice #${invoiceId} — awaiting payment`, "/admin/orders");
 
     // Payment now happens on-site via the PayPal JS SDK (components/PayPalCheckoutButton) —
     // no WHMCS invoice URL / redirect is generated here anymore.

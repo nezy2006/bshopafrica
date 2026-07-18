@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { depositStore } from "@/lib/pawapay-store";
 import { createPawapayOrder, addPaymentToInvoice, acceptOrder, WHMCS_PAWAPAY_GATEWAY } from "@/lib/whmcs";
 import { recordPawapayTransaction } from "@/lib/pawapay-transactions";
+import { pushAdminNotification } from "@/lib/admin-notifications";
 
 const TERMINAL_FAILED = new Set(["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"]);
 
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
         amountUSD: stored.totalUSD, amountLocal: stored.totalRWF, status,
         failureReason: stored.failureReason, invoiceId: stored.invoiceId,
       }).catch(e => console.error("[pawapay/callback] failed to record transaction", e));
+      void pushAdminNotification("payment_failed", `Mobile money payment failed — $${stored.totalUSD}`, `${stored.failureReason} · ${stored.clientEmail ?? "unknown client"}`, "/admin/billing/transactions");
     }
     return NextResponse.json({ success: true });
   }
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
           WHMCS_PAWAPAY_GATEWAY,
         );
         console.log("[pawapay/callback] ✅ invoice paid directly", { invoiceId: stored.invoiceId, depositId });
+        void pushAdminNotification("payment_received", `Mobile money payment received — $${stored.totalUSD}`, `Invoice #${stored.invoiceId}`, "/admin/billing/transactions");
         await recordPawapayTransaction({
           depositId, clientId: stored.clientId, clientEmail: stored.clientEmail,
           phone: stored.phone, provider: stored.provider,
@@ -96,6 +99,7 @@ export async function POST(req: NextRequest) {
         stored.cartItems as { type: string; [k: string]: unknown }[],
       );
       console.log("[pawapay/callback] order created", { orderId, invoiceId, allOrderIds });
+      void pushAdminNotification("new_order", `New order #${orderId}`, `Invoice #${invoiceId} — paid via mobile money`, "/admin/orders");
 
       // 2. Mark invoice as paid — this records the PawaPay transaction in WHMCS
       await addPaymentToInvoice(
@@ -105,6 +109,7 @@ export async function POST(req: NextRequest) {
         process.env.WHMCS_PAWAPAY_GATEWAY ?? "banktransfer",
       );
       console.log("[pawapay/callback] invoice paid", { invoiceId, amount: stored.totalUSD });
+      void pushAdminNotification("payment_received", `Mobile money payment received — $${stored.totalUSD}`, `Invoice #${invoiceId}`, "/admin/billing/transactions");
 
       // 3. Accept every order — this triggers WHMCS automation:
       //    • Create cPanel account via WHM API

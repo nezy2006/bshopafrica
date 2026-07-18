@@ -26,6 +26,7 @@ import { sendSmtpMail } from "@/lib/mailer";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
 import { getTicketMetaBulk } from "@/lib/ticket-meta";
+import { pushAdminNotification } from "@/lib/admin-notifications";
 
 type Params = Record<string, unknown>;
 
@@ -244,6 +245,7 @@ export async function POST(req: NextRequest) {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;
         data = await openTicket({ clientId: session.clientId, subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium"), name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined, attachmentUrls: params.attachmentUrls as string[] | undefined });
+        void pushAdminNotification("new_ticket", `New ticket: ${s("subject")}`, `From ${session.email}`, `/admin/tickets/${(data as { ticketId: number }).ticketId}`);
         break;
       }
       case "addTicketReply": {
@@ -254,6 +256,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
         }
         await addTicketReply(n("ticketId"), session.clientId, s("message"), params.attachmentUrls as string[] | undefined);
+        void pushAdminNotification("ticket_reply", `Client reply on ${ticket.tid}`, ticket.title, `/admin/tickets/${n("ticketId")}`);
         data = { ok: true };
         break;
       }

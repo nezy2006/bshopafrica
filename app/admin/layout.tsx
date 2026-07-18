@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { Bell } from "lucide-react";
 import { getAdminToken, getCurrentAdmin, adminHeaders, clearAdminAuth, type CurrentAdmin } from "@/lib/admin-auth-client";
 
 /* ─── Nav items ──────────────────────────────────────────────────────────── */
@@ -155,6 +156,82 @@ function Sidebar({ open, onClose, admin }: { open: boolean; onClose: () => void;
   );
 }
 
+/* ─── Notification bell ──────────────────────────────────────────────────── */
+interface AdminNotificationItem { id: number; type: string; title: string; message: string | null; link: string | null; created_at: string }
+interface NotificationsResponse { notifications: AdminNotificationItem[]; unreadCount: number; expiringSoon: { label: string; link: string }[]; lastSeenId: number }
+
+function NotificationBell() {
+  const router = useRouter();
+  const [data, setData] = useState<NotificationsResponse | null>(null);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res  = await fetch("/api/admin/notifications", { headers: adminHeaders() });
+      const json = await res.json() as { success: boolean; data?: NotificationsResponse };
+      if (json.success && json.data) setData(json.data);
+    } catch { /* offline */ }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const toggleOpen = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && data && data.unreadCount > 0) {
+      await fetch("/api/admin/notifications", { method: "POST", headers: adminHeaders() });
+      setData(d => d ? { ...d, unreadCount: 0 } : d);
+    }
+  };
+
+  const goTo = (link: string | null) => { setOpen(false); if (link) router.push(link); };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={toggleOpen} className="relative p-2 rounded-lg hover:bg-black/5 text-current">
+        <Bell className="w-5 h-5" />
+        {(data?.unreadCount ?? 0) > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold">
+            {Math.min(data!.unreadCount, 9)}{data!.unreadCount > 9 ? "+" : ""}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 max-h-96 overflow-y-auto text-black">
+          {data && data.expiringSoon.length > 0 && (
+            <div className="px-4 py-2 border-b border-gray-50">
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wide mb-1">Expiring in 3 Days</p>
+              {data.expiringSoon.slice(0, 5).map((e, i) => (
+                <button key={i} onClick={() => goTo(e.link)} className="w-full text-left text-xs text-gray-700 py-1 hover:text-[#6B21A8]">{e.label}</button>
+              ))}
+            </div>
+          )}
+          {!data || data.notifications.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No notifications yet</p>
+          ) : data.notifications.map(n => (
+            <button key={n.id} onClick={() => goTo(n.link)} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0">
+              <p className="text-sm font-semibold text-black">{n.title}</p>
+              {n.message && <p className="text-xs text-gray-500">{n.message}</p>}
+              <p className="text-[10px] text-gray-400 mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Admin layout ───────────────────────────────────────────────────────── */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -200,6 +277,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <MenuIcon />
           </button>
           <Image src="/The-Bshop-logo-REVAMPED-2025_white-logo-landscape-scaled.png" alt="B.Shop Admin" width={120} height={36} className="h-7 w-auto object-contain" />
+          <div className="ml-auto text-white"><NotificationBell /></div>
+        </div>
+
+        {/* Desktop topbar */}
+        <div className="hidden lg:flex items-center justify-end px-8 py-3 border-b border-gray-100 bg-white sticky top-0 z-30">
+          <div className="text-gray-600"><NotificationBell /></div>
         </div>
 
         <motion.main

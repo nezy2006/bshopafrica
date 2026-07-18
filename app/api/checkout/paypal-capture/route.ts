@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { capturePaypalOrder } from "@/lib/paypal";
 import { addPaymentToInvoice, acceptOrder, WHMCS_PAYPAL_GATEWAY } from "@/lib/whmcs";
+import { pushAdminNotification } from "@/lib/admin-notifications";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
     try {
       await addPaymentToInvoice(invoiceId, parseFloat(capture.amount), capture.captureId, WHMCS_PAYPAL_GATEWAY);
       console.log("[paypal-capture] invoice marked paid:", { invoiceId, amount: capture.amount, captureId: capture.captureId });
+      void pushAdminNotification("payment_received", `PayPal payment received — $${capture.amount}`, `Invoice #${invoiceId}`, "/admin/billing/transactions");
     } catch (e) {
       console.error("[paypal-capture] addPaymentToInvoice failed for captured payment", { invoiceId, captureId: capture.captureId }, e);
     }
