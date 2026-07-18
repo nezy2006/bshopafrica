@@ -78,7 +78,7 @@ export interface AdminDomain {
 export interface AdminHostingAccount {
   id: number; userid: number; firstname: string; lastname: string;
   domain: string; name: string; status: string; nextduedate: string;
-  billingcycle: string; amount: string;
+  billingcycle: string; amount: string; pid: number;
 }
 export interface AdminTicket {
   tid: string; id: number; title: string; firstname: string; lastname: string;
@@ -509,13 +509,49 @@ export async function getAdminDomains(limitstart = 0, limitnum = 20): Promise<{ 
   };
 }
 
-export async function getAdminHosting(limitstart = 0, limitnum = 20): Promise<{ hosting: AdminHostingAccount[]; total: number }> {
-  const data = await callWhmcs("GetClientsProducts", { limitstart, limitnum });
+export async function getAdminHosting(limitstart = 0, limitnum = 20, status = ""): Promise<{ hosting: AdminHostingAccount[]; total: number }> {
+  const params: Record<string, string | number> = { limitstart, limitnum };
+  if (status) params.status = status;
+  const data = await callWhmcs("GetClientsProducts", params);
   const raw = (data.products as { product: WhmcsRaw[] } | undefined)?.product ?? [];
   return {
     total: Number(data.totalresults ?? 0),
-    hosting: raw.map(p => ({ id: Number(p.id ?? 0), userid: Number(p.userid ?? 0), firstname: String(p.firstname ?? ""), lastname: String(p.lastname ?? ""), domain: String(p.domain ?? ""), name: String(p.name ?? ""), status: String(p.status ?? ""), nextduedate: String(p.nextduedate ?? ""), billingcycle: String(p.billingcycle ?? ""), amount: String(p.recurringamount ?? "0.00") })),
+    hosting: raw.map(p => ({ id: Number(p.id ?? 0), userid: Number(p.userid ?? 0), firstname: String(p.firstname ?? ""), lastname: String(p.lastname ?? ""), domain: String(p.domain ?? ""), name: String(p.name ?? ""), status: String(p.status ?? ""), nextduedate: String(p.nextduedate ?? ""), billingcycle: String(p.billingcycle ?? ""), amount: String(p.recurringamount ?? "0.00"), pid: Number(p.pid ?? 0) })),
   };
+}
+
+/* ─── Service management (suspend/unsuspend/terminate/upgrade/edit) ────────── */
+export async function suspendService(serviceId: number, reason?: string): Promise<void> {
+  await callWhmcs("ModuleSuspend", { serviceid: serviceId, ...(reason ? { suspendreason: reason } : {}) });
+}
+
+export async function unsuspendService(serviceId: number): Promise<void> {
+  await callWhmcs("ModuleUnsuspend", { serviceid: serviceId });
+}
+
+export async function terminateService(serviceId: number): Promise<void> {
+  await callWhmcs("ModuleTerminate", { serviceid: serviceId });
+}
+
+/** calconly stays false — this performs the upgrade/downgrade immediately
+ *  (billed via paymentmethod) rather than just previewing the price delta. */
+export async function upgradeService(serviceId: number, newProductId: number, newBillingCycle: string, paymentMethod: string): Promise<void> {
+  await callWhmcs("UpgradeProduct", { serviceid: serviceId, type: "product", newproductid: newProductId, newproductbillingcycle: newBillingCycle, paymentmethod: paymentMethod, calconly: false });
+}
+
+export async function updateServiceDetails(serviceId: number, fields: { nextDueDate?: string; recurringAmount?: number; status?: string }): Promise<void> {
+  const params: Record<string, string | number | boolean> = { serviceid: serviceId };
+  if (fields.nextDueDate !== undefined) params.nextduedate = fields.nextDueDate;
+  if (fields.recurringAmount !== undefined) { params.recurringamount = fields.recurringAmount.toFixed(2); params.autorecalc = false; }
+  if (fields.status !== undefined) params.status = fields.status;
+  await callWhmcs("UpdateClientProduct", params);
+}
+
+/** Best-effort — "Hosting Account Welcome Email" is WHMCS's stock template name
+ *  for a new hosting service; installs that renamed/removed it will get a WHMCS
+ *  "Email template not found"-style error surfaced back to the admin. */
+export async function sendServiceWelcomeEmail(serviceId: number): Promise<void> {
+  await callWhmcs("SendEmail", { messagename: "Hosting Account Welcome Email", id: serviceId, type: "product" });
 }
 
 export async function getAdminTickets(status = "", limitstart = 0, limitnum = 20): Promise<{ tickets: AdminTicket[]; total: number }> {

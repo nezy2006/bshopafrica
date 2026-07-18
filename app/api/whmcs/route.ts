@@ -16,6 +16,8 @@ import {
   WHMCS_PAYPAL_GATEWAY, WHMCS_PAWAPAY_GATEWAY,
   createInvoiceItemized, voidInvoice, applyCreditToInvoice, sendInvoiceReminder,
   getQuotes, createQuote, updateQuoteStage, deleteQuote, sendQuote, acceptQuote,
+  suspendService, unsuspendService, terminateService, upgradeService,
+  updateServiceDetails, sendServiceWelcomeEmail,
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
@@ -353,7 +355,59 @@ export async function POST(req: NextRequest) {
       case "adminGetHosting": {
         const admin = await requireAdmin(req, "hosting");
         if (isAdminUnauthorized(admin)) return admin;
-        data = await getAdminHosting(n("limitstart"), n("limitnum", 20));
+        data = await getAdminHosting(n("limitstart"), n("limitnum", 20), s("status"));
+        break;
+      }
+      case "adminSuspendService": {
+        const admin = await requireAdmin(req, "services");
+        if (isAdminUnauthorized(admin)) return admin;
+        await suspendService(n("serviceId"), params.reason ? s("reason") : undefined);
+        await logAdminActivity(admin.id, "suspend_service", `serviceId=${n("serviceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminUnsuspendService": {
+        const admin = await requireAdmin(req, "services");
+        if (isAdminUnauthorized(admin)) return admin;
+        await unsuspendService(n("serviceId"));
+        await logAdminActivity(admin.id, "unsuspend_service", `serviceId=${n("serviceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminTerminateService": {
+        const admin = await requireAdmin(req, "services");
+        if (isAdminUnauthorized(admin)) return admin;
+        await terminateService(n("serviceId"));
+        await logAdminActivity(admin.id, "terminate_service", `serviceId=${n("serviceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminUpgradeService": {
+        const admin = await requireAdmin(req, "services");
+        if (isAdminUnauthorized(admin)) return admin;
+        await upgradeService(n("serviceId"), n("newProductId"), s("newBillingCycle", "monthly"), s("paymentMethod", WHMCS_PAYPAL_GATEWAY));
+        await logAdminActivity(admin.id, "upgrade_service", `serviceId=${n("serviceId")} newProductId=${n("newProductId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminUpdateService": {
+        const admin = await requireAdmin(req, "services");
+        if (isAdminUnauthorized(admin)) return admin;
+        await updateServiceDetails(n("serviceId"), {
+          nextDueDate: params.nextDueDate ? s("nextDueDate") : undefined,
+          recurringAmount: params.recurringAmount !== undefined ? Number(params.recurringAmount) : undefined,
+          status: params.status ? s("status") : undefined,
+        });
+        await logAdminActivity(admin.id, "update_service", `serviceId=${n("serviceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminSendServiceWelcomeEmail": {
+        const admin = await requireAdmin(req, "services");
+        if (isAdminUnauthorized(admin)) return admin;
+        await sendServiceWelcomeEmail(n("serviceId"));
+        await logAdminActivity(admin.id, "send_welcome_email", `serviceId=${n("serviceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
         break;
       }
       case "adminGetTickets": {
