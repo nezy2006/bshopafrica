@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, execute } from "@/lib/db";
+import { query, queryOne, execute, ensureColumn } from "@/lib/db";
 import { config } from "@/lib/config";
 
 export type AdminRole = "super_admin" | "admin" | "support" | "billing" | "sales";
@@ -61,6 +61,8 @@ async function migrate() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+
+  await ensureColumn("admin_users", "notifications_last_seen_id", "INT DEFAULT 0");
 
   const existing = await queryOne<{ cnt: number }>("SELECT COUNT(*) as cnt FROM admin_users");
   if (!existing || Number(existing.cnt) === 0) {
@@ -183,8 +185,8 @@ const ROLE_CATEGORY_ACCESS: Record<AdminRole, "*" | string[]> = {
   super_admin: "*",
   admin:       "*",
   support:     ["tickets", "clients"],
-  billing:     ["invoices", "reports", "stats"],
-  sales:       ["orders", "clients", "domains"],
+  billing:     ["invoices", "reports", "stats", "quotes", "emails"],
+  sales:       ["orders", "clients", "domains", "products", "services"],
 };
 
 export function canAccessCategory(role: AdminRole, category: string): boolean {

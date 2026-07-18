@@ -38,3 +38,16 @@ export async function execute(
   const [result] = await pool.execute(sql, values);
   return result as { insertId: number; affectedRows: number };
 }
+
+/** Adds a column to an existing table if it isn't already there. Table/column
+ *  names are always call-site literals (never user input), and MySQL doesn't
+ *  allow parameterizing identifiers, so string-building the ALTER is safe here. */
+export async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+  const existing = await queryOne<{ cnt: number }>(
+    `SELECT COUNT(*) as cnt FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column]
+  );
+  if (existing && Number(existing.cnt) > 0) return;
+  await execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}

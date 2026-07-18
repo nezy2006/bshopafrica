@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/lib/admin-utils";
+import { adminHeaders } from "@/lib/admin-auth-client";
 
 const INPUT = "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all";
 
@@ -35,7 +36,7 @@ export default function SettingsPage() {
   const save = async () => {
     setSaving(true); setSaved(false);
     try {
-      await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
+      await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json", ...adminHeaders() }, body: JSON.stringify(settings) });
       setSaved(true); setTimeout(() => setSaved(false), 3000);
     } catch { /* error */ }
     setSaving(false);

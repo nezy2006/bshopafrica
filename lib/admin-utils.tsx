@@ -129,6 +129,71 @@ export function Pagination({ page, total, perPage, onChange }: { page: number; t
   );
 }
 
+/* ─── Tabs ────────────────────────────────────────────────────────────────── */
+export function Tabs({ tabs, active, onChange }: { tabs: { id: string; label: string }[]; active: string; onChange: (id: string) => void }) {
+  return (
+    <div className="flex gap-1 mb-6 overflow-x-auto border-b border-gray-100">
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          className={`px-4 py-2.5 text-sm font-bold whitespace-nowrap border-b-2 -mb-px transition-colors ${active === t.id ? "border-[#6B21A8] text-[#6B21A8]" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+        >{t.label}</button>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
+export function Modal({ title, onClose, children, maxWidth = "max-w-md" }: { title: string; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} p-6 max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Pie chart (hand-rolled, no charting lib installed) ────────────────────── */
+const PIE_COLORS = ["#6B21A8", "#2563EB", "#16A34A", "#EA580C", "#DC2626", "#0891B2", "#CA8A04", "#9333EA"];
+
+export function PieChart({ data, label }: { data: { key: string; value: number }[]; label: string }) {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  let cumulative = 0;
+  const stops = data.map((d, i) => {
+    const start = (cumulative / total) * 360;
+    cumulative += d.value;
+    const end = (cumulative / total) * 360;
+    return `${PIE_COLORS[i % PIE_COLORS.length]} ${start}deg ${end}deg`;
+  }).join(", ");
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <p className="text-sm font-bold text-gray-700 mb-4">{label}</p>
+      <div className="flex items-center gap-6 flex-wrap">
+        <div className="w-32 h-32 rounded-full flex-shrink-0" style={{ background: data.length ? `conic-gradient(${stops})` : "#f3f4f6" }} />
+        <div className="space-y-1.5 flex-1 min-w-[140px]">
+          {data.length === 0 && <p className="text-gray-400 text-xs">No data</p>}
+          {data.map((d, i) => (
+            <div key={d.key} className="flex items-center justify-between text-xs gap-3">
+              <span className="flex items-center gap-2 text-gray-600">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                {d.key}
+              </span>
+              <span className="font-bold text-gray-800">{d.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Empty state ────────────────────────────────────────────────────────── */
 export function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
   return <tr><td colSpan={99}><div className="text-center py-16 text-gray-400"><div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center bg-gray-100 rounded-full text-gray-400">{icon}</div><p className="text-sm font-medium">{message}</p></div></td></tr>;

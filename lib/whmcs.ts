@@ -709,7 +709,8 @@ export async function createInvoice(
   return Number(data.invoiceid ?? 0);
 }
 
-/* ─── PawaPay automated order creation ───────────────────────────────────── */
+/* ─── Cart-based order creation (used by checkout, PawaPay/PayPal flows, and
+   the admin "New Order" builder) ─────────────────────────────────────────── */
 // PawaPay gateway setup in WHMCS:
 //   Admin → Setup → Payment Gateways → Manage Existing Gateways
 //   Add "Bank Transfer" or a custom "pawapay" module.
@@ -723,11 +724,15 @@ export interface PawapayOrderResult {
   allOrderIds: number[]; // includes secondary orders (WB, transfer)
 }
 
-export async function createPawapayOrder(
+/** Builds and submits one or more WHMCS AddOrder calls for a cart, against
+ *  whichever payment gateway module name is passed in. Consolidates what used
+ *  to be two near-identical copies (createPawapayOrder / createPaypalOrder). */
+export async function createOrderWithGateway(
   clientId:  number,
   cartItems: CartItemLike[],
+  gateway:   string,
 ): Promise<PawapayOrderResult> {
-  const baseParams = { clientid: clientId, paymentmethod: WHMCS_PAWAPAY_GATEWAY };
+  const baseParams = { clientid: clientId, paymentmethod: gateway };
 
   const domain   = cartItems.find(i => i.type === "domain");
   const hosting  = cartItems.find(i => i.type === "hosting");
@@ -788,7 +793,7 @@ export async function createPawapayOrder(
         billingcycle: "monthly",
       });
       allOrderIds.push(Number(d.orderid ?? 0));
-    } catch (e) { console.error("[createPawapayOrder] WB order failed:", e); }
+    } catch (e) { console.error("[createOrderWithGateway] WB order failed:", e); }
   }
 
   // ── Secondary: transfer (if main order was something else) ───────────────
@@ -805,84 +810,18 @@ export async function createPawapayOrder(
         nameserver4: BSHOP_NAMESERVERS.ns4,
       });
       allOrderIds.push(Number(d.orderid ?? 0));
-    } catch (e) { console.error("[createPawapayOrder] transfer order failed:", e); }
+    } catch (e) { console.error("[createOrderWithGateway] transfer order failed:", e); }
   }
 
   return { orderId, invoiceId, allOrderIds };
 }
 
-/* ─── PayPal order creation ──────────────────────────────────────────────── */
-export async function createPaypalOrder(
-  clientId:  number,
-  cartItems: CartItemLike[],
-): Promise<PawapayOrderResult> {
-  const baseParams = { clientid: clientId, paymentmethod: WHMCS_PAYPAL_GATEWAY };
+export async function createPawapayOrder(clientId: number, cartItems: CartItemLike[]): Promise<PawapayOrderResult> {
+  return createOrderWithGateway(clientId, cartItems, WHMCS_PAWAPAY_GATEWAY);
+}
 
-  const domain   = cartItems.find(i => i.type === "domain");
-  const hosting  = cartItems.find(i => i.type === "hosting");
-  const transfer = cartItems.find(i => i.type === "transfer");
-  const wb       = cartItems.find(i => i.type === "website_builder");
-
-  const mainParams: Record<string, string | number | boolean> = { ...baseParams };
-
-  if (hosting) {
-    mainParams.pid          = (hosting.planId as number | undefined) ?? 1;
-    mainParams.billingcycle = (hosting.cycle as string) === "monthly" ? "monthly" : "annually";
-    if (domain) {
-      mainParams.domain      = domain.domain as string;
-      mainParams.domaintype  = "register";
-      mainParams.regperiod   = 1;
-      mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
-      mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
-      mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
-      mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
-    }
-  } else if (domain) {
-    mainParams.domain      = domain.domain as string;
-    mainParams.domaintype  = "register";
-    mainParams.regperiod   = 1;
-    mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
-    mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
-    mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
-    mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
-  } else if (wb) {
-    mainParams.pid          = wb.productId as number;
-    mainParams.billingcycle = "monthly";
-  } else if (transfer) {
-    mainParams.domain      = transfer.domain as string;
-    mainParams.domaintype  = "transfer";
-    mainParams.eppcode     = transfer.authCode as string;
-    mainParams.nameserver1 = BSHOP_NAMESERVERS.ns1;
-    mainParams.nameserver2 = BSHOP_NAMESERVERS.ns2;
-    mainParams.nameserver3 = BSHOP_NAMESERVERS.ns3;
-    mainParams.nameserver4 = BSHOP_NAMESERVERS.ns4;
-  }
-
-  const mainData  = await callWhmcs("AddOrder", mainParams);
-  const orderId   = Number(mainData.orderid   ?? 0);
-  const invoiceId = Number(mainData.invoiceid ?? 0);
-  const allOrderIds: number[] = [orderId];
-
-  if (wb && (hosting || domain)) {
-    try {
-      const d = await callWhmcs("AddOrder", { ...baseParams, pid: wb.productId as number, billingcycle: "monthly" });
-      allOrderIds.push(Number(d.orderid ?? 0));
-    } catch (e) { console.error("[createPaypalOrder] WB order failed:", e); }
-  }
-  if (transfer && (hosting || domain || wb)) {
-    try {
-      const d = await callWhmcs("AddOrder", {
-        ...baseParams,
-        domain: transfer.domain as string, domaintype: "transfer",
-        eppcode: transfer.authCode as string,
-        nameserver1: BSHOP_NAMESERVERS.ns1, nameserver2: BSHOP_NAMESERVERS.ns2,
-        nameserver3: BSHOP_NAMESERVERS.ns3, nameserver4: BSHOP_NAMESERVERS.ns4,
-      });
-      allOrderIds.push(Number(d.orderid ?? 0));
-    } catch (e) { console.error("[createPaypalOrder] transfer order failed:", e); }
-  }
-
-  return { orderId, invoiceId, allOrderIds };
+export async function createPaypalOrder(clientId: number, cartItems: CartItemLike[]): Promise<PawapayOrderResult> {
+  return createOrderWithGateway(clientId, cartItems, WHMCS_PAYPAL_GATEWAY);
 }
 
 /* ─── Invoice lookup ─────────────────────────────────────────────────────── */
