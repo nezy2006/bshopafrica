@@ -14,6 +14,7 @@ export default function DomainsPage() {
   const [search,   setSearch]   = useState("");
   const [loading,  setLoading]  = useState(true);
   const [expiring, setExpiring] = useState(false);
+  const [busyId,   setBusyId]   = useState<number | null>(null);
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -25,6 +26,13 @@ export default function DomainsPage() {
   }, [page]);
 
   useEffect(() => { fetch_(); }, [fetch_]);
+
+  const toggleAutoRenew = async (d: AdminDomain) => {
+    setBusyId(d.id);
+    await whmcsAdmin("adminUpdateDomainAutoRenew", { domainId: d.id, autoRenew: !d.autorenew });
+    setBusyId(null);
+    fetch_();
+  };
 
   const soon = new Date(); soon.setDate(soon.getDate() + 30);
   const filtered = domains
@@ -42,15 +50,26 @@ export default function DomainsPage() {
       </SearchBar>
 
       <TableCard>
-        <THead cols={["Domain", "Client", "Expiry Date", "Registrar", "Status"]} />
+        <THead cols={["Domain", "Client", "Status", "Registration Date", "Next Due Date", "Auto Renew", "Actions"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={5} /> : filtered.length === 0 ? <EmptyState icon={<Globe className="w-5 h-5" />} message="No domains found" /> : filtered.map(d => (
+          {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon={<Globe className="w-5 h-5" />} message="No domains found" /> : filtered.map(d => (
             <tr key={d.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{d.domainname}</td>
               <td className="px-5 py-3.5 text-gray-700">{d.firstname} {d.lastname}</td>
-              <td className="px-5 py-3.5 text-gray-500">{d.expirydate}</td>
-              <td className="px-5 py-3.5 text-gray-500">{d.registrar || "—"}</td>
               <td className="px-5 py-3.5"><Badge status={d.status} /></td>
+              <td className="px-5 py-3.5 text-gray-500">{d.registrationdate || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{d.nextduedate || "—"}</td>
+              <td className="px-5 py-3.5">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${d.autorenew ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />{d.autorenew ? "On" : "Off"}
+                </span>
+              </td>
+              <td className="px-5 py-3.5">
+                <button onClick={() => toggleAutoRenew(d)} disabled={busyId === d.id}
+                  className="text-xs text-[#6B21A8] font-semibold hover:underline disabled:opacity-50">
+                  {busyId === d.id ? "Saving…" : d.autorenew ? "Turn off" : "Turn on"}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

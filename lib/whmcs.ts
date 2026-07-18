@@ -68,7 +68,8 @@ export interface AdminInvoice {
 }
 export interface AdminDomain {
   id: number; userid: number; firstname: string; lastname: string;
-  domainname: string; status: string; expirydate: string; registrar: string;
+  domainname: string; status: string; registrationdate: string;
+  expirydate: string; nextduedate: string; registrar: string; autorenew: boolean;
 }
 export interface AdminHostingAccount {
   id: number; userid: number; firstname: string; lastname: string;
@@ -260,6 +261,84 @@ export async function getAdminStats(): Promise<AdminStats> {
   };
 }
 
+export interface AdminOverview {
+  clientsTotal:   number;
+  hostingActive:  number;
+  domainsActive:  number;
+  ticketsOpen:    number;
+  ordersPending:  number;
+  monthlyRevenue: number;
+  revenueByDay:   { key: string; value: number }[];
+  ordersThisWeek: number;
+  ordersByDay:    { key: string; value: number }[];
+}
+
+/** Powers the admin dashboard's overview cards + charts. GetStats' own totals
+ *  proved unreliable on this WHMCS install, so each figure here is computed
+ *  from a targeted list call instead (status-filtered totalresults, or a
+ *  manual sum/count over GetTransactions / GetOrders). */
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const now        = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const weekAgo     = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  const [clientsData, hostingData, domainsData, ticketsData, ordersPendingData, txData, ordersData] =
+    await Promise.all([
+      callWhmcs("GetClients",         { limitnum: 1 }),
+      callWhmcs("GetClientsProducts", { status: "Active",  limitnum: 1 }),
+      callWhmcs("GetClientsDomains",  { status: "Active",  limitnum: 1 }),
+      callWhmcs("GetTickets",         { status: "Open",    limitnum: 1 }),
+      callWhmcs("GetOrders",          { status: "Pending", limitnum: 1 }),
+      callWhmcs("GetTransactions",    { daterangestart: fmt(monthStart), daterangeend: fmt(now), limitnum: 500 }),
+      callWhmcs("GetOrders",          { limitnum: 100 }),
+    ]);
+
+  // Monthly revenue: sum incoming ("Credit") transaction amounts for the current month.
+  const txRaw = (txData.transactions as { transaction: WhmcsRaw[] } | undefined)?.transaction ?? [];
+  const revenueByDayMap = new Map<string, number>();
+  let monthlyRevenue = 0;
+  for (const t of txRaw) {
+    const amt = parseFloat(String(t.amountin ?? t.amount ?? "0")) || 0;
+    if (amt <= 0) continue; // only money coming in counts as revenue
+    monthlyRevenue += amt;
+    const day = String(t.date ?? "").split(" ")[0].split("-")[2];
+    if (day) revenueByDayMap.set(day, (revenueByDayMap.get(day) ?? 0) + amt);
+  }
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const revenueByDay = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = String(i + 1).padStart(2, "0");
+    return { key: d, value: Math.round((revenueByDayMap.get(d) ?? 0) * 100) / 100 };
+  });
+
+  // Orders this week: last 7 days, grouped by weekday for the chart.
+  const ordersRaw       = (ordersData.orders as { order: WhmcsRaw[] } | undefined)?.order ?? [];
+  const weekdayByJsDay  = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const orderedWeekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const ordersByDayMap  = new Map<string, number>();
+  let ordersThisWeek = 0;
+  for (const o of ordersRaw) {
+    const d = new Date(String(o.date ?? ""));
+    if (isNaN(d.getTime()) || d < weekAgo) continue;
+    ordersThisWeek++;
+    const label = weekdayByJsDay[d.getDay()];
+    ordersByDayMap.set(label, (ordersByDayMap.get(label) ?? 0) + 1);
+  }
+  const ordersByDay = orderedWeekdays.map(key => ({ key, value: ordersByDayMap.get(key) ?? 0 }));
+
+  return {
+    clientsTotal:   Number(clientsData.totalresults ?? 0),
+    hostingActive:  Number(hostingData.totalresults ?? 0),
+    domainsActive:  Number(domainsData.totalresults ?? 0),
+    ticketsOpen:    Number(ticketsData.totalresults ?? 0),
+    ordersPending:  Number(ordersPendingData.totalresults ?? 0),
+    monthlyRevenue: Math.round(monthlyRevenue * 100) / 100,
+    revenueByDay,
+    ordersThisWeek,
+    ordersByDay,
+  };
+}
+
 export async function getAdminClients(limitstart = 0, limitnum = 20, search = ""): Promise<{ clients: AdminClient[]; total: number }> {
   const params: Record<string, string | number> = { limitstart, limitnum };
   if (search) params.search = search;
@@ -314,11 +393,20 @@ export async function getAdminTransactions(limitstart = 0, limitnum = 50): Promi
 }
 
 export async function getAdminDomains(limitstart = 0, limitnum = 20): Promise<{ domains: AdminDomain[]; total: number }> {
-  const data = await callWhmcs("GetDomains", { limitstart, limitnum });
+  // WHMCS has no "GetDomains" action — GetClientsDomains called without a
+  // clientid returns every domain system-wide, which is what admin needs here.
+  const data = await callWhmcs("GetClientsDomains", { limitstart, limitnum });
   const raw = (data.domains as { domain: WhmcsRaw[] } | undefined)?.domain ?? [];
   return {
     total: Number(data.totalresults ?? 0),
-    domains: raw.map(d => ({ id: Number(d.id ?? 0), userid: Number(d.userid ?? 0), firstname: String(d.firstname ?? ""), lastname: String(d.lastname ?? ""), domainname: String(d.domainname ?? ""), status: String(d.status ?? ""), expirydate: String(d.expirydate ?? ""), registrar: String(d.registrar ?? "") })),
+    domains: raw.map(d => ({
+      id: Number(d.id ?? 0), userid: Number(d.userid ?? 0),
+      firstname: String(d.firstname ?? ""), lastname: String(d.lastname ?? ""),
+      domainname: String(d.domainname ?? ""), status: String(d.status ?? ""),
+      registrationdate: String(d.registrationdate ?? d.regdate ?? ""),
+      expirydate: String(d.expirydate ?? ""), nextduedate: String(d.nextduedate ?? ""),
+      registrar: String(d.registrar ?? ""), autorenew: String(d.donotrenew ?? "0") !== "1",
+    })),
   };
 }
 

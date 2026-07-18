@@ -4,7 +4,7 @@ import {
   getClientDetails, getClientProducts, getClientDomains, getInvoices,
   getClientOrders, getTickets, getTicket, openTicket, addTicketReply,
   closeTicket, updateClientDetails, getInvoicePDFUrl, getPaymentUrl,
-  getAdminStats, getAdminClients, getAdminOrders, getAdminInvoices,
+  getAdminStats, getAdminOverview, getAdminClients, getAdminOrders, getAdminInvoices,
   getAdminDomains, getAdminHosting, getAdminTickets, acceptOrder,
   cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
   getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
@@ -271,6 +271,12 @@ export async function POST(req: NextRequest) {
         data = await getAdminStats();
         break;
       }
+      case "adminGetOverview": {
+        const admin = await requireAdmin(req, "stats");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAdminOverview();
+        break;
+      }
       case "adminGetClients": {
         const admin = await requireAdmin(req, "clients");
         if (isAdminUnauthorized(admin)) return admin;
@@ -293,6 +299,16 @@ export async function POST(req: NextRequest) {
         const admin = await requireAdmin(req, "domains");
         if (isAdminUnauthorized(admin)) return admin;
         data = await getAdminDomains(n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminUpdateDomainAutoRenew": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        const domainId = n("domainId");
+        const autoRenew = Boolean(params.autoRenew);
+        await updateDomainAutoRenew(domainId, autoRenew);
+        await logAdminActivity(admin.id, "update_domain_autorenew", `domainId=${domainId} autoRenew=${autoRenew}`, getAdminRequestIp(req));
+        data = { ok: true };
         break;
       }
       case "adminGetHosting": {
