@@ -12,6 +12,7 @@ import {
   getDomainLockingStatus, updateDomainLockingStatus,
   validateLogin, updateClientPassword, createInvoice, getInvoice,
   updateClientStatus, addClientCredit, sendClientEmail, updateDomainAutoRenew,
+  getTicketDepartments,
   getOrderDetail, markOrderFraud, getPaymentMethods, createOrderWithGateway,
   WHMCS_PAYPAL_GATEWAY, WHMCS_PAWAPAY_GATEWAY,
   createInvoiceItemized, voidInvoice, applyCreditToInvoice, sendInvoiceReminder,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
+import { getTicketMetaBulk } from "@/lib/ticket-meta";
 
 type Params = Record<string, unknown>;
 
@@ -411,6 +413,12 @@ export async function POST(req: NextRequest) {
         data = await getDomainWhoisInfo(n("domainId"));
         break;
       }
+      case "adminGetTicketDepartments": {
+        const admin = await requireAdmin(req, "tickets");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getTicketDepartments();
+        break;
+      }
       case "adminGetHosting": {
         const admin = await requireAdmin(req, "hosting");
         if (isAdminUnauthorized(admin)) return admin;
@@ -472,7 +480,17 @@ export async function POST(req: NextRequest) {
       case "adminGetTickets": {
         const admin = await requireAdmin(req, "tickets");
         if (isAdminUnauthorized(admin)) return admin;
-        data = await getAdminTickets(s("status"), n("limitstart"), n("limitnum", 20));
+        const result = await getAdminTickets(s("status"), n("limitstart"), n("limitnum", 20), n("deptId"));
+        const metaMap = await getTicketMetaBulk(result.tickets.map(t => t.id)).catch(() => new Map());
+        data = {
+          total: result.total,
+          tickets: result.tickets.map(t => ({
+            ...t,
+            assignedAdminId: metaMap.get(t.id)?.assigned_admin_id ?? null,
+            assignedAdminName: metaMap.get(t.id)?.assigned_admin_name ?? null,
+            escalated: metaMap.get(t.id)?.escalated === 1,
+          })),
+        };
         break;
       }
       case "adminAcceptOrder": {

@@ -82,7 +82,7 @@ export interface AdminHostingAccount {
 }
 export interface AdminTicket {
   tid: string; id: number; title: string; firstname: string; lastname: string;
-  email: string; status: string; priority: string; date: string; department: string;
+  email: string; status: string; priority: string; date: string; department: string; lastreply: string;
 }
 
 /* ─── Core ───────────────────────────────────────────────────────────────── */
@@ -577,14 +577,15 @@ export async function sendServiceWelcomeEmail(serviceId: number): Promise<void> 
   await callWhmcs("SendEmail", { messagename: "Hosting Account Welcome Email", id: serviceId, type: "product" });
 }
 
-export async function getAdminTickets(status = "", limitstart = 0, limitnum = 20): Promise<{ tickets: AdminTicket[]; total: number }> {
+export async function getAdminTickets(status = "", limitstart = 0, limitnum = 20, deptId = 0): Promise<{ tickets: AdminTicket[]; total: number }> {
   const params: Record<string, string | number> = { limitstart, limitnum };
   if (status) params.status = status;
+  if (deptId) params.deptid = deptId;
   const data = await callWhmcs("GetTickets", params);
   const raw = (data.tickets as { ticket: WhmcsRaw[] } | undefined)?.ticket ?? [];
   return {
     total: Number(data.totalresults ?? 0),
-    tickets: raw.map(t => ({ tid: String(t.tid ?? ""), id: Number(t.id ?? 0), title: String(t.title ?? ""), firstname: String(t.firstname ?? ""), lastname: String(t.lastname ?? ""), email: String(t.email ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), date: String(t.date ?? ""), department: String(t.deptname ?? "") })),
+    tickets: raw.map(t => ({ tid: String(t.tid ?? ""), id: Number(t.id ?? 0), title: String(t.title ?? ""), firstname: String(t.firstname ?? ""), lastname: String(t.lastname ?? ""), email: String(t.email ?? ""), status: String(t.status ?? ""), priority: String(t.priority ?? ""), date: String(t.date ?? ""), department: String(t.deptname ?? ""), lastreply: String(t.lastreply ?? "") })),
   };
 }
 
@@ -767,6 +768,11 @@ export async function updateTicketDepartment(ticketId: number, deptId: number): 
 
 export async function reopenTicket(ticketId: number): Promise<void> {
   await callWhmcs("UpdateTicket", { ticketid: ticketId, status: "Customer-Reply" });
+}
+
+/** Merges mergeTicketIds into ticketId — irreversible per WHMCS docs. */
+export async function mergeTickets(ticketId: number, mergeTicketIds: number[], newSubject?: string): Promise<void> {
+  await callWhmcs("MergeTicket", { ticketid: ticketId, mergeticketids: mergeTicketIds.join(","), ...(newSubject ? { newsubject: newSubject } : {}) });
 }
 
 export interface TicketDepartment { id: number; name: string }

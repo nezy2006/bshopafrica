@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp, listAdminUsers } from "@/lib/admin-auth";
-import { getTicketMeta, assignTicket, setTicketEscalated } from "@/lib/ticket-meta";
+import { getTicketMeta, assignTicket, setTicketEscalated, linkTicketToOrderInvoice } from "@/lib/ticket-meta";
+import { getCannedResponses } from "@/lib/canned-responses";
 import {
   getTicket, addAdminTicketReply, addTicketNote, closeTicket, reopenTicket,
-  updateTicketPriority, updateTicketDepartment, getTicketDepartments,
+  updateTicketPriority, updateTicketDepartment, getTicketDepartments, mergeTickets,
+  getTickets,
 } from "@/lib/whmcs";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,18 +13,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (isAdminUnauthorized(admin)) return admin;
 
   const ticketId = Number((await params).id);
-  const [ticket, meta, departments, admins] = await Promise.all([
+  const [ticket, meta, departments, admins, cannedResponses] = await Promise.all([
     getTicket(ticketId),
     getTicketMeta(ticketId),
     getTicketDepartments().catch(() => []),
     listAdminUsers().catch(() => []),
+    getCannedResponses().catch(() => []),
   ]);
+  // Merge candidates: this client's other open tickets.
+  const clientTickets = await getTickets(ticket.userid).catch(() => []);
 
   return NextResponse.json({
     success: true,
     data: {
-      ticket, meta, departments,
+      ticket, meta, departments, cannedResponses,
       assignableAdmins: admins.filter(a => a.is_active).map(a => ({ id: a.id, name: a.name })),
+      mergeCandidates: clientTickets.filter(t => t.id !== ticketId),
     },
   });
 }
@@ -61,6 +67,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await updateTicketPriority(ticketId, "High");
       await setTicketEscalated(ticketId, true);
       await logAdminActivity(admin.id, "escalate_ticket", `ticketId=${ticketId}`, ip);
+      break;
+    }
+    case "unescalate": {
+      await setTicketEscalated(ticketId, false);
+      await logAdminActivity(admin.id, "unescalate_ticket", `ticketId=${ticketId}`, ip);
+      break;
+    }
+    case "merge": {
+      const mergeIds = Array.isArray(body.mergeTicketIds) ? (body.mergeTicketIds as unknown[]).map(Number).filter(Boolean) : [];
+      if (mergeIds.length === 0) return NextResponse.json({ success: false, error: "mergeTicketIds is required" }, { status: 400 });
+      await mergeTickets(ticketId, mergeIds, body.newSubject ? String(body.newSubject) : undefined);
+      await logAdminActivity(admin.id, "merge_ticket", `ticketId=${ticketId} merged=${mergeIds.join(",")}`, ip);
+      break;
+    }
+    case "link": {
+      const orderId = body.orderId === null || body.orderId === undefined || body.orderId === "" ? null : Number(body.orderId);
+      const invoiceId = body.invoiceId === null || body.invoiceId === undefined || body.invoiceId === "" ? null : Number(body.invoiceId);
+      await linkTicketToOrderInvoice(ticketId, orderId, invoiceId);
+      await logAdminActivity(admin.id, "link_ticket", `ticketId=${ticketId} orderId=${orderId ?? "-"} invoiceId=${invoiceId ?? "-"}`, ip);
       break;
     }
     case "close": {
