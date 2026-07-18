@@ -32,7 +32,7 @@ export interface WhmcsProduct       { pid: number; name: string; description: st
 export interface LoginResult        { clientId: number; passwordHash: string; firstname: string; lastname: string; email: string; }
 export interface RegisterResult     { clientId: number; }
 export interface OrderResult        { orderId: number; invoiceId: number; }
-export interface ClientDetails      { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
+export interface ClientDetails      { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; credit: string; lastlogin: string; address1: string; city: string; state: string; postcode: string; country: string; companyname: string; }
 export interface ClientProduct      { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
 export interface ClientDomain       { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; autorenew: boolean; }
 export interface ClientInvoice      { id: number; date: string; duedate: string; total: string; status: string; }
@@ -214,7 +214,62 @@ export async function getClientDetails(clientId: number, email?: string): Promis
   const lookup: Record<string, string | number | boolean> = email && !clientId ? { email } : { clientid: clientId };
   const data = await callWhmcs("GetClientsDetails", lookup);
   const c = (data.client ?? data) as Record<string, unknown>;
-  return { id: Number(c.id ?? clientId), firstname: String(c.firstname ?? ""), lastname: String(c.lastname ?? ""), email: String(c.email ?? ""), phonenumber: String(c.phonenumber ?? ""), status: String(c.status ?? ""), datecreated: String(c.datecreated ?? "") };
+  return {
+    id: Number(c.id ?? clientId), firstname: String(c.firstname ?? ""), lastname: String(c.lastname ?? ""),
+    email: String(c.email ?? ""), phonenumber: String(c.phonenumber ?? ""), status: String(c.status ?? ""),
+    datecreated: String(c.datecreated ?? ""), credit: String(c.credit ?? "0.00"),
+    lastlogin: String(c.lastlogin ?? ""), address1: String(c.address1 ?? ""), city: String(c.city ?? ""),
+    state: String(c.state ?? ""), postcode: String(c.postcode ?? ""), country: String(c.country ?? ""),
+    companyname: String(c.companyname ?? ""),
+  };
+}
+
+export async function deleteClient(clientId: number): Promise<void> {
+  await callWhmcs("DeleteClient", { clientid: clientId });
+}
+
+export interface ActivityLogEntryWhmcs { date: string; description: string; username: string; ipaddress: string }
+
+export async function getClientActivityLog(clientId: number, limitnum = 50): Promise<ActivityLogEntryWhmcs[]> {
+  try {
+    const data = await callWhmcs("GetActivityLog", { clientid: clientId, limitnum });
+    const raw = (data.activity as { entry?: WhmcsRaw[] } | undefined)?.entry ?? [];
+    return raw.map(r => ({ date: String(r.date ?? ""), description: String(r.description ?? ""), username: String(r.username ?? ""), ipaddress: String(r.ipaddress ?? "") }));
+  } catch { return []; }
+}
+
+export interface ClientEmailLogEntry { id: number; subject: string; date: string; to: string; failed: boolean }
+
+export async function getClientEmails(clientId: number, limitnum = 50): Promise<ClientEmailLogEntry[]> {
+  try {
+    const data = await callWhmcs("GetEmails", { clientid: clientId, limitnum });
+    const raw = (data.emails as { email?: WhmcsRaw[] } | undefined)?.email ?? [];
+    return raw.map(e => ({ id: Number(e.id ?? 0), subject: String(e.subject ?? ""), date: String(e.date ?? ""), to: String(e.to ?? ""), failed: String(e.failed ?? "0") === "1" }));
+  } catch { return []; }
+}
+
+/** WHMCS has no dedicated "debit" action — AddCredit's amount accepts a
+ *  negative value to deduct from a client's account credit balance. */
+export async function addClientDebit(clientId: number, amount: number, description: string): Promise<void> {
+  await callWhmcs("AddCredit", { clientid: clientId, amount: -Math.abs(amount), description, notes: description });
+}
+
+export async function suspendAllClientServices(clientId: number, reason?: string): Promise<void> {
+  const products = await getClientProducts(clientId);
+  await Promise.all(
+    products.filter(p => p.status === "Active").map(p =>
+      callWhmcs("ModuleSuspend", { serviceid: p.id, ...(reason ? { suspendreason: reason } : {}) }).catch(e => console.error(`[suspendAllClientServices] service ${p.id} failed:`, e))
+    )
+  );
+}
+
+export async function unsuspendAllClientServices(clientId: number): Promise<void> {
+  const products = await getClientProducts(clientId);
+  await Promise.all(
+    products.filter(p => p.status === "Suspended").map(p =>
+      callWhmcs("ModuleUnsuspend", { serviceid: p.id }).catch(e => console.error(`[unsuspendAllClientServices] service ${p.id} failed:`, e))
+    )
+  );
 }
 
 export async function getClientProducts(clientId: number): Promise<ClientProduct[]> {
@@ -376,8 +431,10 @@ export interface AdminTransaction {
   gateway: string; transid: string; invoiceid: number;
 }
 
-export async function getAdminTransactions(limitstart = 0, limitnum = 50): Promise<{ transactions: AdminTransaction[]; total: number }> {
-  const data = await callWhmcs("GetTransactions", { limitstart, limitnum });
+export async function getAdminTransactions(limitstart = 0, limitnum = 50, clientId?: number): Promise<{ transactions: AdminTransaction[]; total: number }> {
+  const params: Record<string, string | number> = { limitstart, limitnum };
+  if (clientId) params.clientid = clientId;
+  const data = await callWhmcs("GetTransactions", params);
   const raw = (data.transactions as { transaction: WhmcsRaw[] } | undefined)?.transaction ?? [];
   return {
     total: Number(data.numreturned ?? raw.length ?? 0),

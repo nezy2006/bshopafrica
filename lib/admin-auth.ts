@@ -180,6 +180,18 @@ export async function getActivityLog(limit = 100, adminId?: number): Promise<Act
   );
 }
 
+/** Our own admin_activity_log doesn't have a clientId column — every client-scoped
+ *  action already writes "clientId=<id>" into `details` (see app/api/whmcs/route.ts),
+ *  so match on that instead of adding a migration for one filter. */
+export async function getActivityLogForClient(clientId: number, limit = 50): Promise<ActivityLogEntry[]> {
+  return query<ActivityLogEntry>(
+    `SELECT l.id, l.admin_id, u.name as admin_name, l.action, l.details, l.ip_address, l.created_at
+     FROM admin_activity_log l JOIN admin_users u ON u.id = l.admin_id
+     WHERE l.details LIKE ? ORDER BY l.created_at DESC LIMIT ?`,
+    [`%clientId=${clientId}%`, limit]
+  );
+}
+
 /* ─── Role-based access ──────────────────────────────────────────────────── */
 const ROLE_CATEGORY_ACCESS: Record<AdminRole, "*" | string[]> = {
   super_admin: "*",
