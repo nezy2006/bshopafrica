@@ -61,7 +61,11 @@ export interface AdminClient {
 export interface AdminOrder {
   id: number; userid: number; firstname: string; lastname: string;
   amount: string; status: string; date: string; currencycode: string;
+  paymentmethod: string; product: string; invoiceid: number;
 }
+
+export interface OrderLineItem { type: string; description: string; amount: string; recurring: string }
+export interface AdminOrderDetail extends AdminOrder { lineitems: OrderLineItem[]; notes: string }
 export interface AdminInvoice {
   id: number; userid: number; firstname: string; lastname: string;
   date: string; duedate: string; total: string; status: string;
@@ -405,13 +409,51 @@ export async function getAdminClients(limitstart = 0, limitnum = 20, search = ""
   };
 }
 
-export async function getAdminOrders(limitstart = 0, limitnum = 20): Promise<{ orders: AdminOrder[]; total: number }> {
-  const data = await callWhmcs("GetOrders", { limitstart, limitnum });
-  const raw = (data.orders as { order: WhmcsRaw[] } | undefined)?.order ?? [];
+function parseOrderLineItems(o: WhmcsRaw): OrderLineItem[] {
+  const raw = (o.lineitems as { lineitem?: WhmcsRaw | WhmcsRaw[] } | undefined)?.lineitem;
+  const arr = raw ? (Array.isArray(raw) ? raw : [raw]) : [];
+  return arr.map(li => ({ type: String(li.type ?? ""), description: String(li.description ?? ""), amount: String(li.amount ?? "0.00"), recurring: String(li.recurring ?? "") }));
+}
+
+function mapAdminOrder(o: WhmcsRaw): AdminOrder {
+  const lineitems = parseOrderLineItems(o);
   return {
-    total: Number(data.totalresults ?? 0),
-    orders: raw.map(o => ({ id: Number(o.id ?? 0), userid: Number(o.userid ?? 0), firstname: String(o.firstname ?? ""), lastname: String(o.lastname ?? ""), amount: String(o.amount ?? "0.00"), status: String(o.status ?? ""), date: String(o.date ?? ""), currencycode: String(o.currencycode ?? "USD") })),
+    id: Number(o.id ?? 0), userid: Number(o.userid ?? 0),
+    firstname: String(o.firstname ?? o.name ?? ""), lastname: String(o.lastname ?? ""),
+    amount: String(o.amount ?? "0.00"), status: String(o.status ?? ""), date: String(o.date ?? ""),
+    currencycode: String(o.currencysuffix ?? o.currencycode ?? "USD"),
+    paymentmethod: String(o.paymentmethodname ?? o.paymentmethod ?? ""),
+    product: lineitems.map(li => li.description).filter(Boolean).join(", "),
+    invoiceid: Number(o.invoiceid ?? 0),
   };
+}
+
+export async function getAdminOrders(limitstart = 0, limitnum = 20, status = ""): Promise<{ orders: AdminOrder[]; total: number }> {
+  const params: Record<string, string | number> = { limitstart, limitnum };
+  if (status) params.status = status;
+  const data = await callWhmcs("GetOrders", params);
+  const raw = (data.orders as { order: WhmcsRaw[] } | undefined)?.order ?? [];
+  return { total: Number(data.totalresults ?? 0), orders: raw.map(mapAdminOrder) };
+}
+
+export async function getOrderDetail(orderId: number): Promise<AdminOrderDetail | null> {
+  const data = await callWhmcs("GetOrders", { id: orderId });
+  const raw = (data.orders as { order: WhmcsRaw[] } | undefined)?.order ?? [];
+  const o = raw[0];
+  if (!o) return null;
+  return { ...mapAdminOrder(o), lineitems: parseOrderLineItems(o), notes: String(o.notes ?? "") };
+}
+
+export async function markOrderFraud(orderId: number, cancelSubscription = false): Promise<void> {
+  await callWhmcs("FraudOrder", { orderid: orderId, cancelsub: cancelSubscription });
+}
+
+export interface PaymentMethod { module: string; displayname: string }
+
+export async function getPaymentMethods(): Promise<PaymentMethod[]> {
+  const data = await callWhmcs("GetPaymentMethods");
+  const raw = (data.paymentmethods as { paymentmethod?: WhmcsRaw[] } | undefined)?.paymentmethod ?? [];
+  return raw.map(p => ({ module: String(p.module ?? ""), displayname: String(p.displayname ?? p.module ?? "") }));
 }
 
 export async function getAdminInvoices(status = "", limitstart = 0, limitnum = 20): Promise<{ invoices: AdminInvoice[]; total: number }> {
@@ -788,8 +830,10 @@ export async function createOrderWithGateway(
   clientId:  number,
   cartItems: CartItemLike[],
   gateway:   string,
+  promoCode?: string,
 ): Promise<PawapayOrderResult> {
-  const baseParams = { clientid: clientId, paymentmethod: gateway };
+  const baseParams: Record<string, string | number> = { clientid: clientId, paymentmethod: gateway };
+  if (promoCode) baseParams.promocode = promoCode;
 
   const domain   = cartItems.find(i => i.type === "domain");
   const hosting  = cartItems.find(i => i.type === "hosting");

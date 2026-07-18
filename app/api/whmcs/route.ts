@@ -12,6 +12,8 @@ import {
   getDomainLockingStatus, updateDomainLockingStatus,
   validateLogin, updateClientPassword, createInvoice, getInvoice,
   updateClientStatus, addClientCredit, sendClientEmail, updateDomainAutoRenew,
+  getOrderDetail, markOrderFraud, getPaymentMethods, createOrderWithGateway,
+  WHMCS_PAYPAL_GATEWAY, WHMCS_PAWAPAY_GATEWAY,
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
@@ -286,7 +288,42 @@ export async function POST(req: NextRequest) {
       case "adminGetOrders": {
         const admin = await requireAdmin(req, "orders");
         if (isAdminUnauthorized(admin)) return admin;
-        data = await getAdminOrders(n("limitstart"), n("limitnum", 20));
+        data = await getAdminOrders(n("limitstart"), n("limitnum", 20), s("status"));
+        break;
+      }
+      case "adminGetOrderDetail": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getOrderDetail(n("orderId"));
+        break;
+      }
+      case "adminMarkOrderFraud": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        await markOrderFraud(n("orderId"), Boolean(params.cancelSubscription));
+        await logAdminActivity(admin.id, "mark_order_fraud", `orderId=${n("orderId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminGetPaymentMethods": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getPaymentMethods();
+        break;
+      }
+      case "adminCreateOrder": {
+        const admin = await requireAdmin(req, "orders");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        if (!clientId) return NextResponse.json({ success: false, error: "clientId is required" }, { status: 400 });
+        const gatewayChoice = s("gateway", "paypal");
+        const gateway = gatewayChoice === "pawapay" ? WHMCS_PAWAPAY_GATEWAY : gatewayChoice === "paypal" ? WHMCS_PAYPAL_GATEWAY : gatewayChoice;
+        const items = Array.isArray(params.items) ? params.items as { type: string; [k: string]: unknown }[] : [];
+        if (items.length === 0) return NextResponse.json({ success: false, error: "At least one item is required" }, { status: 400 });
+        const promoCode = params.promoCode ? s("promoCode") : undefined;
+        const result = await createOrderWithGateway(clientId, items, gateway, promoCode);
+        await logAdminActivity(admin.id, "create_order", `clientId=${clientId} orderId=${result.orderId}`, getAdminRequestIp(req));
+        data = result;
         break;
       }
       case "adminGetInvoices": {
