@@ -18,6 +18,7 @@ import {
   getQuotes, createQuote, updateQuoteStage, deleteQuote, sendQuote, acceptQuote,
   suspendService, unsuspendService, terminateService, upgradeService,
   updateServiceDetails, sendServiceWelcomeEmail,
+  registerDomain, transferDomainRecord, renewDomain, getDomainWhoisInfo,
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
@@ -350,6 +351,64 @@ export async function POST(req: NextRequest) {
         await updateDomainAutoRenew(domainId, autoRenew);
         await logAdminActivity(admin.id, "update_domain_autorenew", `domainId=${domainId} autoRenew=${autoRenew}`, getAdminRequestIp(req));
         data = { ok: true };
+        break;
+      }
+      case "adminRegisterDomain": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        await registerDomain(n("domainId"));
+        await logAdminActivity(admin.id, "register_domain", `domainId=${n("domainId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminTransferDomain": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        await transferDomainRecord(n("domainId"), params.eppCode ? s("eppCode") : undefined);
+        await logAdminActivity(admin.id, "transfer_domain", `domainId=${n("domainId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminRenewDomain": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        await renewDomain(n("domainId"), params.regPeriod ? n("regPeriod") : undefined);
+        await logAdminActivity(admin.id, "renew_domain", `domainId=${n("domainId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminGetDomainNameservers": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getDomainNameservers(n("domainId"));
+        break;
+      }
+      case "adminUpdateDomainNameservers": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        await updateDomainNameservers(n("domainId"), (params.ns as Record<string, string>) ?? {});
+        await logAdminActivity(admin.id, "update_domain_nameservers", `domainId=${n("domainId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminGetDomainLockingStatus": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = { locked: await getDomainLockingStatus(n("domainId")) };
+        break;
+      }
+      case "adminUpdateDomainLockingStatus": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        await updateDomainLockingStatus(n("domainId"), Boolean(params.locked));
+        await logAdminActivity(admin.id, "update_domain_lock", `domainId=${n("domainId")} locked=${Boolean(params.locked)}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminGetDomainWhois": {
+        const admin = await requireAdmin(req, "domains");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getDomainWhoisInfo(n("domainId"));
         break;
       }
       case "adminGetHosting": {

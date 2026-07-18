@@ -509,6 +509,29 @@ export async function getAdminDomains(limitstart = 0, limitnum = 20): Promise<{ 
   };
 }
 
+export async function registerDomain(domainId: number): Promise<void> {
+  await callWhmcs("DomainRegister", { domainid: domainId });
+}
+
+/** Initiates/retries the transfer process on an existing WHMCS domain record
+ *  (registrar-side handoff) — distinct from placing a brand-new transfer
+ *  order, which the admin "New Order" flow already covers via AddOrder. */
+export async function transferDomainRecord(domainId: number, eppCode?: string): Promise<void> {
+  await callWhmcs("DomainTransfer", { domainid: domainId, ...(eppCode ? { eppcode: eppCode } : {}) });
+}
+
+export async function renewDomain(domainId: number, regPeriod?: number): Promise<void> {
+  await callWhmcs("DomainRenew", { domainid: domainId, ...(regPeriod ? { regperiod: regPeriod } : {}) });
+}
+
+export interface WhoisContact { [key: string]: string }
+
+export async function getDomainWhoisInfo(domainId: number): Promise<{ registrant: WhoisContact; admin: WhoisContact; tech: WhoisContact }> {
+  const data = await callWhmcs("DomainGetWhoisInfo", { domainid: domainId });
+  const toContact = (v: unknown) => (v && typeof v === "object" ? v as WhoisContact : {});
+  return { registrant: toContact(data.Registrant), admin: toContact(data.Admin), tech: toContact(data.Tech) };
+}
+
 export async function getAdminHosting(limitstart = 0, limitnum = 20, status = ""): Promise<{ hosting: AdminHostingAccount[]; total: number }> {
   const params: Record<string, string | number> = { limitstart, limitnum };
   if (status) params.status = status;
