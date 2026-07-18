@@ -20,7 +20,9 @@ import {
   suspendService, unsuspendService, terminateService, upgradeService,
   updateServiceDetails, sendServiceWelcomeEmail,
   registerDomain, transferDomainRecord, renewDomain, getDomainWhoisInfo,
+  getEmailTemplates, getClientEmails,
 } from "@/lib/whmcs";
+import { sendSmtpMail } from "@/lib/mailer";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
 import { getTicketMetaBulk } from "@/lib/ticket-meta";
@@ -411,6 +413,29 @@ export async function POST(req: NextRequest) {
         const admin = await requireAdmin(req, "domains");
         if (isAdminUnauthorized(admin)) return admin;
         data = await getDomainWhoisInfo(n("domainId"));
+        break;
+      }
+      case "adminGetClientEmails": {
+        const admin = await requireAdmin(req, "emails");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getClientEmails(n("clientId"), n("limitnum", 100));
+        break;
+      }
+      case "adminGetEmailTemplates": {
+        const admin = await requireAdmin(req, "emails");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getEmailTemplates();
+        break;
+      }
+      case "adminSendTestEmail": {
+        const admin = await requireAdmin(req, "emails");
+        if (isAdminUnauthorized(admin)) return admin;
+        const to = s("to");
+        if (!to) return NextResponse.json({ success: false, error: "to is required" }, { status: 400 });
+        const ok = await sendSmtpMail(to, `[Test] ${s("subject", "Email Template Preview")}`, `${s("subject")}\n\n(This is a subject-line preview — merge fields from the live template are not substituted.)`);
+        if (!ok) return NextResponse.json({ success: false, error: "SMTP is not configured or the send failed — check server logs." }, { status: 500 });
+        await logAdminActivity(admin.id, "send_test_email", `to=${to}`, getAdminRequestIp(req));
+        data = { ok: true };
         break;
       }
       case "adminGetTicketDepartments": {

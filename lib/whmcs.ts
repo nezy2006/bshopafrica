@@ -448,6 +448,14 @@ export async function markOrderFraud(orderId: number, cancelSubscription = false
   await callWhmcs("FraudOrder", { orderid: orderId, cancelsub: cancelSubscription });
 }
 
+export interface EmailTemplate { id: number; name: string; subject: string; custom: boolean }
+
+export async function getEmailTemplates(): Promise<EmailTemplate[]> {
+  const data = await callWhmcs("GetEmailTemplates");
+  const raw = (data.emailtemplates as { emailtemplate?: WhmcsRaw[] } | undefined)?.emailtemplate ?? [];
+  return raw.map(t => ({ id: Number(t.id ?? 0), name: String(t.name ?? ""), subject: String(t.subject ?? ""), custom: String(t.custom ?? "0") === "1" }));
+}
+
 export interface PaymentMethod { module: string; displayname: string }
 
 export async function getPaymentMethods(): Promise<PaymentMethod[]> {
@@ -530,6 +538,24 @@ export async function getDomainWhoisInfo(domainId: number): Promise<{ registrant
   const data = await callWhmcs("DomainGetWhoisInfo", { domainid: domainId });
   const toContact = (v: unknown) => (v && typeof v === "object" ? v as WhoisContact : {});
   return { registrant: toContact(data.Registrant), admin: toContact(data.Admin), tech: toContact(data.Tech) };
+}
+
+/** Clients whose hosting service or domain is due/expiring within `days` — used
+ *  by the Mass Email "expiring this month" recipient filter. GetClientsProducts/
+ *  GetClientsDomains don't return email in admin (no-clientid) mode, so this
+ *  cross-references the matching userids against GetClientsDetails. */
+export async function getExpiringClientContacts(kind: "hosting" | "domain", days: number): Promise<{ id: number; email: string; firstname: string }[]> {
+  const cutoff = Date.now() + days * 24 * 60 * 60 * 1000;
+  let userIds: number[];
+  if (kind === "hosting") {
+    const { hosting } = await getAdminHosting(0, 500, "Active");
+    userIds = [...new Set(hosting.filter(h => { const t = new Date(h.nextduedate).getTime(); return !isNaN(t) && t <= cutoff; }).map(h => h.userid))];
+  } else {
+    const { domains } = await getAdminDomains(0, 500);
+    userIds = [...new Set(domains.filter(d => { const t = new Date(d.expirydate).getTime(); return !isNaN(t) && t <= cutoff; }).map(d => d.userid))];
+  }
+  const details = await Promise.all(userIds.map(id => getClientDetails(id).catch(() => null)));
+  return details.filter((d): d is ClientDetails => d !== null && Boolean(d.email)).map(d => ({ id: d.id, email: d.email, firstname: d.firstname }));
 }
 
 export async function getAdminHosting(limitstart = 0, limitnum = 20, status = ""): Promise<{ hosting: AdminHostingAccount[]; total: number }> {
