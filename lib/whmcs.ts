@@ -398,6 +398,81 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   };
 }
 
+export interface ReportsOverview {
+  revenueByMonth:      { key: string; value: number }[];
+  clientsByMonth:      { key: string; value: number }[];
+  ticketsByMonth:       { key: string; value: number }[];
+  productPopularity:   { key: string; value: number }[];
+}
+
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/** Last-12-months trend data for the Reports dashboard. Each series is built
+ *  from one bulk list call + client-side bucketing, since WHMCS's API has no
+ *  native monthly-aggregate endpoints for any of these. */
+export async function getReportsOverview(): Promise<ReportsOverview> {
+  const now = new Date();
+  const yearAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  const monthKey = (d: Date) => `${MONTH_LABELS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+  const last12Keys: string[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    last12Keys.push(monthKey(d));
+  }
+
+  const [txData, clientsData, ticketsData, hostingData] = await Promise.all([
+    callWhmcs("GetTransactions", { daterangestart: fmt(yearAgo), daterangeend: fmt(now), limitnum: 2000 }),
+    callWhmcs("GetClients", { limitnum: 2000 }),
+    callWhmcs("GetTickets", { limitnum: 2000 }),
+    callWhmcs("GetClientsProducts", { limitnum: 2000 }),
+  ]);
+
+  const revenueMap = new Map<string, number>();
+  const txRaw = (txData.transactions as { transaction: WhmcsRaw[] } | undefined)?.transaction ?? [];
+  for (const t of txRaw) {
+    const amt = parseFloat(String(t.amountin ?? t.amount ?? "0")) || 0;
+    if (amt <= 0) continue;
+    const d = new Date(String(t.date ?? ""));
+    if (isNaN(d.getTime()) || d < yearAgo) continue;
+    const key = monthKey(d);
+    revenueMap.set(key, (revenueMap.get(key) ?? 0) + amt);
+  }
+
+  const clientsMap = new Map<string, number>();
+  const clientsRaw = (clientsData.clients as { client: WhmcsRaw[] } | undefined)?.client ?? [];
+  for (const c of clientsRaw) {
+    const d = new Date(String(c.datecreated ?? ""));
+    if (isNaN(d.getTime()) || d < yearAgo) continue;
+    const key = monthKey(d);
+    clientsMap.set(key, (clientsMap.get(key) ?? 0) + 1);
+  }
+
+  const ticketsMap = new Map<string, number>();
+  const ticketsRaw = (ticketsData.tickets as { ticket: WhmcsRaw[] } | undefined)?.ticket ?? [];
+  for (const t of ticketsRaw) {
+    const d = new Date(String(t.date ?? ""));
+    if (isNaN(d.getTime()) || d < yearAgo) continue;
+    const key = monthKey(d);
+    ticketsMap.set(key, (ticketsMap.get(key) ?? 0) + 1);
+  }
+
+  const productMap = new Map<string, number>();
+  const hostingRaw = (hostingData.products as { product: WhmcsRaw[] } | undefined)?.product ?? [];
+  for (const p of hostingRaw) {
+    const name = String(p.name ?? "Unknown");
+    productMap.set(name, (productMap.get(name) ?? 0) + 1);
+  }
+
+  return {
+    revenueByMonth: last12Keys.map(key => ({ key, value: Math.round((revenueMap.get(key) ?? 0) * 100) / 100 })),
+    clientsByMonth: last12Keys.map(key => ({ key, value: clientsMap.get(key) ?? 0 })),
+    ticketsByMonth: last12Keys.map(key => ({ key, value: ticketsMap.get(key) ?? 0 })),
+    productPopularity: [...productMap.entries()].map(([key, value]) => ({ key, value })).sort((a, b) => b.value - a.value).slice(0, 10),
+  };
+}
+
 export async function getAdminClients(limitstart = 0, limitnum = 20, search = ""): Promise<{ clients: AdminClient[]; total: number }> {
   const params: Record<string, string | number> = { limitstart, limitnum };
   if (search) params.search = search;

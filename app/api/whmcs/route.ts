@@ -4,7 +4,7 @@ import {
   getClientDetails, getClientProducts, getClientDomains, getInvoices,
   getClientOrders, getTickets, getTicket, openTicket, addTicketReply,
   closeTicket, updateClientDetails, getInvoicePDFUrl, getPaymentUrl,
-  getAdminStats, getAdminOverview, getAdminClients, getAdminOrders, getAdminInvoices,
+  getAdminStats, getAdminOverview, getReportsOverview, getAdminClients, getAdminOrders, getAdminInvoices,
   getAdminDomains, getAdminHosting, getAdminTickets, acceptOrder,
   cancelOrder, addAnnouncement, generateAutoAuthUrl, initiateTransfer,
   getTLDPricing, validateCoupon, addPaymentToInvoice, checkEmailExists,
@@ -286,6 +286,12 @@ export async function POST(req: NextRequest) {
         const admin = await requireAdmin(req, "stats");
         if (isAdminUnauthorized(admin)) return admin;
         data = await getAdminOverview();
+        break;
+      }
+      case "adminGetReportsOverview": {
+        const admin = await requireAdmin(req, "reports");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getReportsOverview();
         break;
       }
       case "adminGetClients": {
