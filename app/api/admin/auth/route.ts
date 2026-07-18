@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   const admin = await verifyAdminLogin(email, password);
   if (!admin) {
-    recordAdminLoginFailure(ip);
+    await recordAdminLoginFailure(ip);
     return NextResponse.json({ success: false, error: "Invalid credentials" }, { status: 401 });
   }
   clearAdminLoginFailures(ip);

@@ -88,11 +88,27 @@ export async function verifyAdminLogin(email: string, password: string): Promise
   return admin;
 }
 
+/** Reads a numeric security setting from the shared SiteSettings key/value
+ *  table (Settings → Security tab writes these), falling back to `fallback`
+ *  when unset or not a positive number. */
+async function getSecuritySetting(key: string, fallback: number): Promise<number> {
+  try {
+    const row = await queryOne<{ value: string }>("SELECT `value` FROM SiteSettings WHERE `key` = ?", [`security.${key}`]);
+    const parsed = row ? parseInt(row.value, 10) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  } catch { return fallback; }
+}
+
 export async function createAdminSession(adminId: number): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
+  const hours = await getSecuritySetting("session_timeout_hours", 8);
+  // Kept as a MySQL-side DATE_ADD/INTERVAL (same as the original hardcoded
+  // "INTERVAL 8 HOUR") rather than computing the timestamp in JS, so the
+  // expiry stays in whatever timezone the DB server's NOW() already uses —
+  // no behavior change for the default 8-hour case.
   await execute(
-    "INSERT INTO admin_sessions (admin_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 8 HOUR))",
-    [adminId, token]
+    "INSERT INTO admin_sessions (admin_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))",
+    [adminId, token, hours]
   );
   return token;
 }
@@ -223,11 +239,12 @@ export function checkAdminLoginRateLimit(ip: string): string | null {
   return null;
 }
 
-export function recordAdminLoginFailure(ip: string): void {
+export async function recordAdminLoginFailure(ip: string): Promise<void> {
+  const maxAttempts = await getSecuritySetting("max_login_attempts", 5);
   const now = Date.now();
   const entry = adminLoginRateLimit.get(ip) ?? { failures: 0, blockedUntil: 0 };
   entry.failures++;
-  if (entry.failures >= 5) { entry.blockedUntil = now + 15 * 60 * 1000; entry.failures = 0; }
+  if (entry.failures >= maxAttempts) { entry.blockedUntil = now + 15 * 60 * 1000; entry.failures = 0; }
   adminLoginRateLimit.set(ip, entry);
 }
 
