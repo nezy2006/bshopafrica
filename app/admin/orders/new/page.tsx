@@ -1,20 +1,16 @@
 "use client";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { whmcsAdmin, PageHeader } from "@/lib/admin-utils";
-import type { AdminClient, WhmcsProduct, PaymentMethod } from "@/lib/whmcs";
+import { whmcsAdmin, PageHeader, ClientPicker, type PickableClient } from "@/lib/admin-utils";
+import type { WhmcsProduct, PaymentMethod } from "@/lib/whmcs";
 
 const INPUT = "w-full px-3.5 py-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white transition-all";
 
-type ItemType = "hosting" | "domain" | "addon";
-
 export default function NewOrderPage() {
   const router = useRouter();
-  const [clientQuery, setClientQuery] = useState("");
-  const [clientResults, setClientResults] = useState<AdminClient[]>([]);
-  const [client, setClient] = useState<AdminClient | null>(null);
+  const [client, setClient] = useState<PickableClient | null>(null);
 
   const [products, setProducts] = useState<WhmcsProduct[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -34,13 +30,6 @@ export default function NewOrderPage() {
   useEffect(() => {
     whmcsAdmin<WhmcsProduct[]>("getProducts").then(p => setProducts(p ?? []));
     whmcsAdmin<PaymentMethod[]>("adminGetPaymentMethods").then(m => setMethods(m ?? []));
-  }, []);
-
-  const searchClients = useCallback(async (q: string) => {
-    setClientQuery(q);
-    if (q.trim().length < 2) { setClientResults([]); return; }
-    const res = await whmcsAdmin<{ clients: AdminClient[]; total: number }>("adminGetClients", { search: q, limitnum: 8 });
-    setClientResults(res?.clients ?? []);
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -78,26 +67,7 @@ export default function NewOrderPage() {
         {/* Client picker */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="font-bold text-black text-sm mb-3">Client</h2>
-          {client ? (
-            <div className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
-              <div><p className="font-semibold text-black">{client.firstname} {client.lastname}</p><p className="text-xs text-gray-500">{client.email}</p></div>
-              <button type="button" onClick={() => setClient(null)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
-            </div>
-          ) : (
-            <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input value={clientQuery} onChange={e => searchClients(e.target.value)} placeholder="Search by name or email…" className={`${INPUT} pl-9`} />
-              {clientResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden">
-                  {clientResults.map(c => (
-                    <button type="button" key={c.id} onClick={() => { setClient(c); setClientResults([]); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm">
-                      <span className="font-medium text-black">{c.firstname} {c.lastname}</span> <span className="text-gray-400 text-xs">{c.email}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <ClientPicker client={client} onSelect={setClient} />
         </div>
 
         {/* Items */}

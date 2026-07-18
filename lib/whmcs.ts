@@ -808,6 +808,111 @@ export async function createInvoice(
   return Number(data.invoiceid ?? 0);
 }
 
+export interface InvoiceLineItemInput { description: string; amount: number }
+
+/** Itemized manual invoice — same CreateInvoice action as createInvoice() above,
+ *  but with WHMCS's numbered itemdescriptionN/itemamountN convention for
+ *  multiple line items instead of always exactly one. */
+export async function createInvoiceItemized(clientId: number, items: InvoiceLineItemInput[], dueDate?: string): Promise<number> {
+  const today = new Date().toISOString().split("T")[0];
+  const params: Record<string, string | number> = { userid: clientId, date: today, duedate: dueDate || today };
+  items.forEach((item, i) => {
+    params[`itemdescription${i + 1}`] = item.description;
+    params[`itemamount${i + 1}`] = item.amount.toFixed(2);
+  });
+  const data = await callWhmcs("CreateInvoice", params);
+  return Number(data.invoiceid ?? 0);
+}
+
+export async function voidInvoice(invoiceId: number): Promise<void> {
+  await callWhmcs("UpdateInvoice", { invoiceid: invoiceId, status: "Cancelled" });
+}
+
+export async function applyCreditToInvoice(invoiceId: number, amount: number): Promise<void> {
+  await callWhmcs("ApplyCredit", { invoiceid: invoiceId, amount: amount.toFixed(2) });
+}
+
+/** Reuses the same "General Message" SendEmail pattern already relied on by
+ *  sendClientEmail() / the password-reset flow, rather than assuming a stock
+ *  "Invoice Payment Reminder" template name exists on this install. */
+export async function sendInvoiceReminder(clientId: number, invoiceId: number, total: string, dueDate: string): Promise<void> {
+  const subject = `Payment Reminder: Invoice #${invoiceId}`;
+  const message = `This is a friendly reminder that invoice #${invoiceId} for $${total} is due on ${dueDate}. Please log in to your account to make payment.`;
+  await sendClientEmail(clientId, subject, message);
+}
+
+/* ─── Quotes (native WHMCS quote lifecycle) ─────────────────────────────── */
+export interface Quote {
+  id: number; subject: string; stage: string; validuntil: string; userid: number;
+  firstname: string; lastname: string; total: string; datecreated: string;
+}
+
+export async function getQuotes(limitstart = 0, limitnum = 20): Promise<{ quotes: Quote[]; total: number }> {
+  const data = await callWhmcs("GetQuotes", { limitstart, limitnum });
+  const raw = (data.quotes as { quote?: WhmcsRaw[] } | undefined)?.quote ?? [];
+  return {
+    total: Number(data.totalresults ?? 0),
+    quotes: raw.map(q => ({
+      id: Number(q.id ?? 0), subject: String(q.subject ?? ""), stage: String(q.stage ?? ""),
+      validuntil: String(q.validuntil ?? ""), userid: Number(q.userid ?? 0),
+      firstname: String(q.firstname ?? ""), lastname: String(q.lastname ?? ""),
+      total: String(q.total ?? "0.00"), datecreated: String(q.datecreated ?? ""),
+    })),
+  };
+}
+
+/** WHMCS's CreateQuote `lineitems` param expects base64(PHP serialize()) of an
+ *  indexed array of {desc, qty, up, discount, taxable} — NOT JSON. Confirmed
+ *  against the official docs' PHP example, since guessing wrong here (like
+ *  JSON) would silently produce an empty/garbled quote. */
+function phpSerializeScalar(v: string | number | boolean): string {
+  if (typeof v === "boolean") return `b:${v ? 1 : 0};`;
+  if (typeof v === "number") return Number.isInteger(v) ? `i:${v};` : `d:${v};`;
+  const bytes = Buffer.byteLength(v, "utf8");
+  return `s:${bytes}:"${v}";`;
+}
+
+function phpSerializeLineItems(items: { desc: string; qty: number; up: string; discount: string; taxable: boolean }[]): string {
+  const body = items.map((item, i) => {
+    const entries = Object.entries(item) as [string, string | number | boolean][];
+    const assocBody = entries.map(([k, v]) => `${phpSerializeScalar(k)}${phpSerializeScalar(v)}`).join("");
+    return `${phpSerializeScalar(i)}a:${entries.length}:{${assocBody}}`;
+  }).join("");
+  return `a:${items.length}:{${body}}`;
+}
+
+export async function createQuote(params: { clientId: number; subject: string; validUntil: string; lineitems: InvoiceLineItemInput[]; proposal?: string; adminNotes?: string }): Promise<number> {
+  // Matches WHMCS's own PHP example types verbatim: qty is an int, up/discount are
+  // price strings ("10.00"), taxable is a bool — mixing types up silently breaks parsing.
+  const items = params.lineitems.map(i => ({ desc: i.description, qty: 1, up: i.amount.toFixed(2), discount: "0.00", taxable: false }));
+  const encoded = Buffer.from(phpSerializeLineItems(items), "utf8").toString("base64");
+  const data = await callWhmcs("CreateQuote", {
+    userid: params.clientId, subject: params.subject, stage: "Draft",
+    validuntil: params.validUntil, lineitems: encoded,
+    ...(params.proposal ? { proposal: params.proposal } : {}),
+    ...(params.adminNotes ? { adminnotes: params.adminNotes } : {}),
+  });
+  return Number(data.quoteid ?? 0);
+}
+
+export async function updateQuoteStage(quoteId: number, stage: string): Promise<void> {
+  await callWhmcs("UpdateQuote", { quoteid: quoteId, stage });
+}
+
+export async function deleteQuote(quoteId: number): Promise<void> {
+  await callWhmcs("DeleteQuote", { quoteid: quoteId });
+}
+
+export async function sendQuote(quoteId: number): Promise<void> {
+  await callWhmcs("SendQuote", { quoteid: quoteId });
+}
+
+/** Converts an accepted quote into a real order (AcceptQuote marks it accepted
+ *  in WHMCS but — per WHMCS docs — does not itself create the order/invoice). */
+export async function acceptQuote(quoteId: number): Promise<void> {
+  await callWhmcs("AcceptQuote", { quoteid: quoteId });
+}
+
 /* ─── Cart-based order creation (used by checkout, PawaPay/PayPal flows, and
    the admin "New Order" builder) ─────────────────────────────────────────── */
 // PawaPay gateway setup in WHMCS:

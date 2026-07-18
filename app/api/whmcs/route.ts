@@ -14,6 +14,8 @@ import {
   updateClientStatus, addClientCredit, sendClientEmail, updateDomainAutoRenew,
   getOrderDetail, markOrderFraud, getPaymentMethods, createOrderWithGateway,
   WHMCS_PAYPAL_GATEWAY, WHMCS_PAWAPAY_GATEWAY,
+  createInvoiceItemized, voidInvoice, applyCreditToInvoice, sendInvoiceReminder,
+  getQuotes, createQuote, updateQuoteStage, deleteQuote, sendQuote, acceptQuote,
 } from "@/lib/whmcs";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
@@ -501,6 +503,92 @@ export async function POST(req: NextRequest) {
         data = { ok: true };
         break;
       }
+      case "adminCreateInvoice": {
+        const admin = await requireAdmin(req, "invoices");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        const items = Array.isArray(params.items) ? (params.items as { description: string; amount: number }[]) : [];
+        if (!clientId || items.length === 0) return NextResponse.json({ success: false, error: "clientId and at least one item are required" }, { status: 400 });
+        const invoiceId = await createInvoiceItemized(clientId, items, params.dueDate ? s("dueDate") : undefined);
+        await logAdminActivity(admin.id, "create_invoice", `clientId=${clientId} invoiceId=${invoiceId}`, getAdminRequestIp(req));
+        data = { invoiceId };
+        break;
+      }
+      case "adminVoidInvoice": {
+        const admin = await requireAdmin(req, "invoices");
+        if (isAdminUnauthorized(admin)) return admin;
+        await voidInvoice(n("invoiceId"));
+        await logAdminActivity(admin.id, "void_invoice", `invoiceId=${n("invoiceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminApplyCredit": {
+        const admin = await requireAdmin(req, "invoices");
+        if (isAdminUnauthorized(admin)) return admin;
+        await applyCreditToInvoice(n("invoiceId"), Number(params.amount ?? 0));
+        await logAdminActivity(admin.id, "apply_credit", `invoiceId=${n("invoiceId")} amount=${Number(params.amount ?? 0)}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminSendInvoiceReminder": {
+        const admin = await requireAdmin(req, "invoices");
+        if (isAdminUnauthorized(admin)) return admin;
+        await sendInvoiceReminder(n("clientId"), n("invoiceId"), s("total"), s("dueDate"));
+        await logAdminActivity(admin.id, "send_invoice_reminder", `invoiceId=${n("invoiceId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+
+      case "adminGetQuotes": {
+        const admin = await requireAdmin(req, "quotes");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getQuotes(n("limitstart"), n("limitnum", 20));
+        break;
+      }
+      case "adminCreateQuote": {
+        const admin = await requireAdmin(req, "quotes");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        const lineitems = Array.isArray(params.lineitems) ? (params.lineitems as { description: string; amount: number }[]) : [];
+        if (!clientId || !s("subject") || lineitems.length === 0) return NextResponse.json({ success: false, error: "clientId, subject, and at least one line item are required" }, { status: 400 });
+        const quoteId = await createQuote({ clientId, subject: s("subject"), validUntil: s("validUntil"), lineitems, proposal: params.proposal ? s("proposal") : undefined, adminNotes: params.adminNotes ? s("adminNotes") : undefined });
+        await logAdminActivity(admin.id, "create_quote", `clientId=${clientId} quoteId=${quoteId}`, getAdminRequestIp(req));
+        data = { quoteId };
+        break;
+      }
+      case "adminUpdateQuoteStage": {
+        const admin = await requireAdmin(req, "quotes");
+        if (isAdminUnauthorized(admin)) return admin;
+        await updateQuoteStage(n("quoteId"), s("stage"));
+        await logAdminActivity(admin.id, "update_quote_stage", `quoteId=${n("quoteId")} stage=${s("stage")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminDeleteQuote": {
+        const admin = await requireAdmin(req, "quotes");
+        if (isAdminUnauthorized(admin)) return admin;
+        await deleteQuote(n("quoteId"));
+        await logAdminActivity(admin.id, "delete_quote", `quoteId=${n("quoteId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminSendQuote": {
+        const admin = await requireAdmin(req, "quotes");
+        if (isAdminUnauthorized(admin)) return admin;
+        await sendQuote(n("quoteId"));
+        await logAdminActivity(admin.id, "send_quote", `quoteId=${n("quoteId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminAcceptQuote": {
+        const admin = await requireAdmin(req, "quotes");
+        if (isAdminUnauthorized(admin)) return admin;
+        await acceptQuote(n("quoteId"));
+        await logAdminActivity(admin.id, "accept_quote", `quoteId=${n("quoteId")}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+
       case "validateLogin":         data = { valid: await validateLogin(s("email"), s("password")) }; break;
       case "createInvoice": {
         const session = requireSession(req);

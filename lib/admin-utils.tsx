@@ -194,6 +194,49 @@ export function PieChart({ data, label }: { data: { key: string; value: number }
   );
 }
 
+/* ─── Client picker (search-select, used by New Order / Create Invoice / Quotes) ── */
+export interface PickableClient { id: number; firstname: string; lastname: string; email: string }
+
+export function ClientPicker({ client, onSelect }: { client: PickableClient | null; onSelect: (c: PickableClient | null) => void }) {
+  const [query, setQuery]     = React.useState("");
+  const [results, setResults] = React.useState<PickableClient[]>([]);
+
+  const search = async (q: string) => {
+    setQuery(q);
+    if (q.trim().length < 2) { setResults([]); return; }
+    const res = await whmcsAdmin<{ clients: PickableClient[]; total: number }>("adminGetClients", { search: q, limitnum: 8 });
+    setResults(res?.clients ?? []);
+  };
+
+  if (client) {
+    return (
+      <div className="flex items-center justify-between bg-purple-50 rounded-xl px-4 py-3">
+        <div><p className="font-semibold text-black">{client.firstname} {client.lastname}</p><p className="text-xs text-gray-500">{client.email}</p></div>
+        <button type="button" onClick={() => onSelect(null)} className="text-gray-400 hover:text-red-500">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" strokeLinecap="round"/></svg>
+      <input value={query} onChange={e => search(e.target.value)} placeholder="Search by name or email…"
+        className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white transition-all" />
+      {results.length > 0 && (
+        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden">
+          {results.map(c => (
+            <button type="button" key={c.id} onClick={() => { onSelect(c); setResults([]); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm">
+              <span className="font-medium text-black">{c.firstname} {c.lastname}</span> <span className="text-gray-400 text-xs">{c.email}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Empty state ────────────────────────────────────────────────────────── */
 export function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
   return <tr><td colSpan={99}><div className="text-center py-16 text-gray-400"><div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center bg-gray-100 rounded-full text-gray-400">{icon}</div><p className="text-sm font-medium">{message}</p></div></td></tr>;
