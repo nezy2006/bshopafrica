@@ -36,11 +36,25 @@ export function whmcsDbEnabled(): boolean {
   return Boolean(config.whmcsDbUrl);
 }
 
+// bcryptjs always emits the $2b$ prefix. PHP's password_hash()/WHMCS uses $2y$ —
+// algorithmically identical, but WHMCS's own login path rejects a stored $2b$
+// hash outright. Every hash we write to tblusers.password must be normalized
+// to $2y$; every hash we read back must be normalized to $2b$ before handing
+// it to bcryptjs, since bcrypt.compare() only recognizes its own prefix.
+function toWhmcsPrefix(hash: string): string {
+  return hash.replace("$2b$", "$2y$");
+}
+
+function toBcryptjsPrefix(hash: string): string {
+  return hash.replace("$2y$", "$2b$");
+}
+
 export async function updatePasswordDirect(email: string, newPassword: string): Promise<void> {
   const hash = await bcrypt.hash(newPassword, 10);
+  const whmcsHash = toWhmcsPrefix(hash);
   const [result] = await getPool().execute<mysql.ResultSetHeader>(
     "UPDATE tblusers SET password = ? WHERE email = ?",
-    [hash, email],
+    [whmcsHash, email],
   );
   if (result.affectedRows === 0) {
     throw new Error(`No tblusers row found for email ${email}`);
@@ -52,7 +66,8 @@ export async function validatePasswordDirect(email: string, password: string): P
     "SELECT password FROM tblusers WHERE email = ? LIMIT 1",
     [email],
   );
-  const hash = rows[0]?.password;
-  if (!hash) return false;
-  return bcrypt.compare(password, hash);
+  const storedHash = rows[0]?.password;
+  if (!storedHash) return false;
+  const normalizedHash = toBcryptjsPrefix(storedHash);
+  return bcrypt.compare(password, normalizedHash);
 }
