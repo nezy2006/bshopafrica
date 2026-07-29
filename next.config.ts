@@ -8,16 +8,6 @@ const nextConfig: NextConfig = {
       { protocol: "http",  hostname: "**" },
     ],
   },
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source:      "/billing/:path*",
-          destination: "https://bshopafrica.com/billing/:path*",
-        },
-      ],
-    };
-  },
   async headers() {
     return [
       {
