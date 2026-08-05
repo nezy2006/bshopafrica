@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, Headset } from "lucide-react";
+import { MessageCircle, X, Send, Bot, Headset, LogOut } from "lucide-react";
 import { isLoggedIn, authHeaders, AUTH_KEYS, validateEmail } from "@/lib/auth";
 
 type Role = "client" | "ai" | "agent";
@@ -51,6 +51,16 @@ function formatTime(ts: string): string {
   } catch {
     return "";
   }
+}
+
+function statusIndicator(status: ChatStatus, messages: ChatMessage[]): { emoji: string; label: string } {
+  if (status === "offline") return { emoji: "🔴", label: "Offline" };
+  if (status === "closed") return { emoji: "⚪", label: "Chat closed" };
+  if (status === "escalated") {
+    const agentReplied = messages.some(m => m.role === "agent");
+    return agentReplied ? { emoji: "🟢", label: "Support Team" } : { emoji: "🟡", label: "Connecting to support…" };
+  }
+  return { emoji: "🤖", label: "AI Assistant" };
 }
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
@@ -104,9 +114,20 @@ export default function SupportChat() {
   const [guestEmail, setGuestEmail] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestKnown, setGuestKnown] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loggedIn = typeof window !== "undefined" && isLoggedIn();
+
+  const startNewConversation = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const id = uuid();
+    localStorage.setItem(SESSION_KEY, id);
+    setSessionId(id);
+    setMessages([]);
+    setStatus("active");
+    setUnread(0);
+    saveState(id, [], "active");
+  }, []);
 
   // Bootstrap session id + cached transcript
   useEffect(() => {
@@ -116,10 +137,21 @@ export default function SupportChat() {
       id = uuid();
       localStorage.setItem(SESSION_KEY, id);
     }
-    setSessionId(id);
     const { messages: cached, status: cachedStatus } = loadState(id);
-    setMessages(cached);
-    setStatus(cachedStatus);
+
+    if (cachedStatus === "closed") {
+      // Don't resurrect a conversation the client or an agent already closed —
+      // start fresh, exactly as if no session existed.
+      id = uuid();
+      localStorage.setItem(SESSION_KEY, id);
+      setSessionId(id);
+      setMessages([]);
+      setStatus("active");
+    } else {
+      setSessionId(id);
+      setMessages(cached);
+      setStatus(cachedStatus);
+    }
 
     const savedEmail = localStorage.getItem(EMAIL_KEY);
     if (savedEmail) {
@@ -129,8 +161,9 @@ export default function SupportChat() {
     }
   }, []);
 
+  // Always scroll to the bottom when a new message arrives (or the widget opens).
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open]);
 
   const persist = useCallback((next: ChatMessage[], nextStatus: ChatStatus) => {
@@ -168,6 +201,21 @@ export default function SupportChat() {
   const toggleOpen = () => {
     setOpen(o => !o);
     if (!open) setUnread(0);
+  };
+
+  const endChat = async () => {
+    if (!sessionId) return;
+    if (typeof window !== "undefined" && !window.confirm("End this conversation? You can start a new one anytime.")) return;
+    try {
+      await fetch("/api/support-chat/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+    } catch {
+      /* best-effort — reset locally regardless */
+    }
+    startNewConversation();
   };
 
   const submitGuestInfo = (e: React.FormEvent) => {
@@ -208,10 +256,9 @@ export default function SupportChat() {
       }
       const replyMsg: ChatMessage = {
         id: uuid(),
-        role: json.status === "escalated" && status !== "escalated" ? "agent" : "ai",
+        role: "ai",
         content: json.reply ?? "",
         ts: new Date().toISOString(),
-        ...(json.status === "escalated" && status !== "escalated" ? { agentName: "Support Team" } : {}),
       };
       persist([...withClient, replyMsg], (json.status as ChatStatus) ?? status);
     } catch {
@@ -231,9 +278,8 @@ export default function SupportChat() {
   if (pathname?.startsWith("/admin")) return null;
 
   const bottomOffset = pathname?.startsWith("/dashboard") ? "bottom-6" : "bottom-24";
-
-  const statusLabel =
-    status === "escalated" ? "Connected to Support Team" : status === "offline" ? "Offline" : status === "closed" ? "Chat closed" : "Online";
+  const { emoji: statusEmoji, label: statusLabel } = statusIndicator(status, messages);
+  const inputPlaceholder = status === "escalated" ? "Message support team…" : "Type a message…";
 
   return (
     <div className={`fixed ${bottomOffset} right-6 z-50`}>
@@ -254,10 +300,13 @@ export default function SupportChat() {
               <div className="min-w-0 flex-1">
                 <p className="text-white font-bold text-sm leading-tight">BShop Support</p>
                 <p className="text-white/70 text-xs flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${status === "offline" ? "bg-gray-300" : "bg-green-400"}`} />
+                  <span>{statusEmoji}</span>
                   {statusLabel}
                 </p>
               </div>
+              <button onClick={endChat} aria-label="End chat" title="End chat" className="text-white/80 hover:text-white p-1">
+                <LogOut className="w-4 h-4" />
+              </button>
               <button onClick={toggleOpen} aria-label="Close chat" className="text-white/80 hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
@@ -286,7 +335,7 @@ export default function SupportChat() {
               </div>
             ) : (
               <>
-                <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50/50">
+                <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50/50">
                   {messages.length === 0 && (
                     <div className="flex justify-start mb-3 gap-2">
                       <div className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
@@ -305,6 +354,8 @@ export default function SupportChat() {
                       <span className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-bounce [animation-delay:0.2s]" />
                     </div>
                   )}
+                  {/* Scroll anchor — always keep this in view so new messages read from the top down. */}
+                  <div ref={messagesEndRef} />
                 </div>
 
                 {status === "offline" ? (
@@ -312,8 +363,14 @@ export default function SupportChat() {
                     We&apos;re having trouble connecting. Leave a message and we&apos;ll get back to you by email.
                   </div>
                 ) : status === "closed" ? (
-                  <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400 text-center">
-                    This conversation has been closed.
+                  <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500 text-center space-y-2">
+                    <p>This conversation has been closed by our support team. Start a new chat if you need more help.</p>
+                    <button
+                      onClick={startNewConversation}
+                      className="px-4 py-1.5 bg-[#6B21A8] text-white text-xs font-bold rounded-lg hover:bg-[#581c87]"
+                    >
+                      Start New Chat
+                    </button>
                   </div>
                 ) : null}
 
@@ -321,7 +378,7 @@ export default function SupportChat() {
                   <div className="border-t border-gray-100 px-3 py-3 flex items-end gap-2 shrink-0">
                     <textarea
                       value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKeyDown}
-                      rows={1} placeholder="Type a message…"
+                      rows={1} placeholder={inputPlaceholder}
                       className="flex-1 resize-none px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 outline-none focus:border-[#6B21A8] max-h-24"
                     />
                     <button

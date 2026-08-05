@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
     if (session.status === "escalated" && session.ticket_id) {
       await addTicketReply(session.ticket_id, session.client_id ?? 0, message).catch(() => {});
       return NextResponse.json({
-        reply: "Thanks — I've passed that along to our support team. They'll reply here shortly.",
+        reply: "Please wait, a support agent will be with you shortly.",
         shouldEscalate: false,
         status: "escalated",
       });
