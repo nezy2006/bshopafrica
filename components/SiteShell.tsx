@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
-import WhatsAppButton from "@/components/WhatsAppButton";
 import ScrollProgress from "@/components/ScrollProgress";
 
 function isDashboard(pathname: string) {
@@ -39,7 +38,6 @@ export function SiteExtras() {
     <>
       <ScrollProgress />
       <CookieBanner />
-      <WhatsAppButton />
     </>
   );
 }
