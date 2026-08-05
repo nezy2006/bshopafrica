@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SupportChat from "@/components/SupportChat";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://bshopafrica.com";
 
@@ -36,7 +37,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="antialiased">
-      <body className="min-h-screen flex flex-col">{children}</body>
+      <body className="min-h-screen flex flex-col">
+        {children}
+        <SupportChat />
+      </body>
     </html>
   );
 }

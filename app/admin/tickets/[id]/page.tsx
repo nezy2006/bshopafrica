@@ -7,7 +7,8 @@ import { Badge, Modal } from "@/lib/admin-utils";
 import { adminHeaders } from "@/lib/admin-auth-client";
 import type { SupportTicket, TicketReply } from "@/lib/whmcs";
 
-interface TicketMeta { ticket_id: number; assigned_admin_id: number | null; assigned_admin_name: string | null; escalated: number; linked_order_id: number | null; linked_invoice_id: number | null }
+interface TicketMeta { ticket_id: number; assigned_admin_id: number | null; assigned_admin_name: string | null; escalated: number; linked_order_id: number | null; linked_invoice_id: number | null; source: string | null }
+interface ChatTranscriptMessage { id: string; role: "client" | "ai" | "agent"; content: string; ts: string; agentName?: string }
 interface Department { id: number; name: string }
 interface AssignableAdmin { id: number; name: string }
 interface CannedResponse { id: number; category: string; title: string; body: string }
@@ -19,6 +20,7 @@ interface DetailResponse {
   assignableAdmins: AssignableAdmin[];
   cannedResponses: CannedResponse[];
   mergeCandidates: MergeCandidate[];
+  chatTranscript: ChatTranscriptMessage[] | null;
 }
 
 function MergeModal({ candidates, busy, onClose, onMerge }: { candidates: MergeCandidate[]; busy: boolean; onClose: () => void; onMerge: (ids: number[]) => void }) {
@@ -109,7 +111,7 @@ export default function TicketDetailPage() {
     return <div className="flex justify-center py-24"><div className="w-8 h-8 rounded-full border-4 border-[#6B21A8] border-t-transparent animate-spin" /></div>;
   }
 
-  const { ticket, meta, departments, assignableAdmins, cannedResponses, mergeCandidates } = data;
+  const { ticket, meta, departments, assignableAdmins, cannedResponses, mergeCandidates, chatTranscript } = data;
 
   return (
     <div className="max-w-4xl">
@@ -132,11 +134,28 @@ export default function TicketDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {meta?.source === "chat" && <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-[#6B21A8]">Chat</span>}
           {meta?.escalated === 1 && <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Escalated</span>}
           <Badge status={ticket.priority} />
           <Badge status={ticket.status} />
         </div>
       </div>
+
+      {chatTranscript && chatTranscript.length > 0 && (
+        <div className="mb-6 bg-purple-50/60 border border-purple-100 rounded-2xl p-4">
+          <p className="text-xs font-bold text-[#6B21A8] uppercase mb-3">AI Chat Transcript</p>
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {chatTranscript.map(m => (
+              <div key={m.id} className="text-sm">
+                <span className={`font-bold ${m.role === "client" ? "text-black" : m.role === "agent" ? "text-blue-600" : "text-gray-500"}`}>
+                  {m.role === "client" ? "Client" : m.role === "agent" ? (m.agentName || "Agent") : "AI"}:
+                </span>{" "}
+                <span className="text-gray-700 whitespace-pre-wrap">{m.content}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions toolbar */}
       <div className="flex flex-wrap gap-2 mb-6">

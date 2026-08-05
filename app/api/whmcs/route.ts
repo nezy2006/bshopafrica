@@ -523,6 +523,7 @@ export async function POST(req: NextRequest) {
             assignedAdminId: metaMap.get(t.id)?.assigned_admin_id ?? null,
             assignedAdminName: metaMap.get(t.id)?.assigned_admin_name ?? null,
             escalated: metaMap.get(t.id)?.escalated === 1,
+            source: metaMap.get(t.id)?.source ?? null,
           })),
         };
         break;

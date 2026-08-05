@@ -18,6 +18,7 @@ async function migrate() {
   `);
   await ensureColumn("ticket_meta", "linked_order_id", "INT NULL");
   await ensureColumn("ticket_meta", "linked_invoice_id", "INT NULL");
+  await ensureColumn("ticket_meta", "source", "VARCHAR(20) NULL");
 }
 
 export interface TicketMeta {
@@ -27,12 +28,13 @@ export interface TicketMeta {
   escalated: number;
   linked_order_id: number | null;
   linked_invoice_id: number | null;
+  source: string | null;
 }
 
 export async function getTicketMeta(ticketId: number): Promise<TicketMeta | null> {
   await ensureTicketMetaSchema();
   return queryOne<TicketMeta>(
-    `SELECT m.ticket_id, m.assigned_admin_id, u.name as assigned_admin_name, m.escalated, m.linked_order_id, m.linked_invoice_id
+    `SELECT m.ticket_id, m.assigned_admin_id, u.name as assigned_admin_name, m.escalated, m.linked_order_id, m.linked_invoice_id, m.source
      FROM ticket_meta m LEFT JOIN admin_users u ON u.id = m.assigned_admin_id
      WHERE m.ticket_id = ?`,
     [ticketId]
@@ -45,13 +47,23 @@ export async function getTicketMetaBulk(ticketIds: number[]): Promise<Map<number
   if (ticketIds.length === 0) return map;
   const placeholders = ticketIds.map(() => "?").join(",");
   const rows = await query<TicketMeta>(
-    `SELECT m.ticket_id, m.assigned_admin_id, u.name as assigned_admin_name, m.escalated, m.linked_order_id, m.linked_invoice_id
+    `SELECT m.ticket_id, m.assigned_admin_id, u.name as assigned_admin_name, m.escalated, m.linked_order_id, m.linked_invoice_id, m.source
      FROM ticket_meta m LEFT JOIN admin_users u ON u.id = m.assigned_admin_id
      WHERE m.ticket_id IN (${placeholders})`,
     ticketIds
   );
   for (const r of rows) map.set(r.ticket_id, r);
   return map;
+}
+
+/** Tags a WHMCS ticket as chat-originated so admin UIs can show a "Chat" badge. */
+export async function markTicketChatOrigin(ticketId: number): Promise<void> {
+  await ensureTicketMetaSchema();
+  await execute(
+    `INSERT INTO ticket_meta (ticket_id, source) VALUES (?, 'chat')
+     ON DUPLICATE KEY UPDATE source = VALUES(source)`,
+    [ticketId]
+  );
 }
 
 export async function linkTicketToOrderInvoice(ticketId: number, orderId: number | null, invoiceId: number | null): Promise<void> {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp, listAdminUsers } from "@/lib/admin-auth";
 import { getTicketMeta, assignTicket, setTicketEscalated, linkTicketToOrderInvoice } from "@/lib/ticket-meta";
 import { getCannedResponses } from "@/lib/canned-responses";
+import { getChatSessionByTicketId } from "@/lib/chat-store";
 import {
   getTicket, addAdminTicketReply, addTicketNote, closeTicket, reopenTicket,
   updateTicketPriority, updateTicketDepartment, getTicketDepartments, mergeTickets,
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   ]);
   // Merge candidates: this client's other open tickets.
   const clientTickets = await getTickets(ticket.userid).catch(() => []);
+  const chatSession = meta?.source === "chat" ? await getChatSessionByTicketId(ticketId).catch(() => null) : null;
 
   return NextResponse.json({
     success: true,
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ticket, meta, departments, cannedResponses,
       assignableAdmins: admins.filter(a => a.is_active).map(a => ({ id: a.id, name: a.name })),
       mergeCandidates: clientTickets.filter(t => t.id !== ticketId),
+      chatTranscript: chatSession?.messages ?? null,
     },
   });
 }

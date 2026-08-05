@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { whmcsAdmin, PageHeader, SearchBar, TableCard, THead, SkeletonRows, Badge, Pagination, EmptyState } from "@/lib/admin-utils";
 import type { AdminTicket } from "@/lib/whmcs";
 
-interface EnrichedTicket extends AdminTicket { assignedAdminId: number | null; assignedAdminName: string | null; escalated: boolean }
+interface EnrichedTicket extends AdminTicket { assignedAdminId: number | null; assignedAdminName: string | null; escalated: boolean; source: string | null }
 interface Department { id: number; name: string }
 
 const PER = 20;
@@ -97,7 +97,11 @@ export default function TicketsPage() {
           {loading ? <SkeletonRows cols={8} /> : filtered.length === 0 ? <EmptyState icon={<MessageSquare className="w-5 h-5" />} message="No tickets found" /> : filtered.map(t => (
             <tr key={t.id} onClick={() => router.push(`/admin/tickets/${t.id}`)} className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{t.tid}</td>
-              <td className="px-5 py-3.5 font-medium text-black max-w-xs truncate">{t.title}{t.escalated && <span className="ml-2 text-[10px] font-bold text-red-600 uppercase">Escalated</span>}</td>
+              <td className="px-5 py-3.5 font-medium text-black max-w-xs truncate">
+                {t.title}
+                {t.source === "chat" && <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-[#6B21A8] uppercase">Chat</span>}
+                {t.escalated && <span className="ml-2 text-[10px] font-bold text-red-600 uppercase">Escalated</span>}
+              </td>
               <td className="px-5 py-3.5 text-gray-600">{t.firstname} {t.lastname}</td>
               <td className="px-5 py-3.5 text-gray-500">{t.department || "—"}</td>
               <td className="px-5 py-3.5">{priorityBadge(t.priority)}</td>
