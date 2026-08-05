@@ -11,7 +11,7 @@ import {
   getUnreadCount, clearNotifications, type AppNotification,
 } from "@/lib/notifications";
 import { clearAuth, authHeaders, getSessionToken } from "@/lib/auth";
-import { PayPalLogo, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
+import { PaymentOptionCard, PayPalWordmark, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 import { getPawapayFailureMessage } from "@/lib/pawapay-errors";
 
@@ -317,6 +317,7 @@ function OverviewSection({ client, onNavigate }: { client: ClientDetails; onNavi
       <AnimatePresence>
         {payTarget && (
           <PaymentModal invoiceId={payTarget.id} amountUSD={parseFloat(payTarget.total) || 0}
+            description={`Invoice #${payTarget.id}`}
             clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
             onClose={() => setPayTarget(null)}
             onPaid={() => { setPayTarget(null); load(); }} />
@@ -335,7 +336,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
   const [dnsDomain, setDnsDomain] = useState<ClientDomain | null>(null);
   const [tldPricing, setTldPricing] = useState<Record<string, TLDPriceEntry>>({});
   const [renewingId, setRenewingId] = useState<number | null>(null);
-  const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number } | null>(null);
+  const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number; description: string } | null>(null);
   const [autoRenewBusyId, setAutoRenewBusyId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -357,7 +358,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
         matchText: d.domainname, description: `Domain Renewal - ${d.domainname} (1 year)`, amount,
       });
       if (!invoiceId) throw new Error("No invoice returned");
-      setPayTarget({ invoiceId, amountUSD: invoiceAmount || amount });
+      setPayTarget({ invoiceId, amountUSD: invoiceAmount || amount, description: d.domainname });
     } catch {
       alert("Could not start renewal right now. Please try again or contact support.");
     } finally {
@@ -448,6 +449,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
         {dnsDomain && <DnsModal domain={dnsDomain} clientId={clientId} onClose={() => setDnsDomain(null)} />}
         {payTarget && (
           <PaymentModal invoiceId={payTarget.invoiceId} amountUSD={payTarget.amountUSD}
+            description={payTarget.description} period="1 year"
             clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
             onClose={() => setPayTarget(null)}
             onPaid={() => { setPayTarget(null); load(); }} />
@@ -579,16 +581,28 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
   );
 }
 
-/* ─── PAYMENT MODAL (mobile money + PayPal) ─────────────────────────────── */
+/* ─── PAYMENT MODAL (checkout-style full page — mobile money + PayPal + promo) ─── */
 const USD_TO_RWF = 1400; // fixed rate, matches checkout flow
 
 type MmStep = "input" | "sending" | "waiting" | "success" | "failed";
+type PayMethod = "paypal" | "mtn" | "airtel";
 
-function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
+interface PromoState {
+  code:        string;
+  applied:     boolean;
+  loading:     boolean;
+  type:        "percentage" | "fixed";
+  discount:    number;
+  description: string;
+  error:       string;
+}
+
+function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, onClose, onPaid }: {
   invoiceId: number; amountUSD: number; clientEmail: string;
+  description?: string; period?: string;
   onClose: () => void; onPaid: () => void;
 }) {
-  const [method, setMethod]   = useState<"choose" | "mtn" | "airtel" | "paypal">("choose");
+  const [method, setMethod]   = useState<PayMethod>("paypal");
   const [phone,  setPhone]    = useState("");
   const [predicted, setPredicted] = useState<{ provider: string; phoneNumber: string } | null>(null);
   const [predictLoading, setPredictLoading] = useState(false);
@@ -599,8 +613,41 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
   const [paypalError, setPaypalError] = useState("");
   const [paypalPaid,  setPaypalPaid]  = useState(false);
 
-  const rwfTotal   = Math.round(amountUSD * USD_TO_RWF);
+  const [promo, setPromo] = useState<PromoState>({
+    code: "", applied: false, loading: false, type: "percentage", discount: 0, description: "", error: "",
+  });
+
+  const originalAmount = amountUSD;
+  const discountAmount = promo.applied
+    ? (promo.type === "percentage" ? Math.min(originalAmount, originalAmount * (promo.discount / 100)) : Math.min(originalAmount, promo.discount))
+    : 0;
+  const finalAmount = Math.max(0, originalAmount - discountAmount);
+  const rwfTotal   = Math.round(finalAmount * USD_TO_RWF);
   const cleanPhone = phone.replace(/\D/g, "");
+
+  async function applyPromoCode() {
+    if (!promo.code.trim()) return;
+    setPromo(p => ({ ...p, loading: true, error: "" }));
+    try {
+      const res  = await fetch("/api/whmcs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validatePromoCode", params: { code: promo.code } }),
+      });
+      const json = (await res.json()) as { success: boolean; data?: { valid: boolean; discount: number; type: "percentage" | "fixed"; description: string } };
+      const d = json.data;
+      if (!json.success || !d?.valid) {
+        setPromo(p => ({ ...p, loading: false, applied: false, error: d?.description ?? "Invalid promo code" }));
+        return;
+      }
+      setPromo(p => ({ ...p, loading: false, applied: true, type: d.type, discount: d.discount, description: d.description, error: "" }));
+    } catch {
+      setPromo(p => ({ ...p, loading: false, error: "Could not validate promo code" }));
+    }
+  }
+
+  function removePromoCode() {
+    setPromo({ code: "", applied: false, loading: false, type: "percentage", discount: 0, description: "", error: "" });
+  }
 
   // Classify the detected provider against the network the user picked, so an
   // Airtel number entered under "MTN Mobile Money" (or vice versa) is caught
@@ -671,7 +718,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           amount: rwfTotal, currency: "RWF", phone: predicted.phoneNumber, operator: predicted.provider,
-          clientId, clientEmail, invoiceId, totalUSD: amountUSD, totalRWF: rwfTotal,
+          clientId, clientEmail, invoiceId, totalUSD: finalAmount, totalRWF: rwfTotal,
         }),
       });
       const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
@@ -685,143 +732,220 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, onClose, onPaid }: {
     }
   }
 
+  const inMmFlow = (method === "mtn" || method === "airtel") && mmStep !== "input";
+
   return (
-    <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-      <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto overscroll-contain"
-        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-        transition={{ duration: 0.2, ease: EASE }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Pay Invoice #{invoiceId}</h3>
-            <p className="text-sm text-gray-500">${amountUSD.toFixed(2)} <span className="text-gray-400">≈</span> RWF {rwfTotal.toLocaleString()}</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><I.X /></button>
+    <motion.div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 sm:px-8 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Secure Checkout</p>
+          <h1 className="text-lg font-black text-gray-900">Complete Your Payment</h1>
         </div>
+        <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <I.X />
+        </button>
+      </div>
 
-        {method === "choose" && (
-          <div className="space-y-3">
-            <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); }}
-              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
-              <span className="w-16 flex-shrink-0"><PayPalLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">PayPal</p><p className="text-xs text-gray-500">Pay securely with your PayPal account or card</p></div>
-            </button>
-            <button onClick={() => { setMethod("mtn"); setPhone(""); setPredicted(null); setMmStep("input"); setMmError(""); }}
-              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
-              <span className="w-16 flex-shrink-0"><MtnLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">MTN Mobile Money</p><p className="text-xs text-gray-500">Pay with MTN MoMo Rwanda</p></div>
-            </button>
-            <button onClick={() => { setMethod("airtel"); setPhone(""); setPredicted(null); setMmStep("input"); setMmError(""); }}
-              className="w-full flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-300 transition-colors text-left">
-              <span className="w-16 flex-shrink-0"><AirtelLogo /></span>
-              <div><p className="font-semibold text-gray-900 text-sm">Airtel Money</p><p className="text-xs text-gray-500">Pay with Airtel Money Rwanda</p></div>
-            </button>
+      <div className="max-w-4xl mx-auto px-4 sm:px-8 py-10">
+        <motion.div
+          className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 grid lg:grid-cols-[320px_1fr] gap-8"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: EASE }}
+        >
+          {/* ── Left: order summary + promo ── */}
+          <div className="space-y-6">
+            <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
+              <h3 className="font-bold text-black text-sm mb-4 uppercase tracking-wide">Order Summary</h3>
+              <div className="space-y-2.5 mb-4">
+                <div className="flex justify-between text-sm gap-3">
+                  <span className="text-gray-600 truncate">{description || `Invoice #${invoiceId}`}</span>
+                </div>
+                {period && (
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>Renewal period</span><span>{period}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Original price</span>
+                  <span className="font-semibold text-gray-900">${originalAmount.toFixed(2)}</span>
+                </div>
+                {promo.applied && discountAmount > 0 && (
+                  <div className="flex justify-between text-xs text-purple-600 font-semibold">
+                    <span>Promo discount</span><span>−${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-gray-200 pt-3 flex justify-between font-black text-black">
+                <span>Total</span>
+                <div className="text-right">
+                  <div>${finalAmount.toFixed(2)}</div>
+                  <div className="text-[11px] font-medium text-gray-400 mt-0.5">≈ RWF {rwfTotal.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Promo code */}
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">Have a promo code?</p>
+              <div className="flex gap-2">
+                <input
+                  type="text" value={promo.code}
+                  onChange={e => setPromo(p => ({ ...p, code: e.target.value.toUpperCase(), applied: false, error: "" }))}
+                  placeholder="Enter promo code" disabled={promo.applied}
+                  onKeyDown={e => e.key === "Enter" && applyPromoCode()}
+                  className="flex-1 min-w-0 px-3.5 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-sm uppercase tracking-widest outline-none focus:border-[#6B21A8] transition-colors disabled:opacity-70"
+                />
+                <button
+                  onClick={promo.applied ? removePromoCode : applyPromoCode}
+                  disabled={promo.loading || (!promo.applied && !promo.code.trim())}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 whitespace-nowrap ${
+                    promo.applied ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-[#6B21A8] text-white hover:bg-[#581c87]"
+                  }`}
+                >
+                  {promo.loading
+                    ? <span className="inline-block w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
+                    : promo.applied ? "Remove" : "Apply"}
+                </button>
+              </div>
+              {promo.applied && (
+                <p className="mt-1.5 text-xs text-green-600 font-semibold flex items-center gap-1">
+                  ✓ Promo applied! You save ${discountAmount.toFixed(2)}
+                </p>
+              )}
+              {promo.error && <p className="mt-1.5 text-xs text-red-500 font-medium">{promo.error}</p>}
+            </div>
           </div>
-        )}
 
-        {method === "paypal" && (
-          <div className="space-y-4">
-            <button onClick={() => setMethod("choose")} className="text-xs text-gray-500 hover:text-gray-700">← Back</button>
-            {paypalPaid ? (
+          {/* ── Right: payment methods ── */}
+          <div className="space-y-6">
+            {!inMmFlow && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Select payment method</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <PaymentOptionCard
+                    id="paypal" selected={method === "paypal"}
+                    onSelect={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); }}
+                    logo={<PayPalWordmark />} title="PayPal" subtitle="Pay securely with PayPal or card"
+                  />
+                  <PaymentOptionCard
+                    id="mtn" selected={method === "mtn"}
+                    onSelect={() => { setMethod("mtn"); setPhone(""); setPredicted(null); setMmStep("input"); setMmError(""); }}
+                    logo={<MtnLogo />} title="MTN Mobile Money" subtitle="Pay with MTN MoMo Rwanda"
+                  />
+                  <PaymentOptionCard
+                    id="airtel" selected={method === "airtel"}
+                    onSelect={() => { setMethod("airtel"); setPhone(""); setPredicted(null); setMmStep("input"); setMmError(""); }}
+                    logo={<AirtelLogo />} title="Airtel Money" subtitle="Pay with Airtel Money Rwanda"
+                  />
+                </div>
+              </div>
+            )}
+
+            {method === "paypal" && (
+              <div className="space-y-4">
+                {paypalPaid ? (
+                  <div className="text-center py-6 space-y-2">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600"><I.Check /></div>
+                    <p className="text-sm font-semibold text-gray-900">Payment received!</p>
+                  </div>
+                ) : (
+                  <>
+                    <PayPalCheckoutButton
+                      invoiceId={invoiceId}
+                      amountUSD={finalAmount}
+                      onSuccess={() => { setPaypalPaid(true); setTimeout(onPaid, 1200); }}
+                      onError={(msg) => setPaypalError(msg)}
+                    />
+                    {paypalError && <p className="text-sm text-red-600">{paypalError}</p>}
+                  </>
+                )}
+              </div>
+            )}
+
+            {(method === "mtn" || method === "airtel") && mmStep === "input" && (
+              <div className={`rounded-2xl p-5 space-y-4 border-2 ${method === "mtn" ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-100"}`}>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                    Enter {method === "mtn" ? "MTN" : "Airtel"} number
+                  </label>
+                  <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="07XXXXXXXX"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[#6B21A8] transition-colors" />
+                  {predictLoading && <p className="text-xs text-gray-400 mt-1.5">Detecting operator…</p>}
+                  {!predictLoading && isMmValid && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="w-12 flex-shrink-0">{method === "mtn" ? <MtnLogo /> : <AirtelLogo />}</span>
+                      <p className="text-xs text-green-600">Detected</p>
+                    </div>
+                  )}
+                  {!predictLoading && mmMismatch && (
+                    <p className="text-xs text-amber-700 font-medium mt-1.5">
+                      This looks like {providerIsAirtel ? "an Airtel" : "an MTN"} number — please select {providerIsAirtel ? "Airtel Money" : "MTN Mobile Money"} instead.
+                    </p>
+                  )}
+                  {!predictLoading && cleanPhone.length >= 9 && !predicted && <p className="text-xs text-red-500 mt-1.5">Operator not supported for this number.</p>}
+                </div>
+                {mmError && <p className="text-sm text-red-600">{mmError}</p>}
+                <button onClick={payMobileMoney} disabled={!isMmValid}
+                  className="w-full py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-40 hover:bg-[#581c87] transition-colors">
+                  Pay RWF {rwfTotal.toLocaleString()}
+                </button>
+              </div>
+            )}
+
+            {(method === "mtn" || method === "airtel") && mmStep === "sending" && (
+              <p className="text-center text-sm text-gray-500 py-8">Sending payment request…</p>
+            )}
+
+            {(method === "mtn" || method === "airtel") && mmStep === "waiting" && (
+              <div className="text-center py-6 space-y-3">
+                <div className="w-12 h-12 border-4 border-purple-200 border-t-[#6B21A8] rounded-full animate-spin mx-auto" />
+                <p className="text-sm font-medium text-gray-900">Check your phone</p>
+                <p className="text-xs text-gray-500">Approve the USSD prompt to complete payment. Expires in {countdown}s.</p>
+                {countdown <= 90 && (
+                  <p className="text-xs text-amber-600 font-medium">No prompt yet? Check your phone for a USSD popup, or try again.</p>
+                )}
+              </div>
+            )}
+
+            {(method === "mtn" || method === "airtel") && mmStep === "success" && (
               <div className="text-center py-6 space-y-2">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600"><I.Check /></div>
                 <p className="text-sm font-semibold text-gray-900">Payment received!</p>
               </div>
-            ) : (
-              <>
-                <PayPalCheckoutButton
-                  invoiceId={invoiceId}
-                  amountUSD={amountUSD}
-                  onSuccess={() => { setPaypalPaid(true); setTimeout(onPaid, 1200); }}
-                  onError={(msg) => setPaypalError(msg)}
-                />
-                {paypalError && <p className="text-sm text-red-600">{paypalError}</p>}
-              </>
             )}
-          </div>
-        )}
 
-        {(method === "mtn" || method === "airtel") && mmStep === "input" && (
-          <div className="space-y-4">
-            <button onClick={() => setMethod("choose")} className="text-xs text-gray-500 hover:text-gray-700">← Back</button>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                Enter {method === "mtn" ? "MTN" : "Airtel"} number
-              </label>
-              <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="07XXXXXXXX"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] transition-colors" />
-              {predictLoading && <p className="text-xs text-gray-400 mt-1.5">Detecting operator…</p>}
-              {!predictLoading && isMmValid && (
-                <div className="flex items-center gap-2 mt-1.5">
-                  <span className="w-12 flex-shrink-0">{method === "mtn" ? <MtnLogo /> : <AirtelLogo />}</span>
-                  <p className="text-xs text-green-600">Detected</p>
+            {(method === "mtn" || method === "airtel") && mmStep === "failed" && (
+              <div className="space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3 text-left">
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+                      <path d="M6 18L18 6M6 6l12 12" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-bold text-red-700 text-sm">Payment failed</p>
+                    <p className="text-red-600 text-sm mt-1">
+                      {mmError || "Payment failed. Please try again or use a different payment method."}
+                    </p>
+                  </div>
                 </div>
-              )}
-              {!predictLoading && mmMismatch && (
-                <p className="text-xs text-amber-700 font-medium mt-1.5">
-                  This looks like {providerIsAirtel ? "an Airtel" : "an MTN"} number — please select {providerIsAirtel ? "Airtel Money" : "MTN Mobile Money"} instead.
-                </p>
-              )}
-              {!predictLoading && cleanPhone.length >= 9 && !predicted && <p className="text-xs text-red-500 mt-1.5">Operator not supported for this number.</p>}
-            </div>
-            {mmError && <p className="text-sm text-red-600">{mmError}</p>}
-            <button onClick={payMobileMoney} disabled={!isMmValid}
-              className="w-full py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-40 hover:bg-[#581c87] transition-colors">
-              Pay RWF {rwfTotal.toLocaleString()}
-            </button>
-          </div>
-        )}
-
-        {(method === "mtn" || method === "airtel") && mmStep === "sending" && (
-          <p className="text-center text-sm text-gray-500 py-8">Sending payment request…</p>
-        )}
-
-        {(method === "mtn" || method === "airtel") && mmStep === "waiting" && (
-          <div className="text-center py-6 space-y-3">
-            <div className="w-12 h-12 border-4 border-purple-200 border-t-[#6B21A8] rounded-full animate-spin mx-auto" />
-            <p className="text-sm font-medium text-gray-900">Check your phone</p>
-            <p className="text-xs text-gray-500">Approve the USSD prompt to complete payment. Expires in {countdown}s.</p>
-            {countdown <= 90 && (
-              <p className="text-xs text-amber-600 font-medium">No prompt yet? Check your phone for a USSD popup, or try again.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => { setMmStep("input"); setMmError(""); }}
+                    className="flex-1 px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl hover:bg-[#581c87] transition-colors text-sm">
+                    Try Again
+                  </button>
+                  <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); setMmStep("input"); setMmError(""); setPhone(""); setPredicted(null); }}
+                    className="flex-1 px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">
+                    Use Different Payment Method
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-        )}
-
-        {(method === "mtn" || method === "airtel") && mmStep === "success" && (
-          <div className="text-center py-6 space-y-2">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600"><I.Check /></div>
-            <p className="text-sm font-semibold text-gray-900">Payment received!</p>
-          </div>
-        )}
-
-        {(method === "mtn" || method === "airtel") && mmStep === "failed" && (
-          <div className="space-y-4">
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3 text-left">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
-                  <path d="M6 18L18 6M6 6l12 12" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-bold text-red-700 text-sm">Payment failed</p>
-                <p className="text-red-600 text-sm mt-1">
-                  {mmError || "Payment failed. Please try again or use a different payment method."}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => { setMmStep("input"); setMmError(""); }}
-                className="flex-1 px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl hover:bg-[#581c87] transition-colors text-sm">
-                Try Again
-              </button>
-              <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); setMmStep("input"); setMmError(""); setPhone(""); setPredicted(null); }}
-                className="flex-1 px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">
-                Use Different Payment Method
-              </button>
-            </div>
-          </div>
-        )}
-      </motion.div>
+        </motion.div>
+      </div>
     </motion.div>
   );
 }
@@ -882,7 +1006,7 @@ function HostingSection({ clientId }: { clientId: number }) {
   const [error,       setError]       = useState(false);
   const [cpanelLoading, setCpanelLoading] = useState<Record<number, boolean>>({});
   const [renewingId, setRenewingId] = useState<number | null>(null);
-  const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number } | null>(null);
+  const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number; description: string; period: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -907,7 +1031,7 @@ function HostingSection({ clientId }: { clientId: number }) {
         matchText, description: `Hosting Renewal - ${matchText} (${p.billingcycle})`, amount,
       });
       if (!invoiceId) throw new Error("No invoice returned");
-      setPayTarget({ invoiceId, amountUSD: invoiceAmount || amount });
+      setPayTarget({ invoiceId, amountUSD: invoiceAmount || amount, description: matchText, period: p.billingcycle });
     } catch {
       alert("Could not start renewal right now. Please try again or contact support.");
     } finally {
@@ -991,6 +1115,7 @@ function HostingSection({ clientId }: { clientId: number }) {
       <AnimatePresence>
         {payTarget && (
           <PaymentModal invoiceId={payTarget.invoiceId} amountUSD={payTarget.amountUSD}
+            description={payTarget.description} period={payTarget.period}
             clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
             onClose={() => setPayTarget(null)}
             onPaid={() => { setPayTarget(null); load(); }} />
@@ -1148,6 +1273,7 @@ function InvoicesSection({ clientId }: { clientId: number }) {
       <AnimatePresence>
         {payInvoice && (
           <PaymentModal invoiceId={payInvoice.id} amountUSD={parseFloat(payInvoice.total) || 0}
+            description={`Invoice #${payInvoice.id}`}
             clientEmail={typeof window !== "undefined" ? (localStorage.getItem("bshop_client_email") ?? "") : ""}
             onClose={() => setPayInvoice(null)}
             onPaid={() => { setPayInvoice(null); load(); }} />

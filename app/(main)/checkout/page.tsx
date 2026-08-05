@@ -645,7 +645,7 @@ function StepPayment({ cart }: { cart: Cart }) {
       const res  = await fetch("/api/checkout/create-order", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body:    JSON.stringify({ clientId: Number(clientId), cartItems }),
+        body:    JSON.stringify({ clientId: Number(clientId), cartItems, promoCode: coupon.applied ? coupon.code : undefined }),
       });
       const json = await res.json() as { success: boolean; invoiceId?: number; orderId?: number; allOrderIds?: number[]; error?: string };
       console.log("[Checkout][PayPal/Card] create-order response:", json);

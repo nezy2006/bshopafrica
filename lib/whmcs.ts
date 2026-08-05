@@ -1192,8 +1192,8 @@ export async function createPawapayOrder(clientId: number, cartItems: CartItemLi
   return createOrderWithGateway(clientId, cartItems, WHMCS_PAWAPAY_GATEWAY);
 }
 
-export async function createPaypalOrder(clientId: number, cartItems: CartItemLike[]): Promise<PawapayOrderResult> {
-  return createOrderWithGateway(clientId, cartItems, WHMCS_PAYPAL_GATEWAY);
+export async function createPaypalOrder(clientId: number, cartItems: CartItemLike[], promoCode?: string): Promise<PawapayOrderResult> {
+  return createOrderWithGateway(clientId, cartItems, WHMCS_PAYPAL_GATEWAY, promoCode);
 }
 
 /* ─── Invoice lookup ─────────────────────────────────────────────────────── */

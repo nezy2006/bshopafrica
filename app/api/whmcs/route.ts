@@ -661,6 +661,11 @@ export async function POST(req: NextRequest) {
       }
       case "getTLDPricing":         data = await getTLDPricing(); break;
       case "validateCoupon":        data = await validateCoupon(s("code")); break;
+      case "validatePromoCode": {
+        const coupon = await validateCoupon(s("code"));
+        data = { valid: coupon.valid, discount: coupon.value, type: coupon.type, description: coupon.message };
+        break;
+      }
       case "addPayment": {
         const admin = await requireAdmin(req, "invoices");
         if (isAdminUnauthorized(admin)) return admin;
