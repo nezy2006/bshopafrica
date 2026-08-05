@@ -1,86 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session-store";
-import { getClientDetails, getClientProducts, getClientDomains, openTicket, addTicketReply } from "@/lib/whmcs";
+import { openTicket, addTicketReply } from "@/lib/whmcs";
 import { sendSmtpMail } from "@/lib/mailer";
 import { pushAdminNotification } from "@/lib/admin-notifications";
 import { markTicketChatOrigin } from "@/lib/ticket-meta";
 import { config } from "@/lib/config";
+import { getAutoResponse } from "@/lib/chat-rules";
 import {
   getOrCreateChatSession, appendChatMessages, escalateChatSession,
   newMessage, type ChatMessage, type ChatSession,
 } from "@/lib/chat-store";
-
-const anthropic = new Anthropic();
-
-const BASE_SYSTEM_PROMPT = `You are a helpful customer support assistant for The B.Shop Africa,
-a web hosting and domain registration company serving Africa and beyond.
-
-You help clients with:
-- Domain registration and transfer questions
-- Hosting plans (Business Starter Kit, etc.)
-- Payment methods (MTN MoMo, Airtel Money, PayPal)
-- Account and billing questions
-- Technical support for cPanel
-- Email setup
-- DNS and nameserver questions
-
-Company info:
-- Website: bshopafrica.com
-- Email: admin@bshopafrica.com
-- WhatsApp: +250724684369
-- Hosting plans start from $8/mo
-- Free domain with first year of hosting
-- Supports MTN MoMo, Airtel Money, PayPal payments
-- Nameservers: ns1-ns4.mysecurecloudhost.com
-
-Guidelines:
-- Be friendly, professional and concise
-- Answer in the same language the client uses
-- If client is logged in, personalize responses
-- For billing issues, direct to their dashboard
-- For technical issues you cannot solve, offer to escalate to human support
-- NEVER make up information you don't know
-- If asked about specific account details, ask them to login to dashboard
-
-When you cannot help or client requests human support, respond with:
-[ESCALATE: reason for escalation]
-at the end of your message.
-
-Common solutions:
-- Can't login: go to /forgot-password
-- Payment failed: check balance, try again or use different method
-- Domain not working: DNS propagation takes 24-48 hours
-- cPanel access: go to dashboard → My Hosting → cPanel Login
-- Invoice: go to dashboard → Invoices`;
-
-const ESCALATE_RE = /\[ESCALATE:\s*([^\]]+)\]\s*$/i;
-
-function toAnthropicRole(role: ChatMessage["role"]): "user" | "assistant" {
-  return role === "client" ? "user" : "assistant";
-}
-
-async function buildPersonalizationBlock(clientId: number): Promise<string> {
-  try {
-    const [details, products, domains] = await Promise.all([
-      getClientDetails(clientId),
-      getClientProducts(clientId).catch(() => []),
-      getClientDomains(clientId).catch(() => []),
-    ]);
-    const services = products.map(p => `${p.name} (${p.status}, domain: ${p.domain || "n/a"})`).join("; ") || "none";
-    const domainNames = domains.map(d => `${d.domainname} (${d.status})`).join("; ") || "none";
-    return `
-
-The client is logged in. Greet them by first name.
-- Name: ${details.firstname} ${details.lastname}
-- Email: ${details.email}
-- Active services: ${services}
-- Domains: ${domainNames}
-Use this to personalize your answer, but never invent details beyond what's listed here.`;
-  } catch {
-    return "";
-  }
-}
 
 function transcriptText(messages: ChatMessage[]): string {
   return messages
@@ -166,7 +95,7 @@ export async function POST(req: NextRequest) {
     session = { ...session, messages: [...session.messages, clientMsg] };
 
     // Once escalated, the client is talking to a human — forward their
-    // message onto the WHMCS ticket instead of calling the AI again.
+    // message onto the WHMCS ticket instead of running it through the rules.
     if (session.status === "escalated" && session.ticket_id) {
       await addTicketReply(session.ticket_id, session.client_id ?? 0, message).catch(() => {});
       return NextResponse.json({
@@ -176,30 +105,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let personalization = "";
-    if (authedSession?.clientId) {
-      personalization = await buildPersonalizationBlock(authedSession.clientId);
-    }
-
-    const history = session.messages.map(m => ({
-      role: toAnthropicRole(m.role),
-      content: m.content,
-    }));
-
-    const completion = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      system: BASE_SYSTEM_PROMPT + personalization,
-      messages: history,
-    });
-
-    const textBlock = completion.content.find(b => b.type === "text");
-    const rawReply = textBlock && "text" in textBlock ? textBlock.text : "Sorry, I couldn't generate a response — please try again.";
-
-    const escalateMatch = rawReply.match(ESCALATE_RE);
-    const shouldEscalate = Boolean(escalateMatch);
-    const escalationReason = escalateMatch?.[1]?.trim();
-    const displayReply = rawReply.replace(ESCALATE_RE, "").trim();
+    const { response: displayReply, shouldEscalate, escalationReason } = getAutoResponse(message);
 
     const aiMsg = newMessage("ai", displayReply);
     await appendChatMessages(sessionId, [aiMsg]);
