@@ -64,13 +64,23 @@ export async function POST(req: NextRequest) {
     // ── Direct invoice payment (renewal) — just mark the existing invoice paid ──
     if (stored.invoiceId) {
       try {
+        // If a promo discount was applied, the client only paid the discounted
+        // amount (e.g. $0.60) but the WHMCS invoice is for the full price (e.g.
+        // $20.00). Recording only the discounted amount leaves the invoice
+        // partially paid, so WHMCS never marks it Paid and the service never
+        // renews. Record the full invoice amount instead — the discount is
+        // absorbed as a promotional cost, not passed through to WHMCS.
+        const paymentAmount =
+          stored.discountAmount && stored.discountAmount > 0 && stored.invoiceAmount
+            ? stored.invoiceAmount
+            : stored.totalUSD;
         await addPaymentToInvoice(
           stored.invoiceId,
-          stored.totalUSD,
+          paymentAmount,
           depositId,
           WHMCS_PAWAPAY_GATEWAY,
         );
-        console.log("[pawapay/callback] ✅ invoice paid directly", { invoiceId: stored.invoiceId, depositId });
+        console.log("[pawapay/callback] ✅ invoice paid directly", { invoiceId: stored.invoiceId, depositId, paymentAmount, actualPaid: stored.totalUSD, promoCode: stored.promoCode });
         void pushAdminNotification("payment_received", `Mobile money payment received — $${stored.totalUSD}`, `Invoice #${stored.invoiceId}`, "/admin/billing/transactions");
         await recordPawapayTransaction({
           depositId, clientId: stored.clientId, clientEmail: stored.clientEmail,

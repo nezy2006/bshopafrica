@@ -39,11 +39,14 @@ function loadPaypalScript(currency: string): Promise<void> {
  *  API routes, which talk to PayPal's REST API server-side and mark the WHMCS
  *  invoice paid on success. Nothing here ever redirects to WHMCS. */
 export function PayPalCheckoutButton({
-  invoiceId, amountUSD, orderIds, onSuccess, onError,
+  invoiceId, amountUSD, orderIds, invoiceAmount, discountAmount, promoCode, onSuccess, onError,
 }: {
   invoiceId:  number;
   amountUSD:  number;
   orderIds?:  number[]; // secondary WHMCS orders to accept on success (new-order checkout only)
+  invoiceAmount?:  number; // full invoice amount before discount (renewals) — see lib/pawapay-store.ts
+  discountAmount?: number;
+  promoCode?:      string;
   onSuccess:  () => void;
   onError:    (message: string) => void;
 }) {
@@ -73,7 +76,7 @@ export function PayPalCheckoutButton({
             const res  = await fetch("/api/checkout/paypal-capture", {
               method:  "POST",
               headers: { "Content-Type": "application/json" },
-              body:    JSON.stringify({ orderID: data.orderID, invoiceId, orderIds }),
+              body:    JSON.stringify({ orderID: data.orderID, invoiceId, orderIds, invoiceAmount, discountAmount, promoCode }),
             });
             const json = (await res.json()) as { success: boolean; error?: string };
             if (!json.success) { onError(json.error ?? "Payment could not be completed. Please contact support."); return; }

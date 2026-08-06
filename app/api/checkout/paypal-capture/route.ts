@@ -5,10 +5,13 @@ import { pushAdminNotification } from "@/lib/admin-notifications";
 
 export async function POST(req: NextRequest) {
   try {
-    const { orderID, invoiceId, orderIds } = (await req.json()) as {
+    const { orderID, invoiceId, orderIds, invoiceAmount, discountAmount, promoCode } = (await req.json()) as {
       orderID:   string;
       invoiceId: number;
       orderIds?: number[]; // secondary WHMCS orders (website builder / transfer) from create-order, new-order checkout only
+      invoiceAmount?:  number; // full invoice amount before discount (renewals) — see lib/pawapay-store.ts
+      discountAmount?: number;
+      promoCode?:      string;
     };
 
     if (!orderID || !invoiceId) {
@@ -27,8 +30,17 @@ export async function POST(req: NextRequest) {
     // Money has already moved at this point — always report success to the user from here on,
     // even if the WHMCS-side bookkeeping below has a partial failure. Log for manual follow-up.
     try {
-      await addPaymentToInvoice(invoiceId, parseFloat(capture.amount), capture.captureId, WHMCS_PAYPAL_GATEWAY);
-      console.log("[paypal-capture] invoice marked paid:", { invoiceId, amount: capture.amount, captureId: capture.captureId });
+      // If a promo discount was applied, the client only paid the discounted amount via
+      // PayPal but the WHMCS invoice is for the full price. Recording only the discounted
+      // amount leaves the invoice partially paid, so WHMCS never marks it Paid and the
+      // service never renews. Record the full invoice amount instead — the discount is
+      // absorbed as a promotional cost, not passed through to WHMCS.
+      const paymentAmount =
+        discountAmount && discountAmount > 0 && invoiceAmount
+          ? invoiceAmount
+          : parseFloat(capture.amount);
+      await addPaymentToInvoice(invoiceId, paymentAmount, capture.captureId, WHMCS_PAYPAL_GATEWAY);
+      console.log("[paypal-capture] invoice marked paid:", { invoiceId, amount: paymentAmount, actualPaid: capture.amount, captureId: capture.captureId, promoCode });
       void pushAdminNotification("payment_received", `PayPal payment received — $${capture.amount}`, `Invoice #${invoiceId}`, "/admin/billing/transactions");
     } catch (e) {
       console.error("[paypal-capture] addPaymentToInvoice failed for captured payment", { invoiceId, captureId: capture.captureId }, e);

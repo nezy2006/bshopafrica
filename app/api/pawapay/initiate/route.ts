@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
     totalUSD?:    number;
     totalRWF?:    number;
     invoiceId?:   number;
+    invoiceAmount?:  number; // full invoice amount before discount (renewals) — see lib/pawapay-store.ts
+    discountAmount?: number;
+    promoCode?:      string;
   };
 
   console.log("[pawapay/initiate] request body:", JSON.stringify(body));
@@ -67,6 +70,9 @@ export async function POST(req: NextRequest) {
     totalUSD    = 0,
     totalRWF    = amount,
     invoiceId,
+    invoiceAmount,
+    discountAmount,
+    promoCode,
   } = body;
   const currency  = body.currency ?? "RWF";
   const depositId = randomUUID();
@@ -161,6 +167,9 @@ export async function POST(req: NextRequest) {
     phone:       finalPhone,
     provider:    finalProvider,
     ...(invoiceId ? { invoiceId } : {}),
+    ...(invoiceAmount  != null ? { invoiceAmount }  : {}),
+    ...(discountAmount != null ? { discountAmount } : {}),
+    ...(promoCode       ? { promoCode }             : {}),
     createdAt:   Date.now(),
   });
 

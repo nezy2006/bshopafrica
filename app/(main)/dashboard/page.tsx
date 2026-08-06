@@ -719,6 +719,9 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
         body: JSON.stringify({
           amount: rwfTotal, currency: "RWF", phone: predicted.phoneNumber, operator: predicted.provider,
           clientId, clientEmail, invoiceId, totalUSD: finalAmount, totalRWF: rwfTotal,
+          invoiceAmount: originalAmount,
+          discountAmount: discountAmount > 0 ? discountAmount : undefined,
+          promoCode: promo.applied ? promo.code : undefined,
         }),
       });
       const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
@@ -855,6 +858,9 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
                     <PayPalCheckoutButton
                       invoiceId={invoiceId}
                       amountUSD={finalAmount}
+                      invoiceAmount={originalAmount}
+                      discountAmount={discountAmount > 0 ? discountAmount : undefined}
+                      promoCode={promo.applied ? promo.code : undefined}
                       onSuccess={() => { setPaypalPaid(true); setTimeout(onPaid, 1200); }}
                       onError={(msg) => setPaypalError(msg)}
                     />
