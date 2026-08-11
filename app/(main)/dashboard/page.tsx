@@ -963,9 +963,27 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
             )}
 
             {(method === "mtn" || method === "airtel") && mmStep === "success" && (
-              <div className="text-center py-6 space-y-2">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600"><I.Check /></div>
-                <p className="text-sm font-semibold text-gray-900">Payment received!</p>
+              <div className="text-center py-8 space-y-3">
+                <motion.div
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 18 }}
+                  className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_24px_rgba(34,197,94,0.4)]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8">
+                    <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </motion.div>
+                <div>
+                  <p className="font-bold text-lg text-green-600">Payment Successful!</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {period ? "Your domain/hosting has been renewed." : "Your invoice has been paid."}
+                  </p>
+                  <p className="text-gray-400 text-xs mt-1">A confirmation email has been sent to you.</p>
+                </div>
+                <button onClick={onPaid}
+                  className="mt-2 px-6 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl hover:bg-[#581c87] transition-colors text-sm">
+                  Go to Dashboard
+                </button>
               </div>
             )}
 

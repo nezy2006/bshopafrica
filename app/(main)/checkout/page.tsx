@@ -888,8 +888,8 @@ function StepPayment({ cart }: { cart: Cart }) {
                         <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </motion.div>
-                    <p className="font-bold text-lg text-green-600">Payment confirmed!</p>
-                    <p className="text-gray-400 text-sm">Processing your order…</p>
+                    <p className="font-bold text-lg text-green-600">Payment Successful!</p>
+                    <p className="text-gray-400 text-sm">A confirmation email has been sent to you. Redirecting…</p>
                   </div>
                 )}
 
