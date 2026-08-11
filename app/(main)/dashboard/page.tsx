@@ -609,7 +609,9 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
   const [mmStep,  setMmStep]  = useState<MmStep>("input");
   const [mmError, setMmError] = useState("");
   const [depositId, setDepositId] = useState("");
-  const [countdown, setCountdown] = useState(120);
+  const [countdown, setCountdown] = useState(180);
+  const [extended, setExtended] = useState<number | null>(null);
+  const [retryChecking, setRetryChecking] = useState(false);
   const [paypalError, setPaypalError] = useState("");
   const [paypalPaid,  setPaypalPaid]  = useState(false);
 
@@ -700,13 +702,47 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
     return () => { active = false; clearInterval(interval); };
   }, [mmStep, depositId, onPaid]);
 
-  // Countdown while waiting for USSD approval
+  // Countdown while waiting for USSD approval — visual indicator only;
+  // reaching 0 hands off to the extended grace-period poll below instead
+  // of failing outright.
   useEffect(() => {
-    if (mmStep !== "waiting") return;
-    if (countdown <= 0) { setMmStep("failed"); setMmError("Payment timed out. Please try again."); return; }
+    if (mmStep !== "waiting" || countdown <= 0) return;
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [mmStep, countdown]);
+
+  // Extended grace period: MTN MoMo callbacks can arrive several minutes
+  // after the user approves the USSD prompt. Keep polling (the polling
+  // effect above already runs independently of this) for up to 5 more
+  // minutes before finally giving up.
+  useEffect(() => {
+    if (mmStep !== "waiting" || countdown > 0) return;
+    if (extended === null) { setExtended(300); return; }
+    if (extended <= 0) {
+      setMmStep("failed");
+      setMmError("Payment timed out. Check your MoMo balance before trying again to avoid double payment.");
+      return;
+    }
+    const t = setTimeout(() => setExtended(s => (s ?? 300) - 1), 1000);
+    return () => clearTimeout(t);
+  }, [mmStep, countdown, extended]);
+
+  // "Try Again" after an apparent failure — confirm the invoice wasn't
+  // actually paid by a late callback before starting a second deposit.
+  async function handleTryAgain() {
+    setRetryChecking(true);
+    try {
+      const status = await whmcs<{ status: string }>("getInvoiceStatus", { invoiceId });
+      if (status.status === "Paid") {
+        setMmError("");
+        setMmStep("success");
+        setTimeout(onPaid, 1500);
+        return;
+      }
+    } catch { /* couldn't confirm — fall through and let the user retry */ }
+    finally { setRetryChecking(false); }
+    setMmStep("input"); setMmError("");
+  }
 
   async function payMobileMoney() {
     if (!predicted || !providerMatches) return;
@@ -728,7 +764,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
       console.log("[PawaPay] initiate response:", json);
       if (!json.success || !json.depositId) throw new Error(json.error ?? "Failed to initiate payment");
       setDepositId(json.depositId);
-      setMmStep("waiting"); setCountdown(120);
+      setMmStep("waiting"); setCountdown(180); setExtended(null);
     } catch (e) {
       setMmStep("failed");
       setMmError(e instanceof Error ? e.message : "Payment initiation failed");
@@ -907,10 +943,21 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
             {(method === "mtn" || method === "airtel") && mmStep === "waiting" && (
               <div className="text-center py-6 space-y-3">
                 <div className="w-12 h-12 border-4 border-purple-200 border-t-[#6B21A8] rounded-full animate-spin mx-auto" />
-                <p className="text-sm font-medium text-gray-900">Check your phone</p>
-                <p className="text-xs text-gray-500">Approve the USSD prompt to complete payment. Expires in {countdown}s.</p>
-                {countdown <= 90 && (
+                <p className="text-sm font-medium text-gray-900">
+                  {countdown > 0 ? "Check your phone" : "Still waiting for confirmation…"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {countdown > 0
+                    ? `Waiting for payment confirmation… (${Math.floor(countdown / 60)}m ${String(countdown % 60).padStart(2, "0")}s)`
+                    : "Still processing… please wait"}
+                </p>
+                {countdown > 0 && countdown <= 90 && (
                   <p className="text-xs text-amber-600 font-medium">No prompt yet? Check your phone for a USSD popup, or try again.</p>
+                )}
+                {countdown <= 0 && (
+                  <p className="text-xs text-amber-600 font-medium">
+                    This is taking longer than usual — MTN MoMo confirmations can take a few minutes. We&apos;ll keep checking automatically.
+                  </p>
                 )}
               </div>
             )}
@@ -937,13 +984,19 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
                     </p>
                   </div>
                 </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left">
+                  <p className="text-xs text-amber-700 font-medium">
+                    ⚠️ Do not pay again until you confirm your first payment failed in your MoMo app.
+                  </p>
+                </div>
                 <div className="flex gap-3">
-                  <button onClick={() => { setMmStep("input"); setMmError(""); }}
-                    className="flex-1 px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl hover:bg-[#581c87] transition-colors text-sm">
-                    Try Again
+                  <button onClick={handleTryAgain} disabled={retryChecking}
+                    className="flex-1 px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl hover:bg-[#581c87] transition-colors text-sm disabled:opacity-60">
+                    {retryChecking ? "Checking payment status…" : "Try Again"}
                   </button>
                   <button onClick={() => { setMethod("paypal"); setPaypalError(""); setPaypalPaid(false); setMmStep("input"); setMmError(""); setPhone(""); setPredicted(null); }}
-                    className="flex-1 px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">
+                    disabled={retryChecking}
+                    className="flex-1 px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm disabled:opacity-60">
                     Use Different Payment Method
                   </button>
                 </div>

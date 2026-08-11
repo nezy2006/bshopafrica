@@ -208,6 +208,19 @@ export async function POST(req: NextRequest) {
         data = await getInvoices(session.clientId);
         break;
       }
+      case "getInvoiceStatus": {
+        // Used before letting a client retry a mobile money payment — confirms
+        // whether a slow/late PawaPay callback already paid this invoice, so
+        // we don't send them into a second charge for the same thing.
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        const details = await getInvoice(n("invoiceId"));
+        if (details.userid !== session.clientId) {
+          return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+        }
+        data = { status: details.status };
+        break;
+      }
       case "getClientOrders": {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;

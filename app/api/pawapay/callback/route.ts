@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { depositStore } from "@/lib/pawapay-store";
-import { createPawapayOrder, addPaymentToInvoice, acceptOrder, WHMCS_PAWAPAY_GATEWAY } from "@/lib/whmcs";
+import { createPawapayOrder, addPaymentToInvoice, acceptOrder, getInvoice, WHMCS_PAWAPAY_GATEWAY } from "@/lib/whmcs";
 import { recordPawapayTransaction } from "@/lib/pawapay-transactions";
 import { pushAdminNotification } from "@/lib/admin-notifications";
 
@@ -64,6 +64,16 @@ export async function POST(req: NextRequest) {
     // ── Direct invoice payment (renewal) — just mark the existing invoice paid ──
     if (stored.invoiceId) {
       try {
+        // Guard against double-processing: if the UI's countdown gave up and
+        // the user paid again, a late-arriving callback for the FIRST deposit
+        // could still land here after the invoice is already paid. Skip it.
+        const existingInvoice = await getInvoice(stored.invoiceId);
+        if (existingInvoice.status === "Paid") {
+          console.log("[pawapay/callback] invoice already paid, skipping duplicate", { invoiceId: stored.invoiceId, depositId });
+          depositStore.delete(depositId);
+          return NextResponse.json({ success: true });
+        }
+
         // If a promo discount was applied, the client only paid the discounted
         // amount (e.g. $0.60) but the WHMCS invoice is for the full price (e.g.
         // $20.00). Recording only the discounted amount leaves the invoice
