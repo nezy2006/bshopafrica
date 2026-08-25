@@ -205,16 +205,17 @@ function OverviewSection({ client, onNavigate }: { client: ClientDetails; onNavi
         {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />) : (
           <>
             {[
-              { label: "Active Domains",    value: domains.filter(d => d.status === "Active").length, color: "text-purple-600", bg: "bg-purple-50", icon: <I.Globe /> },
-              { label: "Active Hosting",    value: hosting.filter(h => h.status === "Active").length, color: "text-blue-600",   bg: "bg-blue-50",   icon: <I.Server /> },
-              { label: "Unpaid Invoices",   value: `${unpaidInvoices.length} ($${unpaidTotal.toFixed(0)})`, color: "text-red-600", bg: "bg-red-50", icon: <I.Alert /> },
-              { label: "Open Tickets",      value: openTickets.length, color: "text-orange-600", bg: "bg-orange-50", icon: <I.Headset /> },
+              { label: "Active Domains",    value: domains.filter(d => d.status === "Active").length, color: "text-purple-600", bg: "bg-purple-50", icon: <I.Globe />,   section: "domains"  as Section },
+              { label: "Active Hosting",    value: hosting.filter(h => h.status === "Active").length, color: "text-blue-600",   bg: "bg-blue-50",   icon: <I.Server />,  section: "hosting"  as Section },
+              { label: "Unpaid Invoices",   value: `${unpaidInvoices.length} ($${unpaidTotal.toFixed(0)})`, color: "text-red-600", bg: "bg-red-50", icon: <I.Alert />,   section: "invoices" as Section },
+              { label: "Open Tickets",      value: openTickets.length, color: "text-orange-600", bg: "bg-orange-50", icon: <I.Headset />, section: "support"  as Section },
             ].map(stat => (
-              <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-5">
+              <button key={stat.label} type="button" onClick={() => onNavigate(stat.section)}
+                className="bg-white rounded-2xl border border-gray-200 p-5 text-left cursor-pointer transition-transform duration-200 hover:scale-105 hover:shadow-md">
                 <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-3`}>{stat.icon}</div>
                 <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                 <p className="text-sm text-gray-500 mt-0.5">{stat.label}</p>
-              </div>
+              </button>
             ))}
           </>
         )}
@@ -1405,9 +1406,11 @@ function SupportSection({ client }: { client: ClientDetails }) {
   const [ticketLoading,  setTicketLoading]  = useState(false);
   const [replyText,      setReplyText]      = useState("");
   const [replying,       setReplying]       = useState(false);
+  const [replyError,     setReplyError]     = useState("");
   const [newTicket,      setNewTicket]      = useState(false);
   const [form,           setForm]           = useState({ subject: "", message: "", dept: "1", priority: "Medium" });
   const [submitting,     setSubmitting]     = useState(false);
+  const [formError,      setFormError]      = useState("");
   const [successId,      setSuccessId]      = useState("");
   const [newReplyBanner, setNewReplyBanner] = useState(false);
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1463,13 +1466,16 @@ function SupportSection({ client }: { client: ClientDetails }) {
   async function submitReply() {
     if (!selected || !replyText.trim()) return;
     setReplying(true);
+    setReplyError("");
     try {
       await whmcs("addTicketReply", {
         ticketId: selected.id, clientId: client.id, message: replyText,
       });
       setReplyText("");
-      viewTicket(selected);
-    } catch { /* ignore */ }
+      await viewTicket(selected);
+    } catch (err) {
+      setReplyError(err instanceof Error ? err.message : "Failed to send reply. Please try again.");
+    }
     finally { setReplying(false); }
   }
 
@@ -1485,6 +1491,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
   async function submitNewTicket() {
     if (!form.subject.trim() || !form.message.trim()) return;
     setSubmitting(true);
+    setFormError("");
     try {
       const name  = localStorage.getItem("bshop_client_name")  ?? `${client.firstname} ${client.lastname}`.trim();
       const email = localStorage.getItem("bshop_client_email") ?? client.email;
@@ -1497,7 +1504,9 @@ function SupportSection({ client }: { client: ClientDetails }) {
       setSuccessId(tid);
       setTimeout(() => setSuccessId(""), 6000);
       load();
-    } catch { /* ignore */ }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to submit ticket. Please try again.");
+    }
     finally { setSubmitting(false); }
   }
 
@@ -1601,6 +1610,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
             <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={4}
               placeholder="Type your reply…"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
+            {replyError && <p className="mt-2 text-sm text-red-600 flex items-center gap-1.5"><I.Alert />{replyError}</p>}
             <button onClick={submitReply} disabled={replying || !replyText.trim()}
               className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
               <I.Send />{replying ? "Sending…" : "Send Reply"}
@@ -1616,7 +1626,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Support Tickets</h2>
-        <button onClick={() => setNewTicket(true)}
+        <button onClick={() => { setFormError(""); setNewTicket(true); }}
           className="inline-flex items-center gap-2 px-4 py-2 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors">
           <I.Plus />Open New Ticket
         </button>
@@ -1690,6 +1700,7 @@ function SupportSection({ client }: { client: ClientDetails }) {
                 </div>
                 <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={5} placeholder="Describe your issue…"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none transition-colors" />
+                {formError && <p className="text-sm text-red-600 flex items-center gap-1.5"><I.Alert />{formError}</p>}
               </div>
               <div className="flex gap-3 mt-5">
                 <button onClick={() => setNewTicket(false)} className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm">Cancel</button>
@@ -1707,7 +1718,24 @@ function SupportSection({ client }: { client: ClientDetails }) {
 }
 
 /* ─── NOTIFICATIONS ──────────────────────────────────────────────────────── */
-function NotificationsSection() {
+// Notification ids are prefixed by source (`domain-`, `hosting-`, `invoice-`, `ticket-`)
+// which is more precise than `type` alone — hosting-expiry notifications are typed
+// "domain_expiring" too, so the id prefix is checked first.
+function sectionForNotification(n: AppNotification): Section {
+  if (n.id.startsWith("domain-"))  return "domains";
+  if (n.id.startsWith("hosting-")) return "hosting";
+  if (n.id.startsWith("invoice-")) return "invoices";
+  if (n.id.startsWith("ticket-"))  return "support";
+  switch (n.type) {
+    case "domain_expiring":   return "domains";
+    case "invoice_due":       return "invoices";
+    case "ticket_replied":    return "support";
+    case "service_suspended": return "hosting";
+    default:                  return "notifications";
+  }
+}
+
+function NotificationsSection({ onNavigate }: { onNavigate: (s: Section) => void }) {
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
 
   useEffect(() => {
@@ -1737,7 +1765,7 @@ function NotificationsSection() {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-50 overflow-hidden">
           {notifs.map(n => (
-            <div key={n.id} onClick={() => { markRead(n.id); setNotifs(getNotifications()); }}
+            <div key={n.id} onClick={() => { markRead(n.id); setNotifs(getNotifications()); onNavigate(sectionForNotification(n)); }}
               className={`flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? "bg-purple-50/30" : ""}`}>
               <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${typeColors[n.type]}`}>
                 {n.type === "domain_expiring" ? <I.Globe /> : n.type === "invoice_due" ? <I.FileText /> : n.type === "ticket_replied" ? <I.Headset /> : <I.Bell />}
@@ -1888,26 +1916,44 @@ function AccountSettingsSection({ client }: { client: ClientDetails }) {
           <h3 className="font-semibold text-gray-900">Payment Methods</h3>
           <p className="text-sm text-gray-500">We accept the following payment methods for all orders and renewals.</p>
           <div className="space-y-3">
-            <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl">
-              <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 00-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 00.554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 01.923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/></svg>
+            <div className="flex items-start justify-between gap-4 p-4 border border-gray-200 rounded-xl">
+              <div className="flex items-start gap-4">
+                <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 00-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 00.554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 01.923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/></svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">PayPal</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Secure online payment. Available for all orders and renewals.</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">PayPal</p>
-                <p className="text-xs text-gray-500 mt-0.5">Secure online payment. Available for all orders and renewals.</p>
-              </div>
+              <span className="flex-shrink-0 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full whitespace-nowrap">Active ✅</span>
             </div>
-            <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl">
-              <div className="w-9 h-9 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            <div className="flex items-start justify-between gap-4 p-4 border border-gray-200 rounded-xl">
+              <div className="flex items-start gap-4">
+                <div className="w-9 h-9 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">MTN Mobile Money</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Pay with MTN Mobile Money via PawaPay.</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900 text-sm">MTN / Airtel Mobile Money</p>
-                <p className="text-xs text-gray-500 mt-0.5">Pay with mobile money via PawaPay — Uganda, Rwanda, Tanzania and more.</p>
+              <span className="flex-shrink-0 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full whitespace-nowrap">Active ✅</span>
+            </div>
+            <div className="flex items-start justify-between gap-4 p-4 border border-gray-200 rounded-xl">
+              <div className="flex items-start gap-4">
+                <div className="w-9 h-9 bg-red-50 text-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">Airtel Money</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Pay with Airtel Money via PawaPay.</p>
+                </div>
               </div>
+              <span className="flex-shrink-0 text-xs font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full whitespace-nowrap">Active ✅</span>
             </div>
           </div>
-          <p className="text-xs text-gray-400 pt-1">To pay an outstanding invoice, go to the <span className="font-medium text-gray-600">Invoices</span> section in the sidebar.</p>
+          <p className="text-xs text-gray-400 pt-1">To make a payment, go to <span className="font-medium text-gray-600">Invoices</span> and click <span className="font-medium text-gray-600">Pay Now</span>.</p>
         </div>
       )}
     </div>
@@ -2017,7 +2063,7 @@ function DashboardTopBar({ onLogout, onSection }: { onLogout: () => void; onSect
                 {notifs.length === 0
                   ? <div className="py-8 text-center text-gray-400 text-sm">No notifications</div>
                   : notifs.map(n => (
-                    <div key={n.id} onClick={() => { markRead(n.id); setNotifs(getNotifications().slice(0, 5)); }}
+                    <div key={n.id} onClick={() => { markRead(n.id); setNotifs(getNotifications().slice(0, 5)); onSection(sectionForNotification(n)); setNotifOpen(false); }}
                       className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 ${!n.read ? "bg-purple-50/50" : ""}`}>
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${!n.read ? "bg-purple-500" : "bg-gray-300"}`} />
                       <div>
@@ -2258,7 +2304,7 @@ function DashboardInner() {
               {section === "orders"        && <OrdersSection clientId={client.id} />}
               {section === "invoices"      && <InvoicesSection clientId={client.id} />}
               {section === "support"       && <SupportSection client={client} />}
-              {section === "notifications" && <NotificationsSection />}
+              {section === "notifications" && <NotificationsSection onNavigate={setSection} />}
               {section === "settings"      && <AccountSettingsSection client={client} />}
             </motion.div>
           </AnimatePresence>

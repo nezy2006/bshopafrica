@@ -467,11 +467,11 @@ function SignupPageInner() {
                 </div>
                 <span className="text-sm text-gray-600 leading-snug">
                   I agree to the{" "}
-                  <Link href="#" className="text-[#6B21A8] font-semibold hover:underline">
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#6B21A8] font-semibold hover:underline">
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link href="#" className="text-[#6B21A8] font-semibold hover:underline">
+                  <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#6B21A8] font-semibold hover:underline">
                     Privacy Policy
                   </Link>
                 </span>

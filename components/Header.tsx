@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { User } from "lucide-react";
 import { getCartCount } from "@/lib/cart";
-import { getUnreadCount, getNotifications, markAllRead, clearNotifications, type AppNotification } from "@/lib/notifications";
+import { getUnreadCount, getNotifications, markAllRead, markRead, clearNotifications, type AppNotification } from "@/lib/notifications";
 import { isSessionExpired, clearAuth, refreshSession, authHeaders } from "@/lib/auth";
 
 // Primary links — always shown on md+ screens
@@ -30,6 +30,23 @@ const SECONDARY_NAV = [
 const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV];
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+// Notification ids are prefixed by source (`domain-`, `hosting-`, `invoice-`, `ticket-`)
+// which is more precise than `type` alone — hosting-expiry notifications are typed
+// "domain_expiring" too, so the id prefix is checked first.
+function sectionForNotification(n: AppNotification): string {
+  if (n.id.startsWith("domain-"))  return "domains";
+  if (n.id.startsWith("hosting-")) return "hosting";
+  if (n.id.startsWith("invoice-")) return "invoices";
+  if (n.id.startsWith("ticket-"))  return "support";
+  switch (n.type) {
+    case "domain_expiring":   return "domains";
+    case "invoice_due":       return "invoices";
+    case "ticket_replied":    return "support";
+    case "service_suspended": return "hosting";
+    default:                  return "notifications";
+  }
+}
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
 function CartIcon() {
@@ -366,7 +383,14 @@ export default function Header() {
                     ) : (
                       <div>
                         {notifs.map(n => (
-                          <div key={n.id} className={`flex gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!n.read ? "bg-purple-50/50" : ""}`}>
+                          <div key={n.id}
+                            onClick={() => {
+                              markRead(n.id);
+                              setNotifs(getNotifications().slice(0, 5));
+                              setNotifDropOpen(false);
+                              router.push(`/dashboard?s=${sectionForNotification(n)}`);
+                            }}
+                            className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? "bg-purple-50/50" : ""}`}>
                             <NotifIcon type={n.type} />
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm leading-snug ${!n.read ? "font-medium text-gray-900" : "text-gray-600"}`}>{n.message}</p>

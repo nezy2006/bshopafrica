@@ -233,12 +233,12 @@ export default function DomainSearch() {
       <div className="max-w-4xl mx-auto">
         <motion.div className="bg-white rounded-3xl p-10 sm:p-14"
           style={{ boxShadow: "0 20px 80px rgba(0,0,0,0.08)" }}
-          initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: EASE }}>
 
           {/* heading */}
           <motion.div className="text-center mb-10"
-            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.6 }}>
             <span className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-4">
               Domain Search
@@ -249,7 +249,7 @@ export default function DomainSearch() {
 
           {/* Register / Transfer tabs */}
           <motion.div className="flex justify-center mb-7"
-            initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }}>
             <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
               {(["register", "transfer"] as const).map(m => (
@@ -272,7 +272,7 @@ export default function DomainSearch() {
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2, ease: EASE }}>
               <motion.div className="flex flex-col sm:flex-row gap-3"
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25, duration: 0.5 }}>
                 <div className="flex-1 relative rounded-xl border-2 transition-all duration-300"
                   style={focused ? { borderColor: "#6B21A8", boxShadow: "0 0 0 4px rgba(107,33,168,0.12)" } : { borderColor: "#e5e7eb" }}>
@@ -312,7 +312,7 @@ export default function DomainSearch() {
             {TLDS.map((tld, i) => (
               <motion.button key={tld} type="button"
                 onClick={() => { setSelected(tld); reset(); }}
-                custom={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                custom={i} variants={fadeUp} initial="hidden" animate="visible"
                 whileHover={{ scale: 1.1, y: -3 }} whileTap={{ scale: 0.96 }}
                 className="px-4 py-1.5 rounded-full text-sm font-semibold border-2 transition-all duration-200 cursor-pointer"
                 style={selected === tld

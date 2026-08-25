@@ -248,21 +248,23 @@ function ContactForm() {
           </motion.svg>
         </motion.div>
 
-        <motion.h3
+        <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0  }}
           transition={{ delay: 0.4, duration: 0.45 }}
-          className="text-2xl font-black text-black mb-2"
+          className="w-full max-w-sm bg-green-50 border border-green-300 rounded-2xl px-5 py-4 mb-6"
         >
-          Message sent!
-        </motion.h3>
+          <p className="text-green-700 font-bold text-base">
+            ✅ Your message has been sent! We will get back to you within 24 hours.
+          </p>
+        </motion.div>
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0  }}
           transition={{ delay: 0.5, duration: 0.4 }}
           className="text-gray-500 mb-8 max-w-xs"
         >
-          {ticketId ? `Ticket #${ticketId} created. ` : ""}We&apos;ll reply within 48 hours.
+          {ticketId ? `Ticket #${ticketId} created.` : ""}
         </motion.p>
         <motion.button
           initial={{ opacity: 0 }}

@@ -62,32 +62,47 @@ async function sendViaWhmcs(clientId: number, resetUrl: string): Promise<boolean
 }
 
 /* ─── Nodemailer SMTP ────────────────────────────────────────────────────── */
+async function sendOnce(email: string, resetUrl: string, firstname: string): Promise<string> {
+  const transporter = nodemailer.createTransport({
+    host:   config.smtpHost,
+    port:   config.smtpPort,
+    secure: config.smtpPort === 465,
+    auth:   { user: config.smtpUser, pass: config.smtpPass },
+  });
+
+  const info = await transporter.sendMail({
+    from:    "The B.Shop Africa <admin@bshopafrica.com>",
+    to:      email,
+    replyTo: "admin@bshopafrica.com",
+    subject: "Reset your B.Shop Africa password",
+    text:    buildEmailText(resetUrl),
+    html:    buildEmailHtml(resetUrl, firstname),
+  });
+  return info.messageId;
+}
+
+// Retries once on failure — SMTP sends intermittently fail on this host (timeouts,
+// transient connection resets), and a single retry clears most of them without
+// making the client wait noticeably longer.
 async function sendViaSmtp(email: string, resetUrl: string, firstname: string): Promise<boolean> {
   if (!config.smtpPass) {
     console.warn("[reset-password] SMTP_PASS not set — skipping nodemailer");
     return false;
   }
   try {
-    const transporter = nodemailer.createTransport({
-      host:   config.smtpHost,
-      port:   config.smtpPort,
-      secure: config.smtpPort === 465,
-      auth:   { user: config.smtpUser, pass: config.smtpPass },
-    });
-
-    const info = await transporter.sendMail({
-      from:    "The B.Shop Africa <admin@bshopafrica.com>",
-      to:      email,
-      replyTo: "admin@bshopafrica.com",
-      subject: "Reset your B.Shop Africa password",
-      text:    buildEmailText(resetUrl),
-      html:    buildEmailHtml(resetUrl, firstname),
-    });
-    console.log("[reset-password] SMTP sent:", info.messageId);
+    const messageId = await sendOnce(email, resetUrl, firstname);
+    console.log("[reset-password] SMTP sent:", messageId);
     return true;
   } catch (err) {
-    console.error("[reset-password] SMTP error:", err);
-    return false;
+    console.error("[reset-password] SMTP error (attempt 1/2):", err instanceof Error ? err.message : err);
+    try {
+      const messageId = await sendOnce(email, resetUrl, firstname);
+      console.log("[reset-password] SMTP sent on retry:", messageId);
+      return true;
+    } catch (retryErr) {
+      console.error("[reset-password] SMTP error (attempt 2/2, giving up):", retryErr instanceof Error ? retryErr.message : retryErr);
+      return false;
+    }
   }
 }
 
@@ -107,10 +122,12 @@ export async function POST(req: NextRequest) {
     let client;
     try {
       client = await getClientDetails(0, clean);
-    } catch {
+    } catch (err) {
+      console.error(`[reset-password] getClientDetails lookup failed for ${clean}:`, err instanceof Error ? err.message : err);
       client = null;
     }
     if (!client || !client.id) {
+      console.warn(`[reset-password] No account found for ${clean}`);
       return NextResponse.json({ success: false, error: "No account found with that email address." });
     }
 
@@ -127,10 +144,15 @@ export async function POST(req: NextRequest) {
     const whmcsOk   = await sendViaWhmcs(client.id, resetUrl);
     let emailSent = whmcsOk;
     if (!whmcsOk) {
+      console.warn(`[reset-password] WHMCS SendEmail failed for ${clean}, falling back to direct SMTP`);
       emailSent = await sendViaSmtp(client.email || clean, resetUrl, client.firstname);
     }
     if (!emailSent) {
-      console.warn(`[reset-password] All delivery methods failed for ${clean}`);
+      console.error(`[reset-password] All delivery methods (WHMCS + SMTP, with retry) failed for ${clean}`);
+      return NextResponse.json({
+        success: false,
+        error:   "We couldn't send the reset email right now. Please try again in a few minutes or contact support.",
+      }, { status: 502 });
     }
 
     return NextResponse.json({ success: true });
