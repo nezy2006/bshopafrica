@@ -29,6 +29,7 @@ export default function TermsPage() {
       <LegalSection title="5. Payments">
         <p>We accept payment via PayPal (including major debit and credit cards through PayPal's checkout), MTN Mobile Money, and Airtel Money. All prices are displayed in USD unless otherwise noted; mobile money charges are converted to local currency at the prevailing rate shown at checkout.</p>
         <p>Invoices are due on the date specified in your account. Services may be suspended for non-payment after the grace period noted on the invoice. You are responsible for any fees, taxes, or currency conversion charges applied by your payment provider.</p>
+        <p><strong>Late Payment Fees:</strong> Invoices not paid by the due date will incur a late fee as specified in your invoice. Please ensure timely payment to avoid additional charges.</p>
       </LegalSection>
 
       <LegalSection title="6. Refunds">

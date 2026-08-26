@@ -74,14 +74,12 @@ function InvoicePaid({ invoice }: { invoice: InvoiceDetails }) {
           >
             Go to Dashboard
           </Link>
-          <a
-            href={`https://bshopafrica.com/billing/viewinvoice.php?id=${invoice.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/dashboard?s=invoices"
             className="px-8 py-3.5 border-2 border-[#6B21A8] text-[#6B21A8] font-bold rounded-full text-sm hover:bg-purple-50 transition-colors"
           >
             View Invoice →
-          </a>
+          </Link>
           <Link
             href="/"
             className="px-8 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-full text-sm hover:border-gray-300 transition-colors"
@@ -121,7 +119,7 @@ function InvoicePending({ invoice, onRefresh }: { invoice: InvoiceDetails | null
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 text-sm text-amber-800 text-left space-y-2">
         <p className="font-semibold">Your payment may still be processing.</p>
         <p>If you completed payment on PayPal, it can take a few minutes for WHMCS to confirm. This page refreshes automatically.</p>
-        <p>If you did not complete payment, you can return to WHMCS to pay the invoice.</p>
+        <p>If you did not complete payment, you can pay the invoice from your dashboard.</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
@@ -136,14 +134,12 @@ function InvoicePending({ invoice, onRefresh }: { invoice: InvoiceDetails | null
           Check Again
         </button>
         {invoice && (
-          <a
-            href={`https://bshopafrica.com/billing/viewinvoice.php?id=${invoice.id}&paynow=1`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/dashboard?s=invoices"
             className="px-6 py-3 border-2 border-gray-200 text-gray-700 font-bold rounded-full text-sm hover:border-gray-300 transition-colors"
           >
-            Pay Invoice on WHMCS →
-          </a>
+            Pay Invoice →
+          </Link>
         )}
       </div>
     </motion.div>

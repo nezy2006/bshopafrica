@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/lib/admin-utils";
+import { adminHeaders } from "@/lib/admin-auth-client";
 
 const CATEGORIES = ["General", "Hosting Tips", "Domain Guide", "Business Growth", "Tech News", "Company News"];
 const INPUT = "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all";
 
-interface Post { id: number; title: string; slug: string; excerpt: string; content: string; category: string; author: string; published: boolean; coverImage: string | null; readTime: string; }
+interface Post { id: number; title: string; slug: string; excerpt: string; content: string; category: string; author: string; published: boolean; featured: boolean; publishAt: string | null; coverImage: string | null; readTime: string; }
 
 export default function EditBlogPostPage({ params }: { params: Promise<{ id: string }> }) {
   const router   = useRouter();
@@ -20,11 +21,11 @@ export default function EditBlogPostPage({ params }: { params: Promise<{ id: str
     params.then(async ({ id: rawId }) => {
       setId(Number(rawId));
       try {
-        const res  = await fetch(`/api/blog/${rawId}`);
+        const res  = await fetch(`/api/blog/${rawId}`, { headers: adminHeaders() });
         const json = await res.json() as { success: boolean; data?: Post };
         if (json.success && json.data) {
           const { id: _, ...rest } = json.data;
-          setForm({ ...rest, coverImage: rest.coverImage ?? "" });
+          setForm({ ...rest, coverImage: rest.coverImage ?? "", publishAt: rest.publishAt ? rest.publishAt.slice(0, 16) : "" });
         }
       } catch { setError("Failed to load post."); }
     });
@@ -36,8 +37,9 @@ export default function EditBlogPostPage({ params }: { params: Promise<{ id: str
     if (!form) return;
     setSaving(true); setError("");
     try {
-      const body = publish !== undefined ? { ...form, published: publish } : form;
-      const res  = await fetch(`/api/blog/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const base = { ...form, publishAt: form.publishAt || null };
+      const body = publish !== undefined ? { ...base, published: publish } : base;
+      const res  = await fetch(`/api/blog/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...adminHeaders() }, body: JSON.stringify(body) });
       const json = await res.json() as { success: boolean; error?: string };
       if (!json.success) { setError(json.error ?? "Failed to save."); }
       else router.push("/admin/blog");
@@ -80,6 +82,19 @@ export default function EditBlogPostPage({ params }: { params: Promise<{ id: str
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Read Time</label>
             <input value={form.readTime} onChange={e => set("readTime", e.target.value)} className={INPUT} />
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Schedule Publish <span className="text-gray-400 font-normal">(optional)</span></label>
+            <input type="datetime-local" value={form.publishAt ?? ""} onChange={e => set("publishAt", e.target.value)} className={INPUT} />
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={form.featured} onChange={e => set("featured", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-[#6B21A8] focus:ring-[#6B21A8]" />
+              Featured post
+            </label>
           </div>
         </div>
         <div>

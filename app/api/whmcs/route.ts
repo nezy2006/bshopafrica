@@ -21,6 +21,7 @@ import {
   updateServiceDetails, sendServiceWelcomeEmail,
   registerDomain, transferDomainRecord, renewDomain, getDomainWhoisInfo,
   getEmailTemplates, getClientEmails,
+  getAffiliateByClientId, activateAffiliate, getAffiliateTransactions, requestAffiliateWithdrawal,
 } from "@/lib/whmcs";
 import { sendSmtpMail } from "@/lib/mailer";
 import { createSession, getSession } from "@/lib/session-store";
@@ -807,6 +808,36 @@ export async function POST(req: NextRequest) {
         }
         await updateClientPassword(session.clientId, String(password));
         data = { ok: true };
+        break;
+      }
+
+      case "getAffiliate": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        data = await getAffiliateByClientId(session.clientId);
+        break;
+      }
+      case "activateAffiliate": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        data = await activateAffiliate(session.clientId);
+        break;
+      }
+      case "getAffiliateTransactions": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        const affiliate = await getAffiliateByClientId(session.clientId);
+        data = affiliate ? await getAffiliateTransactions(affiliate.affiliateId) : [];
+        break;
+      }
+      case "requestAffiliateWithdrawal": {
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        const affiliate = await getAffiliateByClientId(session.clientId);
+        if (!affiliate || affiliate.balance <= 0) {
+          return NextResponse.json({ success: false, error: "No withdrawable balance." }, { status: 400 });
+        }
+        data = await requestAffiliateWithdrawal(session.clientId, affiliate.affiliateId, affiliate.balance, s("name") || undefined, session.email);
         break;
       }
 

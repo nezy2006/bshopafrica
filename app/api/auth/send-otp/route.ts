@@ -16,13 +16,17 @@ function buildEmailHtml(code: string, firstname: string) {
       <p style="font-size: 14px; color: #555;">This code expires in <strong>10 minutes</strong>.</p>
       <p style="font-size: 13px; color: #999;">If you did not request this code, please ignore this email.</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="font-size: 12px; color: #999;">The B.Shop Africa · bshopafrica.com · admin@bshopafrica.com</p>
+      <p style="font-size: 13px; color: #555; line-height: 1.6;">
+        The B.Shop Africa Team<br/>
+        admin@bshopafrica.com | bshopafrica.com<br/>
+        WhatsApp: +250724684369
+      </p>
     </div>
   `;
 }
 
 function buildEmailText(code: string) {
-  return `Your B.Shop Africa login code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, please ignore this email.\n\nThe B.Shop Africa Team\nbshopafrica.com`;
+  return `Your B.Shop Africa login code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, please ignore this email.\n\nThe B.Shop Africa Team\nadmin@bshopafrica.com | bshopafrica.com\nWhatsApp: +250724684369`;
 }
 
 function buildEmailSubject(code: string) {

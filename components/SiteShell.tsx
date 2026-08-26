@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import ScrollProgress from "@/components/ScrollProgress";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 function isDashboard(pathname: string) {
   return pathname.startsWith("/dashboard");
@@ -15,7 +16,9 @@ export function SiteHeader() {
   if (isDashboard(pathname)) return null;
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 z-50 h-8 bg-black flex items-center justify-center px-4">
+      <AnnouncementBanner />
+      <div className="fixed left-0 right-0 z-50 h-8 bg-black flex items-center justify-center px-4"
+        style={{ top: "var(--announce-h, 0px)" }}>
         <p className="text-sm font-semibold tracking-wide shimmer-text whitespace-nowrap">
           Get a FREE DOMAIN on Your First Year
         </p>

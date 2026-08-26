@@ -4,8 +4,9 @@ import { FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PageHeader, TableCard, THead, SkeletonRows, EmptyState, SearchBar } from "@/lib/admin-utils";
+import { adminHeaders } from "@/lib/admin-auth-client";
 
-interface Post { id: number; title: string; slug: string; category: string; published: boolean; createdAt: string; author: string; }
+interface Post { id: number; title: string; slug: string; category: string; published: boolean; featured: boolean; publishAt: string | null; createdAt: string; author: string; }
 
 export default function BlogListPage() {
   const [posts,   setPosts]   = useState<Post[]>([]);
@@ -14,7 +15,7 @@ export default function BlogListPage() {
 
   const load = async () => {
     try {
-      const res  = await fetch("/api/blog");
+      const res  = await fetch("/api/blog?all=1", { headers: adminHeaders() });
       const json = await res.json() as { success: boolean; data?: Post[] };
       if (json.success && json.data) setPosts(json.data);
     } catch { /* db not connected yet */ }
@@ -29,15 +30,22 @@ export default function BlogListPage() {
 
   const togglePublish = async (post: Post) => {
     try {
-      await fetch(`/api/blog/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ published: !post.published }) });
+      await fetch(`/api/blog/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...adminHeaders() }, body: JSON.stringify({ published: !post.published }) });
       setPosts(ps => ps.map(p => p.id === post.id ? { ...p, published: !p.published } : p));
+    } catch { /* handle error */ }
+  };
+
+  const toggleFeatured = async (post: Post) => {
+    try {
+      await fetch(`/api/blog/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...adminHeaders() }, body: JSON.stringify({ featured: !post.featured }) });
+      setPosts(ps => ps.map(p => p.id === post.id ? { ...p, featured: !p.featured } : p));
     } catch { /* handle error */ }
   };
 
   const deletePost = async (id: number) => {
     if (!confirm("Delete this post?")) return;
     try {
-      await fetch(`/api/blog/${id}`, { method: "DELETE" });
+      await fetch(`/api/blog/${id}`, { method: "DELETE", headers: adminHeaders() });
       setPosts(ps => ps.filter(p => p.id !== id));
     } catch { /* handle error */ }
   };
@@ -52,14 +60,25 @@ export default function BlogListPage() {
       <SearchBar value={search} onChange={setSearch} placeholder="Search posts…" />
 
       <TableCard>
-        <THead cols={["Title", "Category", "Author", "Date", "Status", "Actions"]} />
+        <THead cols={["Title", "Category", "Author", "Date", "Featured", "Status", "Actions"]} />
         <tbody>
-          {loading ? <SkeletonRows cols={6} /> : filtered.length === 0 ? <EmptyState icon={<FileText className="w-5 h-5" />} message="No blog posts yet" /> : filtered.map(p => (
+          {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon={<FileText className="w-5 h-5" />} message="No blog posts yet" /> : filtered.map(p => (
             <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-semibold text-black max-w-xs truncate">{p.title}</td>
               <td className="px-5 py-3.5"><span className="px-2.5 py-0.5 bg-purple-100 text-[#6B21A8] rounded-full text-xs font-bold">{p.category}</span></td>
               <td className="px-5 py-3.5 text-gray-500">{p.author}</td>
-              <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(p.createdAt).toLocaleDateString()}</td>
+              <td className="px-5 py-3.5 text-gray-400 text-xs">
+                {new Date(p.createdAt).toLocaleDateString()}
+                {p.publishAt && new Date(p.publishAt) > new Date() && (
+                  <div className="text-amber-600 font-semibold mt-0.5">Scheduled: {new Date(p.publishAt).toLocaleString()}</div>
+                )}
+              </td>
+              <td className="px-5 py-3.5">
+                <button onClick={() => toggleFeatured(p)} title={p.featured ? "Remove from featured" : "Set as featured"}
+                  className={`text-lg leading-none ${p.featured ? "text-amber-500" : "text-gray-300 hover:text-amber-400"}`}>
+                  {p.featured ? "★" : "☆"}
+                </button>
+              </td>
               <td className="px-5 py-3.5">
                 <button onClick={() => togglePublish(p)}
                   className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${p.published ? "bg-green-500" : "bg-gray-200"}`}>

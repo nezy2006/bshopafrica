@@ -9,6 +9,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import NextImage from "next/image";
 import { PageHeader } from "@/lib/admin-utils";
+import { adminHeaders } from "@/lib/admin-auth-client";
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 const CATEGORIES = ["News", "Tutorial", "Tips", "Company Update", "Industry"];
@@ -142,6 +143,8 @@ export default function NewBlogPostPage() {
     tags:        "",
     author:      "The B.Shop Team",
     seoDesc:     "",
+    featured:    false,
+    publishAt:   "",
   });
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState("");
@@ -176,12 +179,13 @@ export default function NewBlogPostPage() {
     try {
       const res  = await fetch("/api/blog", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
         body: JSON.stringify({
           ...form,
           content:   editor.getHTML(),
           excerpt:   form.seoDesc,
           published: false,
+          publishAt: form.publishAt || null,
         }),
       });
       const json = await res.json() as { success: boolean; error?: string };
@@ -203,12 +207,13 @@ export default function NewBlogPostPage() {
     try {
       const res  = await fetch("/api/blog", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
         body: JSON.stringify({
           ...form,
           content:   editor.getHTML(),
           excerpt:   form.seoDesc,
           published: true,
+          publishAt: form.publishAt || null,
         }),
       });
       const json = await res.json() as { success: boolean; error?: string };
@@ -300,6 +305,17 @@ export default function NewBlogPostPage() {
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Slug</label>
             <input value={form.slug} onChange={e => set("slug", e.target.value)} placeholder="auto-generated" className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Schedule Publish <span className="normal-case font-normal">(optional)</span></label>
+            <input type="datetime-local" value={form.publishAt} onChange={e => setForm(f => ({ ...f, publishAt: e.target.value }))} className={INPUT} />
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))}
+                className="w-4 h-4 rounded border-gray-300 text-[#6B21A8] focus:ring-[#6B21A8]" />
+              Featured post
+            </label>
           </div>
         </div>
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, execute } from "@/lib/db";
+import { requireAdmin, isAdminUnauthorized } from "@/lib/admin-auth";
 
-interface BlogRow { id: number; title: string; slug: string; excerpt: string; content: string; category: string; author: string; published: number; coverImage: string | null; readTime: string; createdAt: string; updatedAt: string; }
+interface BlogRow { id: number; title: string; slug: string; excerpt: string; content: string; category: string; author: string; published: number; featured: number; publishAt: string | null; coverImage: string | null; readTime: string; createdAt: string; updatedAt: string; }
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -20,6 +21,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
+    const admin = await requireAdmin(req, "blog");
+    if (isAdminUnauthorized(admin)) return admin;
     const { id } = await params;
     const body = await req.json() as Record<string, unknown>;
     const sets = Object.keys(body).map(k => `\`${k}\` = ?`).join(", ");
@@ -32,8 +35,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
+export async function DELETE(req: NextRequest, { params }: Ctx) {
   try {
+    const admin = await requireAdmin(req, "blog");
+    if (isAdminUnauthorized(admin)) return admin;
     const { id } = await params;
     await execute("DELETE FROM BlogPost WHERE id = ?", [Number(id)]);
     return NextResponse.json({ success: true });

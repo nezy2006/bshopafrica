@@ -265,15 +265,24 @@ function AddonCard({ item, onRemove }: { item: CartSSL | CartEmail; onRemove: ()
 }
 
 /* ─── Website Builder card ───────────────────────────────────────────────── */
+// Covers two different products sharing the same cart slot: the AI-generated
+// one-time site build (has businessName/siteData) and the Weebly-style
+// Free/Starter/Pro/Business subscription plans (has cycle instead).
 function WebsiteBuilderCard({ item, onRemove }: { item: CartWebsiteBuilder; onRemove: () => void }) {
-  // Parse colors from siteData for a mini color preview
+  const isSubscriptionPlan = !!item.cycle;
+
+  // Parse colors from siteData for a mini color preview (AI builder only)
   let primaryColor = "#6B21A8";
   let secondaryColor = "#4c1d95";
   try {
-    const d = JSON.parse(item.siteData) as { colorPrimary?: string; colorSecondary?: string };
+    const d = JSON.parse(item.siteData ?? "{}") as { colorPrimary?: string; colorSecondary?: string };
     if (d.colorPrimary)   primaryColor   = d.colorPrimary;
     if (d.colorSecondary) secondaryColor = d.colorSecondary;
   } catch { /* ignore */ }
+
+  const includes = isSubscriptionPlan
+    ? ["Drag & drop editor", "SSL certificate", "Mobile responsive design"]
+    : ["Complete website (all selected pages)", "Hosting integration & domain connection", "SSL certificate · Mobile responsive"];
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
@@ -285,12 +294,12 @@ function WebsiteBuilderCard({ item, onRemove }: { item: CartWebsiteBuilder; onRe
           <div className="w-full h-full flex items-center justify-center text-white"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z"/></svg></div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900">AI Website Builder</p>
-          <p className="text-sm text-gray-500">{item.businessName} · One-time setup</p>
+          <p className="font-semibold text-gray-900">{isSubscriptionPlan ? item.name : "AI Website Builder"}</p>
+          {!isSubscriptionPlan && <p className="text-sm text-gray-500">{item.businessName} · One-time setup</p>}
         </div>
         <div className="text-right flex-shrink-0">
           <p className="font-bold text-gray-900">${item.price.toFixed(2)}</p>
-          <p className="text-xs text-gray-400">one-time</p>
+          <p className="text-xs text-gray-400">{isSubscriptionPlan ? (item.cycle === "yearly" ? "per year" : "per month") : "one-time"}</p>
         </div>
         <button onClick={onRemove} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
           <TrashIcon />
@@ -298,7 +307,7 @@ function WebsiteBuilderCard({ item, onRemove }: { item: CartWebsiteBuilder; onRe
       </div>
       <div className="bg-purple-50 rounded-xl px-4 py-2.5 text-xs text-purple-700 space-y-1">
         <div className="font-semibold mb-1">Includes:</div>
-        {["Complete website (all selected pages)", "Hosting integration & domain connection", "SSL certificate · Mobile responsive"].map(f => (
+        {includes.map(f => (
           <div key={f} className="flex items-center gap-1.5"><span className="text-purple-500">✓</span>{f}</div>
         ))}
       </div>
@@ -531,10 +540,13 @@ export default function CartPage() {
                       <p className="text-sm font-semibold text-gray-800">+ Starter Builder</p>
                       <p className="text-xs text-gray-500">Custom domain, remove ads, $100 Google Ads credit</p>
                     </div>
-                    <a href="https://bshopafrica.com/billing/cart.php?a=add&pid=31" target="_blank" rel="noopener noreferrer"
+                    <button type="button" onClick={() => {
+                        addToCart({ id: "website_builder", type: "website_builder", name: "Website Builder - Starter", productId: 31, price: 8.99, cycle: "monthly" });
+                        setItems(getCart());
+                      }}
                       className="flex-shrink-0 ml-4 text-xs px-3 py-1.5 bg-[#6B21A8] text-white font-bold rounded-lg hover:bg-[#581c87] transition-colors whitespace-nowrap">
                       + Add $8.99/mo
-                    </a>
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -594,7 +606,7 @@ export default function CartPage() {
                   )}
                   {websiteBuilder && (
                     <div className="flex justify-between text-gray-600">
-                      <span>AI Website Builder</span>
+                      <span>{websiteBuilder.cycle ? websiteBuilder.name : "AI Website Builder"}</span>
                       <span>${websiteBuilder.price.toFixed(2)}</span>
                     </div>
                   )}

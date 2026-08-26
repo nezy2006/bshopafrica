@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -136,8 +136,10 @@ function LeftPanel() {
 }
 
 /* ─── Login Page ─────────────────────────────────────────────────────────── */
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
 
   const [email,          setEmail]          = useState("");
   const [password,       setPassword]       = useState("");
@@ -175,7 +177,7 @@ export default function LoginPage() {
       const client = json.data;
       setAuth(client.clientId, client.firstname, client.lastname, client.email || email, client.sessionToken);
       window.dispatchEvent(new Event("bshop_cart_update"));
-      router.push("/dashboard");
+      router.push(redirectTo);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -284,7 +286,7 @@ export default function LoginPage() {
                     No account found with that email address.
                   </p>
                   <Link
-                    href={`/signup?email=${encodeURIComponent(email)}`}
+                    href={`/signup?email=${encodeURIComponent(email)}${redirectTo !== "/dashboard" ? `&redirect=${encodeURIComponent(redirectTo)}` : ""}`}
                     className="inline-block text-sm font-bold text-[#6B21A8] hover:underline"
                   >
                     Create an account →
@@ -318,5 +320,13 @@ export default function LoginPage() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#6B21A8] border-t-transparent rounded-full animate-spin" /></div>}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

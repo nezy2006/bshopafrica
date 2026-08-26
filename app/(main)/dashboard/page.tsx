@@ -15,7 +15,7 @@ import { PaymentOptionCard, PayPalWordmark, MtnLogo, AirtelLogo } from "@/compon
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 import { getPawapayFailureMessage } from "@/lib/pawapay-errors";
 
-type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "notifications" | "settings";
+type Section = "overview" | "domains" | "hosting" | "orders" | "invoices" | "support" | "affiliate" | "notifications" | "settings";
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
@@ -51,6 +51,8 @@ interface ClientOrder   { id: number; date: string; total: string; status: strin
 interface SupportTicket { id: number; tid: string; title: string; status: string; priority: string; deptname: string; date: string; lastreply: string; replies?: TicketReply[]; }
 interface TicketAttachment { filename: string; index: string; }
 interface TicketReply   { id: number; userid: number; admin: string; name: string; email: string; date: string; message: string; type: "client" | "staff"; attachments: TicketAttachment[]; }
+interface AffiliateDetails { affiliateId: number; clientId: number; balance: number; totalEarned: number; visitors: number; signups: number; campaigns: number; datejoined: string; }
+interface AffiliateTransaction { id: number; date: string; description: string; amount: number; }
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
 const I = {
@@ -75,6 +77,9 @@ const I = {
   Send:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
   Refresh:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
   Paperclip: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
+  Users:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  Copy:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  Wallet:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>,
 };
 
 /* ─── Shared UI ──────────────────────────────────────────────────────────── */
@@ -1221,8 +1226,8 @@ function EmailsSection({ clientId }: { clientId: number }) {
             <div className="flex gap-3 flex-wrap justify-center">
               <a href="https://bshopafrica.com/webmail" target="_blank" rel="noopener noreferrer"
                 className="px-5 py-2.5 bg-[#6B21A8] text-white font-semibold rounded-xl text-sm">Open Webmail</a>
-              <a href="https://bshopafrica.com/billing/clientarea.php" target="_blank" rel="noopener noreferrer"
-                className="px-5 py-2.5 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm hover:border-purple-300 transition-colors">Go to cPanel</a>
+              <Link href="/dashboard?s=hosting"
+                className="px-5 py-2.5 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm hover:border-purple-300 transition-colors">Go to cPanel</Link>
             </div>
           } />
       </div>
@@ -1717,6 +1722,170 @@ function SupportSection({ client }: { client: ClientDetails }) {
   );
 }
 
+/* ─── AFFILIATE ──────────────────────────────────────────────────────────── */
+function AffiliateSection({ client }: { client: ClientDetails }) {
+  const [affiliate,    setAffiliate]    = useState<AffiliateDetails | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState(false);
+  const [activating,   setActivating]   = useState(false);
+  const [activateErr,  setActivateErr]  = useState("");
+  const [transactions, setTransactions] = useState<AffiliateTransaction[]>([]);
+  const [txLoading,    setTxLoading]    = useState(false);
+  const [copied,       setCopied]       = useState(false);
+  const [withdrawing,  setWithdrawing]  = useState(false);
+  const [withdrawMsg,  setWithdrawMsg]  = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(false);
+    try { setAffiliate(await whmcs<AffiliateDetails | null>("getAffiliate")); }
+    catch { setError(true); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!affiliate) return;
+    setTxLoading(true);
+    whmcs<AffiliateTransaction[]>("getAffiliateTransactions")
+      .then(setTransactions)
+      .catch(() => setTransactions([]))
+      .finally(() => setTxLoading(false));
+  }, [affiliate?.affiliateId]);
+
+  async function handleActivate() {
+    setActivating(true); setActivateErr("");
+    try {
+      setAffiliate(await whmcs<AffiliateDetails | null>("activateAffiliate"));
+    } catch (err) {
+      setActivateErr(err instanceof Error ? err.message : "Could not activate affiliate account. Please try again or contact support.");
+    } finally {
+      setActivating(false);
+    }
+  }
+
+  async function handleWithdraw() {
+    if (!affiliate || affiliate.balance <= 0) return;
+    setWithdrawing(true); setWithdrawMsg("");
+    try {
+      await whmcs("requestAffiliateWithdrawal", { name: `${client.firstname} ${client.lastname}`.trim() });
+      setWithdrawMsg("Withdrawal request submitted! Our team will process it shortly.");
+    } catch (err) {
+      setWithdrawMsg(err instanceof Error ? err.message : "Failed to submit withdrawal request. Please try again.");
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
+  const referralLink = affiliate && typeof window !== "undefined"
+    ? `${window.location.origin}/signup?ref=${affiliate.affiliateId}`
+    : "";
+
+  function copyLink() {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  if (error) return <ErrorState onRetry={load} />;
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Affiliate Program</h2>
+        <p className="text-gray-500 mt-1">Earn commission by referring new customers to B.Shop Africa.</p>
+      </div>
+
+      {loading ? <Skeleton className="h-48" /> : !affiliate ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+          <div className="w-14 h-14 bg-purple-50 text-[#6B21A8] rounded-full flex items-center justify-center mx-auto mb-4"><I.Users /></div>
+          <h3 className="font-bold text-gray-900 text-lg mb-2">Start Earning Today</h3>
+          <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">Join our affiliate program and earn commission every time someone you refer purchases hosting or a domain.</p>
+          {activateErr && <p className="text-sm text-red-600 mb-4">{activateErr}</p>}
+          <button onClick={handleActivate} disabled={activating}
+            className="px-6 py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+            {activating ? "Activating…" : "Activate Affiliate Account"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Referral link */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <h3 className="font-semibold text-gray-900 mb-3">Your Referral Link</h3>
+            <div className="flex items-center gap-2">
+              <input readOnly value={referralLink}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 outline-none" />
+              <button onClick={copyLink}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors flex-shrink-0">
+                <I.Copy />{copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Share this link — when someone signs up through it, they&apos;re credited to your account.</p>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: "Visitors",     value: affiliate.visitors,                    icon: <I.ExternalLink />, color: "text-blue-600",   bg: "bg-blue-50" },
+              { label: "Signups",      value: affiliate.signups,                     icon: <I.Users />,        color: "text-purple-600", bg: "bg-purple-50" },
+              { label: "Total Earned", value: `$${affiliate.totalEarned.toFixed(2)}`, icon: <I.Wallet />,       color: "text-green-600",  bg: "bg-green-50" },
+              { label: "Balance",      value: `$${affiliate.balance.toFixed(2)}`,     icon: <I.Wallet />,       color: "text-orange-600", bg: "bg-orange-50" },
+            ].map(stat => (
+              <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-5">
+                <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-3`}>{stat.icon}</div>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Withdrawal */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">Commission Balance</h3>
+                <p className="text-sm text-gray-500 mt-0.5">${affiliate.balance.toFixed(2)} available to withdraw</p>
+              </div>
+              <button onClick={handleWithdraw} disabled={withdrawing || affiliate.balance <= 0}
+                className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+                {withdrawing ? "Submitting…" : "Request Withdrawal"}
+              </button>
+            </div>
+            {withdrawMsg && <p className="text-sm text-gray-600 mt-3">{withdrawMsg}</p>}
+          </div>
+
+          {/* Transaction / withdrawal history */}
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Transaction History</h3>
+            </div>
+            {txLoading ? <div className="p-5"><Skeleton className="h-24" /></div> :
+             transactions.length === 0 ? (
+              <EmptyState icon={<I.Wallet />} title="No transactions yet" desc="Commission earnings and withdrawal history will appear here." />
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {transactions.map(t => (
+                  <div key={t.id} className="flex items-center justify-between px-5 py-3">
+                    <div>
+                      <p className="text-sm text-gray-900">{t.description}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{t.date}</p>
+                    </div>
+                    <span className={`font-semibold text-sm ${t.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {t.amount >= 0 ? "+" : ""}${t.amount.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ─── NOTIFICATIONS ──────────────────────────────────────────────────────── */
 // Notification ids are prefixed by source (`domain-`, `hosting-`, `invoice-`, `ticket-`)
 // which is more precise than `type` alone — hosting-expiry notifications are typed
@@ -2013,6 +2182,7 @@ function DashboardTopBar({ onLogout, onSection }: { onLogout: () => void; onSect
     { id: "hosting"   as Section, label: "My Hosting"       },
     { id: "invoices"  as Section, label: "Invoices"         },
     { id: "support"   as Section, label: "Support"          },
+    { id: "affiliate" as Section, label: "Affiliate"        },
     { id: "settings"  as Section, label: "Account Settings" },
   ];
 
@@ -2134,6 +2304,7 @@ const NAV: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "orders",         label: "My Orders",         icon: <I.ShoppingBag /> },
   { id: "invoices",       label: "Invoices",          icon: <I.FileText /> },
   { id: "support",        label: "Support Tickets",   icon: <I.Headset /> },
+  { id: "affiliate",      label: "Affiliate",         icon: <I.Users /> },
   { id: "notifications",  label: "Notifications",     icon: <I.Bell /> },
   { id: "settings",       label: "Account Settings",  icon: <I.Settings /> },
 ];
@@ -2304,6 +2475,7 @@ function DashboardInner() {
               {section === "orders"        && <OrdersSection clientId={client.id} />}
               {section === "invoices"      && <InvoicesSection clientId={client.id} />}
               {section === "support"       && <SupportSection client={client} />}
+              {section === "affiliate"     && <AffiliateSection client={client} />}
               {section === "notifications" && <NotificationsSection onNavigate={setSection} />}
               {section === "settings"      && <AccountSettingsSection client={client} />}
             </motion.div>

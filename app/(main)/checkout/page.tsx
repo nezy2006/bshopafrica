@@ -138,7 +138,7 @@ function CartSummary({ cart, couponDiscount = 0 }: { cart: Cart; couponDiscount?
         )}
         {cart.websiteBuilder && (
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">AI Website Builder</span>
+            <span className="text-gray-600">{cart.websiteBuilder.cycle ? cart.websiteBuilder.name : "AI Website Builder"}</span>
             <span className="font-semibold">${cart.websiteBuilder.price}</span>
           </div>
         )}

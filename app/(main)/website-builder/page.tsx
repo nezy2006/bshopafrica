@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Palette, Smartphone, Search, Globe, Headphones, ShoppingCart,
   MousePointer2, Check,
 } from "lucide-react";
+import { addToCart } from "@/lib/cart";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
-// WHMCS cart base — update PIDs once Weebly products are created in WHMCS
-const WHMCS = "https://bshopafrica.com/billing/cart.php?a=add&pid=";
 const WEEBLY_PIDS = { free: "30", starter: "31", pro: "32", business: "33" };
 
 /* ─── Features ───────────────────────────────────────────────────────────── */
@@ -80,7 +80,7 @@ interface Plan {
   note:       string;
   features:   string[];
   btnLabel:   string;
-  btnHref:    string;
+  productId:  number;
   outlined?:  boolean;
 }
 
@@ -97,8 +97,8 @@ const PLANS: Plan[] = [
       "Weebly subdomain",
       "SSL certificate",
     ],
-    btnLabel:  "Get Hosting",
-    btnHref:   "/hosting",
+    btnLabel:  "Get Started",
+    productId: Number(WEEBLY_PIDS.free),
     outlined:  true,
   },
   {
@@ -115,8 +115,8 @@ const PLANS: Plan[] = [
       "$100 Google Ads credit",
       "Chat & email support",
     ],
-    btnLabel: "Get Starter",
-    btnHref:  `${WHMCS}${WEEBLY_PIDS.starter}`,
+    btnLabel:  "Get Starter",
+    productId: Number(WEEBLY_PIDS.starter),
   },
   {
     name:     "Pro",
@@ -130,8 +130,8 @@ const PLANS: Plan[] = [
       "Site search",
       "Notification bar",
     ],
-    btnLabel: "Get Pro",
-    btnHref:  `${WHMCS}${WEEBLY_PIDS.pro}`,
+    btnLabel:  "Get Pro",
+    productId: Number(WEEBLY_PIDS.pro),
   },
   {
     name:     "Business",
@@ -146,14 +146,13 @@ const PLANS: Plan[] = [
       "Real-time shipping",
       "Abandoned cart emails",
     ],
-    btnLabel: "Get Business",
-    btnHref:  `${WHMCS}${WEEBLY_PIDS.business}`,
+    btnLabel:  "Get Business",
+    productId: Number(WEEBLY_PIDS.business),
   },
 ];
 
-function PricingCard({ plan, cycle, index }: { plan: Plan; cycle: Cycle; index: number }) {
-  const price  = cycle === "monthly" ? plan.monthly : (plan.yearly / 12);
-  const isHref = plan.btnHref.startsWith("http");
+function PricingCard({ plan, cycle, index, onSelect }: { plan: Plan; cycle: Cycle; index: number; onSelect: (plan: Plan, cycle: Cycle) => void }) {
+  const price = cycle === "monthly" ? plan.monthly : (plan.yearly / 12);
 
   return (
     <motion.div
@@ -205,31 +204,18 @@ function PricingCard({ plan, cycle, index }: { plan: Plan; cycle: Cycle; index: 
         </ul>
 
         <div className="mt-6">
-          {isHref ? (
-            <a href={plan.btnHref} target="_blank" rel="noopener noreferrer"
-              className={`relative overflow-hidden group flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
-                plan.outlined
-                  ? plan.best
-                    ? "bg-white/20 text-white border-2 border-white/40 hover:bg-white/30"
-                    : "border-2 border-[#6B21A8] text-[#6B21A8] hover:bg-purple-50"
-                  : plan.best
-                    ? "bg-white text-[#6B21A8] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
-                    : "bg-[#6B21A8] text-white hover:shadow-[0_0_20px_rgba(107,33,168,0.5)]"
-              }`}>
-              {plan.btnLabel}
-            </a>
-          ) : (
-            <Link href={plan.btnHref}
-              className={`flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
-                plan.outlined
-                  ? "border-2 border-[#6B21A8] text-[#6B21A8] hover:bg-purple-50"
-                  : plan.best
-                    ? "bg-white text-[#6B21A8] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
-                    : "bg-[#6B21A8] text-white hover:shadow-[0_0_20px_rgba(107,33,168,0.5)]"
-              }`}>
-              {plan.btnLabel}
-            </Link>
-          )}
+          <button type="button" onClick={() => onSelect(plan, cycle)}
+            className={`flex items-center justify-center w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
+              plan.outlined
+                ? plan.best
+                  ? "bg-white/20 text-white border-2 border-white/40 hover:bg-white/30"
+                  : "border-2 border-[#6B21A8] text-[#6B21A8] hover:bg-purple-50"
+                : plan.best
+                  ? "bg-white text-[#6B21A8] hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                  : "bg-[#6B21A8] text-white hover:shadow-[0_0_20px_rgba(107,33,168,0.5)]"
+            }`}>
+            {plan.btnLabel}
+          </button>
         </div>
       </div>
     </motion.div>
@@ -237,8 +223,21 @@ function PricingCard({ plan, cycle, index }: { plan: Plan; cycle: Cycle; index: 
 }
 
 function PricingSection() {
+  const router = useRouter();
   const [cycle, setCycle] = useState<Cycle>("annually");
   const saving = cycle === "annually" ? "Save up to 25%" : null;
+
+  function handleSelect(plan: Plan, selectedCycle: Cycle) {
+    addToCart({
+      id:        "website_builder",
+      type:      "website_builder",
+      name:      `Website Builder - ${plan.name}`,
+      productId: plan.productId,
+      price:     selectedCycle === "monthly" ? plan.monthly : plan.yearly,
+      cycle:     selectedCycle === "monthly" ? "monthly" : "yearly",
+    });
+    router.push("/cart");
+  }
 
   return (
     <section id="pricing" className="bg-gray-50 py-24 px-4 sm:px-6 lg:px-8">
@@ -277,7 +276,7 @@ function PricingSection() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {PLANS.map((plan, i) => (
-            <PricingCard key={plan.name} plan={plan} cycle={cycle} index={i} />
+            <PricingCard key={plan.name} plan={plan} cycle={cycle} index={i} onSelect={handleSelect} />
           ))}
         </div>
 

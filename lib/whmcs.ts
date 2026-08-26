@@ -1110,6 +1110,7 @@ export async function createOrderWithGateway(
   const hosting  = cartItems.find(i => i.type === "hosting");
   const transfer = cartItems.find(i => i.type === "transfer");
   const wb       = cartItems.find(i => i.type === "website_builder");
+  const wbCycle  = wb?.cycle === "yearly" ? "annually" : "monthly";
 
   // ── Build main order params ──────────────────────────────────────────────
   const mainParams: Record<string, string | number | boolean> = { ...baseParams };
@@ -1139,7 +1140,7 @@ export async function createOrderWithGateway(
   } else if (wb) {
     // Website builder product only
     mainParams.pid          = wb.productId as number;
-    mainParams.billingcycle = "monthly";
+    mainParams.billingcycle = wbCycle;
   } else if (transfer) {
     // Transfer only (no other items)
     mainParams.domain      = transfer.domain as string;
@@ -1162,7 +1163,7 @@ export async function createOrderWithGateway(
       const d = await callWhmcs("AddOrder", {
         ...baseParams,
         pid:          wb.productId as number,
-        billingcycle: "monthly",
+        billingcycle: wbCycle,
       });
       allOrderIds.push(Number(d.orderid ?? 0));
     } catch (e) { console.error("[createOrderWithGateway] WB order failed:", e); }
@@ -1326,4 +1327,111 @@ export function generateAutoAuthUrl(email: string, destination = "clientarea.php
   const timestamp    = Math.floor(Date.now() / 1000);
   const hash         = crypto.createHash("sha1").update(email + timestamp + autoAuthKey).digest("hex");
   return `${whmcsUrl}/dologin.php?email=${encodeURIComponent(email)}&timestamp=${timestamp}&hash=${hash}&goto=${encodeURIComponent(destination)}`;
+}
+
+/* ─── Affiliate program ──────────────────────────────────────────────────────
+ * WHMCS's affiliate API responses aren't exercised anywhere else in this
+ * codebase, unlike the client/ticket/invoice APIs above (which are proven
+ * against the real install). Field names below follow WHMCS's documented
+ * GetAffiliates/AffiliateActivate/GetTransactions shapes as closely as
+ * possible, with defensive `??` fallbacks across the plausible alternate
+ * field names WHMCS versions have used. Verify against a real response from
+ * this install and adjust the fallback chains below if any field reads 0/""
+ * unexpectedly. Affiliates must be enabled and a commission rate configured
+ * in WHMCS Admin → Affiliates → Settings for any of this to return real data. */
+export interface AffiliateDetails {
+  affiliateId:   number;
+  clientId:      number;
+  balance:       number; // unpaid commission available to withdraw
+  totalEarned:   number; // lifetime commission earned (paid + unpaid)
+  visitors:      number;
+  signups:       number;
+  campaigns:     number;
+  datejoined:    string;
+}
+
+function parseAffiliateRow(row: WhmcsRaw, clientId: number): AffiliateDetails {
+  return {
+    affiliateId: Number(row.id ?? row.affiliateid ?? 0),
+    clientId,
+    balance:     Number(row.balance ?? row.unpaidearnings ?? row.earnings ?? 0),
+    totalEarned: Number(row.totalvalue ?? row.paidearnings ?? row.totalearnings ?? row.balance ?? 0),
+    visitors:    Number(row.visitors ?? row.clicks ?? 0),
+    signups:     Number(row.signups ?? row.referrals ?? 0),
+    campaigns:   Number(row.campaigns ?? 0),
+    datejoined:  String(row.datejoined ?? row.date ?? ""),
+  };
+}
+
+/** Looks up a client's affiliate record. Returns null if the client has never
+ *  activated affiliate status (GetAffiliates has no documented clientid filter,
+ *  so this pages through the full list and matches client-side — fine at
+ *  small-to-medium affiliate counts; revisit if this ever needs to scale). */
+export async function getAffiliateByClientId(clientId: number): Promise<AffiliateDetails | null> {
+  try {
+    const data = await callWhmcs("GetAffiliates", { limitnum: 1000 });
+    const raw  = (data.affiliates as { affiliate: WhmcsRaw | WhmcsRaw[] } | undefined)?.affiliate ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    const match = list.find(a => Number(a.clientid ?? a.userid ?? 0) === clientId);
+    return match ? parseAffiliateRow(match, clientId) : null;
+  } catch (e) {
+    console.error("[whmcs.getAffiliateByClientId]", e);
+    return null;
+  }
+}
+
+/** Activates affiliate status for a client that doesn't have one yet. */
+export async function activateAffiliate(clientId: number): Promise<AffiliateDetails | null> {
+  await callWhmcs("AffiliateActivate", { clientid: clientId });
+  return getAffiliateByClientId(clientId);
+}
+
+export interface AffiliateTransaction {
+  id:          number;
+  date:        string;
+  description: string;
+  amount:      number;
+}
+
+/** Commission/withdrawal history for one affiliate. WHMCS doesn't expose a
+ *  dedicated affiliate-transactions API in the stock action set — this uses
+ *  GetTransactions (the general accounting-transactions API) filtered to rows
+ *  whose description mentions this affiliate, since that's how WHMCS logs
+ *  affiliate commission credits/payouts in tblaccounts. If this install logs
+ *  them differently, this will come back empty rather than erroring — the UI
+ *  handles an empty history gracefully. */
+export async function getAffiliateTransactions(affiliateId: number): Promise<AffiliateTransaction[]> {
+  try {
+    const data = await callWhmcs("GetTransactions", { limitnum: 200 });
+    const raw  = (data.transactions as { transaction: WhmcsRaw | WhmcsRaw[] } | undefined)?.transaction ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list
+      .filter(t => String(t.description ?? "").toLowerCase().includes(`affiliate #${affiliateId}`.toLowerCase())
+                || String(t.description ?? "").toLowerCase().includes("affiliate"))
+      .map(t => ({
+        id:          Number(t.id ?? 0),
+        date:        String(t.date ?? ""),
+        description: String(t.description ?? ""),
+        amount:      Number(t.amountin ?? t.amount ?? 0) - Number(t.amountout ?? 0),
+      }));
+  } catch (e) {
+    console.error("[whmcs.getAffiliateTransactions]", e);
+    return [];
+  }
+}
+
+/** Submits a withdrawal request as an admin ticket in the Billing department
+ *  — WHMCS's stock API has no dedicated affiliate-payout-request action, so
+ *  this routes the request to a human the same way any other billing request
+ *  would go, tagging the affiliate ID for easy lookup. */
+export async function requestAffiliateWithdrawal(clientId: number, affiliateId: number, balance: number, name?: string, email?: string): Promise<{ ticketId: number; tid: string }> {
+  return openTicket({
+    clientId,
+    subject: "Affiliate Withdrawal Request",
+    message: `Requesting withdrawal of affiliate commission balance.\n\nAffiliate ID: ${affiliateId}\nRequested amount: $${balance.toFixed(2)}`,
+    deptId:  2,
+    priority: "Medium",
+    name,
+    email,
+  });
 }

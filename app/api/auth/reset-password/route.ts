@@ -19,13 +19,17 @@ function buildEmailHtml(resetUrl: string, firstname: string) {
       </div>
       <p style="font-size: 13px; color: #999;">This link expires in <strong>30 minutes</strong>. If you did not request this, you can safely ignore this email.</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-      <p style="font-size: 12px; color: #999;">The B.Shop Africa · bshopafrica.com · admin@bshopafrica.com</p>
+      <p style="font-size: 13px; color: #555; line-height: 1.6;">
+        The B.Shop Africa Team<br/>
+        admin@bshopafrica.com | bshopafrica.com<br/>
+        WhatsApp: +250724684369
+      </p>
     </div>
   `;
 }
 
 function buildEmailText(resetUrl: string) {
-  return `Reset your B.Shop Africa password:\n\n${resetUrl}\n\nThis link expires in 30 minutes.\n\nIf you did not request this, you can safely ignore this email.\n\nThe B.Shop Africa Team\nbshopafrica.com`;
+  return `Reset your B.Shop Africa password:\n\n${resetUrl}\n\nThis link expires in 30 minutes.\n\nIf you did not request this, you can safely ignore this email.\n\nThe B.Shop Africa Team\nadmin@bshopafrica.com | bshopafrica.com\nWhatsApp: +250724684369`;
 }
 
 /* ─── WHMCS SendEmail ────────────────────────────────────────────────────── */

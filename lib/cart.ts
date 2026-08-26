@@ -47,8 +47,11 @@ export interface CartWebsiteBuilder {
   name: string;
   productId: number;
   price: number;
-  siteData: string; // JSON-stringified generated site content
-  businessName: string;
+  // Weebly-style subscription plans (Free/Starter/Pro/Business) set this;
+  // the AI one-time site generator omits it (one-time fee, no recurring cycle).
+  cycle?: "monthly" | "yearly";
+  siteData?: string;      // JSON-stringified generated site content (AI builder only)
+  businessName?: string;  // AI builder only
 }
 
 export type CartItem = CartDomain | CartHosting | CartSSL | CartEmail | CartTransfer | CartWebsiteBuilder;

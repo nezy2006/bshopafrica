@@ -23,7 +23,7 @@ async function notifyAdminBySmtp(name: string, email: string, subject: string, m
       to:      "admin@bshopafrica.com",
       replyTo: email,
       subject: `[Contact Form] ${subject}`,
-      text:    `New contact form submission\n\nName: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`,
+      text:    `New contact form submission\n\nName: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}\n\n--\nThe B.Shop Africa Team\nadmin@bshopafrica.com | bshopafrica.com\nWhatsApp: +250724684369`,
       html:    `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
         <p><strong>New contact form submission</strong></p>
         <p><strong>Name:</strong> ${name}<br/>
@@ -31,6 +31,12 @@ async function notifyAdminBySmtp(name: string, email: string, subject: string, m
         <strong>Subject:</strong> ${subject}</p>
         <p><strong>Message:</strong></p>
         <p style="white-space: pre-wrap;">${message}</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="font-size: 13px; color: #555; line-height: 1.6;">
+          The B.Shop Africa Team<br/>
+          admin@bshopafrica.com | bshopafrica.com<br/>
+          WhatsApp: +250724684369
+        </p>
       </div>`,
     });
     return true;
