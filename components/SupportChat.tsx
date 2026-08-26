@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, Headset, LogOut } from "lucide-react";
+import { MessageCircle, X, Send, Headset, LogOut } from "lucide-react";
 import { isLoggedIn, authHeaders, AUTH_KEYS, validateEmail } from "@/lib/auth";
 
 type Role = "client" | "ai" | "agent";
@@ -60,7 +60,7 @@ function statusIndicator(status: ChatStatus, messages: ChatMessage[]): { emoji: 
     const agentReplied = messages.some(m => m.role === "agent");
     return agentReplied ? { emoji: "🟢", label: "Support Team" } : { emoji: "🟡", label: "Connecting to support…" };
   }
-  return { emoji: "🤖", label: "AI Assistant" };
+  return { emoji: "🟢", label: "Online" };
 }
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
@@ -85,7 +85,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           isAgent ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-500"
         }`}
       >
-        {isAgent ? <Headset className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+        <Headset className="w-3.5 h-3.5" />
       </div>
       <div className="max-w-[75%]">
         {isAgent && msg.agentName && <p className="text-[11px] font-bold text-blue-600 mb-0.5 ml-1">{msg.agentName}</p>}
@@ -294,7 +294,7 @@ export default function SupportChat() {
             {/* Header */}
             <div className="bg-[#6B21A8] px-4 py-3.5 flex items-center gap-3 shrink-0">
               <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+                <Headset className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-white font-bold text-sm leading-tight">BShop Support</p>
@@ -338,7 +338,7 @@ export default function SupportChat() {
                   {messages.length === 0 && (
                     <div className="flex justify-start mb-3 gap-2">
                       <div className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
-                        <Bot className="w-3.5 h-3.5" />
+                        <Headset className="w-3.5 h-3.5" />
                       </div>
                       <div className="bg-gray-100 text-gray-800 text-sm px-3.5 py-2.5 rounded-2xl rounded-bl-sm max-w-[75%]">
                         Hi{loggedIn && typeof window !== "undefined" && localStorage.getItem(AUTH_KEYS.clientFirst) ? `, ${localStorage.getItem(AUTH_KEYS.clientFirst)}` : ""}! How can I help you today?
@@ -389,7 +389,6 @@ export default function SupportChat() {
                     </button>
                   </div>
                 )}
-                <p className="text-center text-[10px] text-gray-300 pb-2">Powered by AI</p>
               </>
             )}
           </motion.div>

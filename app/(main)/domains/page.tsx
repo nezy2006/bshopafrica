@@ -5,8 +5,6 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { DomainJourney, ExtensionShowcase } from "@/components/DomainJourney";
 
-const TLDS = [".com", ".net", ".org", ".biz", ".xyz", ".africa", ".co.rw"];
-
 const WHY_CARDS = [
   {
     icon: <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
@@ -63,9 +61,8 @@ function ArrowRight() {
 
 /* ─── Hero ───────────────────────────────────────────────────────────────── */
 function HeroSection() {
-  const [query,       setQuery]       = useState("");
-  const [selectedTld, setSelectedTld] = useState(".com");
-  const [loading,     setLoading]     = useState(false);
+  const [query,   setQuery]   = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,18 +135,9 @@ function HeroSection() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for your domain name"
+            placeholder="Search for your domain (e.g. mybusiness.com)"
             className="flex-1 px-5 py-3.5 text-base font-medium text-black bg-transparent rounded-xl outline-none placeholder-gray-400 min-w-0"
           />
-          <select
-            value={selectedTld}
-            onChange={(e) => setSelectedTld(e.target.value)}
-            className="px-4 py-3.5 text-sm font-bold text-[#6B21A8] bg-purple-50 border-0 rounded-xl outline-none cursor-pointer"
-          >
-            {TLDS.map((ext) => (
-              <option key={ext} value={ext}>{ext}</option>
-            ))}
-          </select>
           <button
             type="submit"
             disabled={loading}
@@ -159,34 +147,6 @@ function HeroSection() {
             <span>{loading ? "Searching…" : "Search"}</span>
           </button>
         </motion.form>
-
-        {/* TLD pills */}
-        <motion.div
-          className="mt-6 flex flex-wrap gap-2 justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.65, duration: 0.6 }}
-        >
-          {TLDS.map((ext, i) => (
-            <motion.button
-              key={ext}
-              type="button"
-              onClick={() => setSelectedTld(ext)}
-              whileHover={{ scale: 1.08, y: -2 }}
-              whileTap={{ scale: 0.96 }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 + i * 0.05, duration: 0.4 }}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold border-2 transition-all duration-200 cursor-pointer ${
-                selectedTld === ext
-                  ? "bg-white text-[#6B21A8] border-white shadow-lg"
-                  : "bg-transparent text-white border-white/30 hover:border-white/70"
-              }`}
-            >
-              {ext}
-            </motion.button>
-          ))}
-        </motion.div>
       </div>
     </section>
   );

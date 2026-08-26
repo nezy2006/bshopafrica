@@ -142,7 +142,7 @@ function toGroqRole(role: ChatMessage["role"]): "user" | "assistant" {
 
 function transcriptText(messages: ChatMessage[]): string {
   return messages
-    .map(m => `${m.role === "client" ? "Client" : m.role === "agent" ? `Agent (${m.agentName ?? "Staff"})` : "AI"}: ${m.content}`)
+    .map(m => `${m.role === "client" ? "Client" : m.role === "agent" ? `Agent (${m.agentName ?? "Staff"})` : "Support"}: ${m.content}`)
     .join("\n\n");
 }
 

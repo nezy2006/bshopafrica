@@ -11,15 +11,16 @@ const TLDS = [".com", ".net", ".org", ".co", ".io", ".africa"];
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
 
-const CONFETTI_COLORS = ["#6B21A8", "#a855f7", "#22c55e", "#3b82f6", "#f59e0b", "#ec4899", "#06b6d4"];
+// Splits a user-typed "mybusiness.com" into { name: "mybusiness", tld: ".com" }.
+// Splits on the last dot — good enough for the single-level TLDs this page deals in.
+function splitDomain(raw: string): { name: string; tld: string } | null {
+  const trimmed = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const dot = trimmed.lastIndexOf(".");
+  if (dot <= 0 || dot === trimmed.length - 1) return null;
+  return { name: trimmed.slice(0, dot), tld: trimmed.slice(dot) };
+}
 
-const fadeUp = {
-  hidden:  { opacity: 0, y: 40 },
-  visible: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { delay: i * 0.08, duration: 0.55, ease: EASE },
-  }),
-};
+const CONFETTI_COLORS = ["#6B21A8", "#a855f7", "#22c55e", "#3b82f6", "#f59e0b", "#ec4899", "#06b6d4"];
 
 /* ─── Icons ──────────────────────────────────────────────────────────────── */
 function Spinner() {
@@ -70,12 +71,14 @@ function ConfettiBurst() {
 }
 
 /* ─── Result cards ───────────────────────────────────────────────────────── */
-function AvailableCard({ result, tld, onReset }: { result: DomainCheckResult; tld: string; onReset: () => void }) {
+function AvailableCard({ result, onReset }: { result: DomainCheckResult; onReset: () => void }) {
   const router = useRouter();
   const [added, setAdded] = useState(false);
 
   const handleAddToCart = () => {
-    const name = result.domain.slice(0, result.domain.length - tld.length);
+    const parsed = splitDomain(result.domain);
+    const name = parsed?.name ?? result.domain;
+    const tld  = parsed?.tld  ?? "";
     addToCart({ id: result.domain, type: "domain", name, tld, domain: result.domain, price: result.price ?? 12 });
     setAdded(true);
     setTimeout(() => router.push("/cart"), 600);
@@ -125,11 +128,12 @@ function AvailableCard({ result, tld, onReset }: { result: DomainCheckResult; tl
   );
 }
 
-function TakenCard({ result, query, onSearchTld, onReset }: {
-  result: DomainCheckResult; query: string; onSearchTld: (tld: string) => void; onReset: () => void;
+function TakenCard({ result, onSearchTld, onReset }: {
+  result: DomainCheckResult; onSearchTld: (tld: string) => void; onReset: () => void;
 }) {
   const [shakeKey, setShakeKey] = useState(0);
   const suggestions = TLDS.filter(t => !result.domain.endsWith(t));
+  const base = splitDomain(result.domain)?.name ?? result.domain;
 
   useEffect(() => { setShakeKey(k => k + 1); }, []);
 
@@ -163,7 +167,7 @@ function TakenCard({ result, query, onSearchTld, onReset }: {
             whileHover={{ scale: 1.06, y: -2 }} whileTap={{ scale: 0.96 }}
             className="px-4 py-1.5 rounded-full border-2 border-red-200 bg-white text-sm font-semibold text-gray-700 hover:border-[#6B21A8] hover:text-[#6B21A8] transition-all duration-200 cursor-pointer"
           >
-            {query}{tld}
+            {base}{tld}
           </motion.button>
         ))}
       </div>
@@ -195,7 +199,6 @@ export default function DomainSearch() {
   const router = useRouter();
   const [mode,       setMode]       = useState<"register" | "transfer">("register");
   const [query,      setQuery]      = useState("");
-  const [selected,   setSelected]   = useState(".com");
   const [focused,    setFocused]    = useState(false);
   const [loading,    setLoading]    = useState(false);
   const [result,     setResult]     = useState<DomainCheckResult | null>(null);
@@ -203,13 +206,18 @@ export default function DomainSearch() {
 
   const reset = useCallback(() => { setResult(null); setError(null); }, []);
 
-  const runSearch = useCallback(async (domain: string, tld: string) => {
-    if (!domain.trim()) return;
+  const runSearch = useCallback(async (fullDomain: string) => {
+    const parsed = splitDomain(fullDomain);
+    if (!parsed) {
+      setResult(null);
+      setError("Please include a domain extension, e.g. mybusiness.com");
+      return;
+    }
     setLoading(true); setResult(null); setError(null);
     try {
       const res  = await fetch("/api/whmcs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "checkDomain", params: { domain: domain.trim(), tld } }),
+        body: JSON.stringify({ action: "checkDomain", params: { domain: parsed.name, tld: parsed.tld } }),
       });
       const json = (await res.json()) as { success: boolean; data?: DomainCheckResult; error?: string };
       if (!json.success || !json.data) throw new Error(json.error ?? "Domain check failed. Please try again.");
@@ -219,8 +227,13 @@ export default function DomainSearch() {
     } finally { setLoading(false); }
   }, []);
 
-  const handleSearch   = (e: React.FormEvent) => { e.preventDefault(); runSearch(query, selected); };
-  const handleTldSearch = (tld: string)       => { setSelected(tld); runSearch(query, tld); };
+  const handleSearch   = (e: React.FormEvent) => { e.preventDefault(); runSearch(query); };
+  const handleTldSearch = (tld: string) => {
+    const parsed = result ? splitDomain(result.domain) : null;
+    const next   = `${parsed?.name ?? query}${tld}`;
+    setQuery(next);
+    runSearch(next);
+  };
   const handleTransfer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -279,14 +292,9 @@ export default function DomainSearch() {
                   <input type="text" value={query}
                     onChange={e => { setQuery(e.target.value); reset(); }}
                     onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-                    placeholder={mode === "register" ? "yourname" : "yourdomain.com"}
+                    placeholder={mode === "register" ? "Search for your domain (e.g. mybusiness.com)" : "yourdomain.com"}
                     className="w-full px-5 py-4 text-base font-medium text-black bg-transparent rounded-xl outline-none"
                   />
-                  {mode === "register" && (
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm pointer-events-none">
-                      {selected}
-                    </span>
-                  )}
                 </div>
                 <button type="submit" disabled={loading || !query.trim()}
                   className="flex items-center justify-center gap-2 px-8 py-4 bg-[#6B21A8] text-white font-semibold rounded-xl transition-all duration-200 min-w-[160px] hover:bg-[#581c87] hover:shadow-[0_0_20px_rgba(107,33,168,0.4)] disabled:opacity-60 disabled:cursor-not-allowed active:scale-95">
@@ -298,39 +306,20 @@ export default function DomainSearch() {
             </motion.form>
           </AnimatePresence>
 
-          {/* TLD pills */}
-          <AnimatePresence>
-            {mode === "transfer" && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-                className="mt-5 text-center text-sm text-gray-400">
-                Enter a full domain (e.g. <span className="font-mono text-gray-500">yourbrand.com</span>) and we&apos;ll check eligibility and price instantly.
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          <div className={`mt-8 flex flex-wrap gap-2 justify-center transition-all duration-300 ${mode === "transfer" ? "opacity-0 pointer-events-none h-0 mt-0 overflow-hidden" : ""}`}>
-            {TLDS.map((tld, i) => (
-              <motion.button key={tld} type="button"
-                onClick={() => { setSelected(tld); reset(); }}
-                custom={i} variants={fadeUp} initial="hidden" animate="visible"
-                whileHover={{ scale: 1.1, y: -3 }} whileTap={{ scale: 0.96 }}
-                className="px-4 py-1.5 rounded-full text-sm font-semibold border-2 transition-all duration-200 cursor-pointer"
-                style={selected === tld
-                  ? { backgroundColor: "#6B21A8", borderColor: "#6B21A8", color: "#fff" }
-                  : { backgroundColor: "#fff", borderColor: "#e5e7eb", color: "#4b5563" }
-                }>
-                {tld}
-              </motion.button>
-            ))}
-          </div>
+          {/* Helper text */}
+          <p className="mt-5 text-center text-sm text-gray-400">
+            {mode === "register"
+              ? <>Type the full domain including its extension — e.g. <span className="font-mono text-gray-500">mybusiness.com</span></>
+              : <>Enter a full domain (e.g. <span className="font-mono text-gray-500">yourbrand.com</span>) and we&apos;ll check eligibility and price instantly.</>}
+          </p>
 
           {/* Results */}
           <AnimatePresence mode="wait">
             {result?.available && (
-              <AvailableCard key="available" result={result} tld={selected} onReset={reset} />
+              <AvailableCard key="available" result={result} onReset={reset} />
             )}
             {result && !result.available && (
-              <TakenCard key="taken" result={result} query={query} onSearchTld={handleTldSearch} onReset={reset} />
+              <TakenCard key="taken" result={result} onSearchTld={handleTldSearch} onReset={reset} />
             )}
             {error && <ErrorCard key="error" message={error} onReset={reset} />}
           </AnimatePresence>
