@@ -20,8 +20,9 @@ const PRIMARY_NAV = [
 
 // Secondary links — shown inline on lg+, in "More" dropdown on md only
 const SECONDARY_NAV = [
-  { label: "Builder",  href: "/website-builder"  },
-  { label: "About",    href: "/about"             },
+  { label: "Builder",    href: "/website-builder"  },
+  { label: "Affiliates", href: "/affiliate"        },
+  { label: "About",      href: "/about"             },
   { label: "Digital Campfire", href: "/digital-campfire"  },
   { label: "Contact",  href: "/contact"           },
 ];

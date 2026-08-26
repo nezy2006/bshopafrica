@@ -91,39 +91,39 @@ function JoinButton({ className }: { className: string }) {
 /* ─── Hero ───────────────────────────────────────────────────────────────── */
 function HeroSection() {
   return (
-    <section className="relative bg-gradient-to-br from-[#3b0764] via-[#6B21A8] to-[#4c1d95] pt-36 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <section className="relative bg-white pt-36 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
         style={{
-          backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)",
+          backgroundImage: "linear-gradient(#6B21A8 1px,transparent 1px),linear-gradient(90deg,#6B21A8 1px,transparent 1px)",
           backgroundSize: "60px 60px",
         }}
       />
       <div
-        className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full opacity-25"
+        className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full opacity-30"
         style={{
-          background: "radial-gradient(ellipse at center, rgba(216,180,254,0.5) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse at center, rgba(107,33,168,0.12) 0%, transparent 70%)",
           filter: "blur(70px)",
         }}
       />
 
       <div className="relative z-10 max-w-3xl mx-auto text-center">
         <motion.span
-          className="inline-block px-4 py-1.5 bg-white/15 text-white text-xs font-semibold tracking-widest rounded-full uppercase mb-6"
+          className="inline-block px-4 py-1.5 bg-purple-100 text-[#6B21A8] text-xs font-semibold tracking-widest rounded-full uppercase mb-6"
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
         >
           Affiliate Program
         </motion.span>
 
         <motion.h1
-          className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.08] tracking-tight mb-5"
+          className="text-4xl sm:text-5xl lg:text-6xl font-black text-black leading-[1.08] tracking-tight mb-5"
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.75, ease: EASE }}
         >
-          Earn Money with <span className="text-purple-200">BShop Africa</span>
+          Earn Money with <span className="text-[#6B21A8]">BShop Africa</span>
         </motion.h1>
 
         <motion.p
-          className="text-lg sm:text-xl text-purple-200 mb-10 max-w-xl mx-auto leading-relaxed"
+          className="text-lg sm:text-xl text-gray-500 mb-10 max-w-xl mx-auto leading-relaxed"
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.65 }}
         >
           Refer businesses to B.Shop Africa and earn commission on every hosting plan or domain they purchase through your link.
@@ -132,7 +132,7 @@ function HeroSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.65 }}
         >
-          <JoinButton className="inline-flex items-center gap-2 px-9 py-4 bg-white text-[#6B21A8] font-black rounded-full text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,255,255,0.25)]" />
+          <JoinButton className="inline-flex items-center gap-2 px-9 py-4 bg-[#6B21A8] text-white font-black rounded-full text-base transition-all duration-300 hover:bg-[#581c87] hover:shadow-[0_0_40px_rgba(107,33,168,0.35)]" />
         </motion.div>
       </div>
     </section>
@@ -142,7 +142,7 @@ function HeroSection() {
 /* ─── How it works ───────────────────────────────────────────────────────── */
 function HowItWorksSection() {
   return (
-    <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
+    <section className="bg-gray-50 py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <motion.div
           className="text-center mb-16"
@@ -181,7 +181,7 @@ function HowItWorksSection() {
 /* ─── Perks / commission ─────────────────────────────────────────────────── */
 function PerksSection() {
   return (
-    <section className="bg-gray-50 py-24 px-4 sm:px-6 lg:px-8">
+    <section className="bg-white py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <motion.div
           className="text-center mb-14"
@@ -202,7 +202,7 @@ function PerksSection() {
               key={perk.title}
               initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1, duration: 0.55, ease: EASE }}
-              className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm"
+              className="bg-gray-50 rounded-2xl p-6 border border-gray-100 shadow-sm"
             >
               <div className="w-12 h-12 rounded-xl bg-purple-50 text-[#6B21A8] flex items-center justify-center mb-4">{perk.icon}</div>
               <h3 className="font-bold text-gray-900 mb-2">{perk.title}</h3>
