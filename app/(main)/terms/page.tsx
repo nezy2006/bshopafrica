@@ -23,7 +23,7 @@ export default function TermsPage() {
       </LegalSection>
 
       <LegalSection title="4. Domain Registration">
-        <p>Domain registrations are processed through our accredited registrar partners and are subject to the policies of the relevant domain registry (e.g. ICANN for gTLDs). Domain names are registered in your name as the registrant unless otherwise specified. It is your responsibility to renew domains before their expiry date — expired domains may enter a redemption period with additional recovery fees, or may be released for registration by others.</p>
+        <p>Domain registrations are processed through our accredited registrar partners and are subject to the policies of the relevant domain registry (e.g. ICANN for gTLDs). Domain names are registered in your name as the registrant unless otherwise specified. It is your responsibility to renew domains before their expiry date: expired domains may enter a redemption period with additional recovery fees, or may be released for registration by others.</p>
       </LegalSection>
 
       <LegalSection title="5. Payments">

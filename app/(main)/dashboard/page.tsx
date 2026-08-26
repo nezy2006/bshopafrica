@@ -419,7 +419,7 @@ function DomainsSection({ clientId }: { clientId: number }) {
                         <button
                           onClick={() => toggleAutoRenew(d)}
                           disabled={autoRenewBusyId === d.id}
-                          title={d.autorenew ? "Auto-renew is on — click to disable" : "Auto-renew is off — click to enable"}
+                          title={d.autorenew ? "Auto-renew is on - click to disable" : "Auto-renew is off - click to enable"}
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${d.autorenew ? "bg-green-500" : "bg-gray-300"}`}
                         >
                           <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${d.autorenew ? "translate-x-4" : "translate-x-1"}`} />
@@ -572,7 +572,7 @@ function DnsModal({ domain, clientId, onClose }: { domain: ClientDomain; clientI
                   <I.ExternalLink />{cpanelLoginLoading ? "Opening…" : "Login to cPanel"}
                 </button>
               ) : (
-                <p className="text-xs text-gray-400">No hosting account found for this domain — DNS zone editing requires a hosting account with us.</p>
+                <p className="text-xs text-gray-400">No hosting account found for this domain: DNS zone editing requires a hosting account with us.</p>
               )}
             </div>
           </div>
@@ -924,7 +924,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
                   )}
                   {!predictLoading && mmMismatch && (
                     <p className="text-xs text-amber-700 font-medium mt-1.5">
-                      This looks like {providerIsAirtel ? "an Airtel" : "an MTN"} number — please select {providerIsAirtel ? "Airtel Money" : "MTN Mobile Money"} instead.
+                      This looks like {providerIsAirtel ? "an Airtel" : "an MTN"} number - please select {providerIsAirtel ? "Airtel Money" : "MTN Mobile Money"} instead.
                     </p>
                   )}
                   {!predictLoading && cleanPhone.length >= 9 && !predicted && <p className="text-xs text-red-500 mt-1.5">Operator not supported for this number.</p>}
@@ -957,7 +957,7 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
                 )}
                 {countdown <= 0 && (
                   <p className="text-xs text-amber-600 font-medium">
-                    This is taking longer than usual — MTN MoMo confirmations can take a few minutes. We&apos;ll keep checking automatically.
+                    This is taking longer than usual: MTN MoMo confirmations can take a few minutes. We&apos;ll keep checking automatically.
                   </p>
                 )}
               </div>
@@ -1166,7 +1166,7 @@ function HostingSection({ clientId }: { clientId: number }) {
                   <DiskBar diskused={acct.diskused} disklimit={acct.disklimit} />
                 ) : (
                   <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Disk Usage</span><span>— / —</span></div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Disk Usage</span><span>- / -</span></div>
                     <div className="h-1.5 bg-gray-100 rounded-full" />
                   </div>
                 )}

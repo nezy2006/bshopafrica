@@ -48,8 +48,8 @@ export default function ActivityLogPage() {
             <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
               <td className="px-5 py-3.5 font-medium text-black">{e.admin_name}</td>
               <td className="px-5 py-3.5 text-gray-700">{actionLabel(e.action)}</td>
-              <td className="px-5 py-3.5 text-gray-400 text-xs max-w-xs truncate">{e.details || "—"}</td>
-              <td className="px-5 py-3.5 text-gray-400 text-xs font-mono">{e.ip_address || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-400 text-xs max-w-xs truncate">{e.details || "-"}</td>
+              <td className="px-5 py-3.5 text-gray-400 text-xs font-mono">{e.ip_address || "-"}</td>
               <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
             </tr>
           ))}

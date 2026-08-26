@@ -14,7 +14,7 @@ const ITEMS = [
   },
   {
     q: "Do all plans include a free domain?",
-    a: "Yes! Every hosting plan we offer includes one free domain registration for the first year. After that, renewal is billed at standard rates — no surprises.",
+    a: "Yes! Every hosting plan we offer includes one free domain registration for the first year. After that, renewal is billed at standard rates, no surprises.",
   },
   {
     q: "What payment methods do you accept?",
@@ -22,11 +22,11 @@ const ITEMS = [
   },
   {
     q: "Is there a money-back guarantee?",
-    a: "Absolutely. We offer a 30-day money-back guarantee on all hosting plans. If you're not satisfied for any reason, contact our support team and we'll process your refund promptly — no awkward questions.",
+    a: "Absolutely. We offer a 30-day money-back guarantee on all hosting plans. If you're not satisfied for any reason, contact our support team and we'll process your refund promptly, no awkward questions.",
   },
   {
     q: "How do I migrate my existing website?",
-    a: "Our technical team offers free website migration for all new customers. Simply open a support ticket after signing up and we'll handle the entire transfer for you — zero downtime, zero headache.",
+    a: "Our technical team offers free website migration for all new customers. Simply open a support ticket after signing up and we'll handle the entire transfer for you: zero downtime, zero headache.",
   },
   {
     q: "Do you offer email hosting?",

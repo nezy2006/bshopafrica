@@ -810,7 +810,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                         )}
                         {!predictLoading && mmMismatch && (
                           <p className="text-xs text-amber-700 font-medium">
-                            This looks like {providerMatchesMtn ? "an MTN" : "an Airtel"} number — please select {providerMatchesMtn ? "MTN Mobile Money" : "Airtel Money"} above.
+                            This looks like {providerMatchesMtn ? "an MTN" : "an Airtel"} number - please select {providerMatchesMtn ? "MTN Mobile Money" : "Airtel Money"} above.
                           </p>
                         )}
                         {!predictLoading && !predictedProvider && predictError && (
@@ -867,7 +867,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                     )}
                     {mmCountdown <= 0 && (
                       <p className="text-xs text-amber-600 font-medium">
-                        This is taking longer than usual — MTN MoMo confirmations can take a few minutes. We&apos;ll keep checking automatically.
+                        This is taking longer than usual: MTN MoMo confirmations can take a few minutes. We&apos;ll keep checking automatically.
                       </p>
                     )}
                     <button onClick={resetMm}

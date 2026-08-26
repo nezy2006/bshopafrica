@@ -170,7 +170,7 @@ export default function TeamPage() {
               <td className="px-5 py-3.5 font-medium text-black">{a.name}</td>
               <td className="px-5 py-3.5 text-gray-500">{a.email}</td>
               <td className="px-5 py-3.5"><RoleBadge role={a.role} /></td>
-              <td className="px-5 py-3.5 text-gray-500">{a.department || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{a.department || "-"}</td>
               <td className="px-5 py-3.5"><Badge status={a.is_active ? "active" : "cancelled"} /></td>
               <td className="px-5 py-3.5 text-gray-400 text-xs">{a.last_login ? new Date(a.last_login).toLocaleString() : "Never"}</td>
               <td className="px-5 py-3.5 flex gap-3">

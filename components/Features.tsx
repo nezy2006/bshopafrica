@@ -9,7 +9,7 @@ const FEATURES = [
     Icon: Zap,
     color: "bg-yellow-50 text-yellow-600",
     title: "Effortless & Fast",
-    desc: "LiteSpeed servers and optimised stacks mean your site loads in milliseconds — anywhere on the continent.",
+    desc: "LiteSpeed servers and optimised stacks mean your site loads in milliseconds, anywhere on the continent.",
   },
   {
     Icon: Tag,

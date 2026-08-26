@@ -17,11 +17,11 @@ const WEEBLY_PIDS = { free: "30", starter: "31", pro: "32", business: "33" };
 
 /* ─── Features ───────────────────────────────────────────────────────────── */
 const FEATURES = [
-  { icon: MousePointer2, title: "Drag & Drop Editor",    desc: "Build pages visually — no coding needed. Move any element anywhere." },
+  { icon: MousePointer2, title: "Drag & Drop Editor",    desc: "Build pages visually - no coding needed. Move any element anywhere." },
   { icon: Palette,       title: "500+ Templates",        desc: "Professional templates for every industry, fully customisable." },
   { icon: Smartphone,    title: "Mobile Ready",          desc: "Every site automatically looks great on phones and tablets." },
   { icon: Search,        title: "SEO Built-in",          desc: "Built-in SEO tools to help your site rank on Google from day one." },
-  { icon: ShoppingCart,  title: "eCommerce Ready",       desc: "Sell products, take payments, manage orders — all in one place." },
+  { icon: ShoppingCart,  title: "eCommerce Ready",       desc: "Sell products, take payments, manage orders - all in one place." },
   { icon: Headphones,    title: "24/7 Support",          desc: "Our team is here around the clock to help you build and grow." },
 ];
 
@@ -394,7 +394,7 @@ function FeaturesSection() {
 function HowItWorksSection() {
   const steps = [
     { num: "01", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>, title: "Pick a Template",  desc: "Choose from 500+ professional designs built for your industry." },
-    { num: "02", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07 4 4z"/></svg>, title: "Drag & Drop",     desc: "Customise every element — text, images, colors — visually with no code." },
+    { num: "02", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07 4 4z"/></svg>, title: "Drag & Drop",     desc: "Customise every element (text, images, colors) visually with no code." },
     { num: "03", icon: <svg className="w-9 h-9 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>, title: "Publish & Go Live", desc: "One click to publish. Your site is live instantly with a free SSL." },
   ];
   return (

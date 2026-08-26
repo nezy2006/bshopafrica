@@ -96,7 +96,7 @@ function FreeDomainSearch({ onDomainAdded }: { onDomainAdded: () => void }) {
             </p>
             <p className={`text-xs ${result.available ? "text-green-700" : "text-red-600"}`}>
               {result.available
-                ? added ? "Added to cart!" : "Available — FREE with your hosting plan"
+                ? added ? "Added to cart!" : "Available - FREE with your hosting plan"
                 : "Not available. Try a different name."}
             </p>
           </div>
@@ -334,7 +334,7 @@ function TransferCard({ item, onRemove }: { item: CartTransfer; onRemove: () => 
         </span>
       </div>
       <div className="bg-purple-50 rounded-xl px-4 py-2.5 text-xs text-purple-700">
-        Nameservers will be automatically set to <span className="font-semibold">ns1–ns4.mysecurecloudhost.com</span> after transfer.
+        Nameservers will be automatically set to <span className="font-semibold">ns1-ns4.mysecurecloudhost.com</span> after transfer.
       </div>
     </motion.div>
   );
@@ -407,9 +407,9 @@ function PromoCodeField() {
       const result = json.data;
       if (!result?.valid) { setError(result?.message ?? "Invalid coupon code"); setLoading(false); return; }
       localStorage.setItem("bshop_coupon_code", result.code);
-      setMessage(`${result.message} — it'll be applied at checkout`);
+      setMessage(`${result.message}, it'll be applied at checkout`);
     } catch {
-      setError("Could not validate coupon — please try again");
+      setError("Could not validate coupon, please try again");
     }
     setLoading(false);
   };
@@ -516,7 +516,7 @@ export default function CartPage() {
                           <span className="px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full uppercase">Free</span>
                         </p>
                         <p className="text-xs text-green-700 mt-0.5">
-                          Drag &amp; drop builder, 500+ templates, SSL — included with your hosting plan.
+                          Drag &amp; drop builder, 500+ templates, SSL - included with your hosting plan.
                         </p>
                       </div>
                     </div>

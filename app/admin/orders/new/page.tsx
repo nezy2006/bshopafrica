@@ -52,7 +52,7 @@ export default function NewOrderPage() {
       clientId: client.id, items, gateway, promoCode: promoCode || undefined,
     });
     setBusy(false);
-    if (!res) { setError("Order creation failed — check the server log for the WHMCS error."); return; }
+    if (!res) { setError("Order creation failed: check the server log for the WHMCS error."); return; }
     router.push("/admin/orders");
   };
 

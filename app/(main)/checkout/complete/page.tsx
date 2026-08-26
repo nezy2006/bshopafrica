@@ -228,7 +228,7 @@ function CheckoutCompleteInner() {
       } else {
         setError(json.error ?? "Could not load invoice");
       }
-    } catch { setError("Network error — please try again"); }
+    } catch { setError("Network error, please try again"); }
     finally { setLoading(false); }
   }, [resolvedInvoiceId]);
 

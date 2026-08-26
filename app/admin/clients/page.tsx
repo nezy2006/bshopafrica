@@ -119,7 +119,7 @@ export default function ClientsPage() {
                 <span className="hover:text-[#6B21A8] hover:underline">{c.firstname} {c.lastname}</span>
               </td>
               <td className="px-5 py-3.5 text-gray-500 text-xs">{c.email}</td>
-              <td className="px-5 py-3.5 text-gray-500">{c.phonenumber || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{c.phonenumber || "-"}</td>
               <td className="px-5 py-3.5"><Badge status={c.status} /></td>
               <td className="px-5 py-3.5 font-semibold">${c.balance}</td>
               <td className="px-5 py-3.5 text-gray-600">{c.servicesCount}</td>

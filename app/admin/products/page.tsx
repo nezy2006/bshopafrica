@@ -18,7 +18,7 @@ function ProductsTab() {
     <div className="space-y-4">
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        Product templates (pricing, description) are read-only here — WHMCS's remote API has no action to edit or enable/disable an existing product. Make template changes in WHMCS itself (Setup → Products/Services).
+        Product templates (pricing, description) are read-only here: WHMCS's remote API has no action to edit or enable/disable an existing product. Make template changes in WHMCS itself (Setup → Products/Services).
       </div>
       <TableCard>
         <THead cols={["ID", "Product Name", "Description"]} />
@@ -50,7 +50,7 @@ function EditServiceModal({ svc, onClose, onDone }: { svc: AdminHostingAccount; 
   };
 
   return (
-    <Modal title={`Edit Service — ${svc.name}`} onClose={onClose}>
+    <Modal title={`Edit Service: ${svc.name}`} onClose={onClose}>
       <form onSubmit={save} className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Next Due Date</label>
@@ -81,7 +81,7 @@ function UpgradeServiceModal({ svc, products, onClose, onDone }: { svc: AdminHos
   };
 
   return (
-    <Modal title={`Upgrade/Downgrade — ${svc.name}`} onClose={onClose}>
+    <Modal title={`Upgrade/Downgrade: ${svc.name}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">New Product</label>
@@ -150,7 +150,7 @@ function ServicesTab() {
         <tbody>
           {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon={<Server className="w-5 h-5" />} message="No services found" /> : filtered.map(svc => (
             <tr key={svc.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-              <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{svc.domain || "—"}</td>
+              <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{svc.domain || "-"}</td>
               <td className="px-5 py-3.5 text-gray-700">{svc.firstname} {svc.lastname}</td>
               <td className="px-5 py-3.5 text-gray-600">{svc.name}</td>
               <td className="px-5 py-3.5 font-semibold">${svc.amount}</td>

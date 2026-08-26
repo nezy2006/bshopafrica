@@ -10,7 +10,7 @@ import type { PaymentMethod } from "@/lib/whmcs";
 const INPUT = "w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white focus:shadow-[0_0_0_4px_rgba(107,33,168,0.1)] transition-all";
 
 const DEFAULTS: Record<string, string> = {
-  site_name: "The B.Shop", contact_email: "admin@bshopafrica.com", support_hours: "Monday–Friday, 9AM–5PM CAT",
+  site_name: "The B.Shop", contact_email: "admin@bshopafrica.com", support_hours: "Monday-Friday, 9AM-5PM CAT",
   announcement_text: "Get a FREE DOMAIN on Your First Year", announcement_enabled: "true",
   facebook_url: "", twitter_url: "", instagram_url: "", linkedin_url: "",
   company_logo_url: "", company_address: "", company_phone: "",
@@ -79,7 +79,7 @@ function AutomationTab({ settings, set, save, saving, saved }: { settings: Recor
     <div className="max-w-xl space-y-6">
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        These are informational settings for our own dashboard's reminder workflows — WHMCS's own invoice-generation/overdue-notice cron behavior isn't safely editable via the remote API and must be configured in WHMCS directly.
+        These are informational settings for our own dashboard's reminder workflows: WHMCS's own invoice-generation/overdue-notice cron behavior isn't safely editable via the remote API and must be configured in WHMCS directly.
       </div>
       <Section title="Automation">
         <div>
@@ -135,9 +135,9 @@ function EmailSmtpTab() {
             onClick={async () => {
               if (!to.trim()) return;
               setBusy(true);
-              const res = await whmcsAdmin("adminSendTestEmail", { to, subject: "SMTP Test — B.Shop Admin" });
+              const res = await whmcsAdmin("adminSendTestEmail", { to, subject: "SMTP Test - B.Shop Admin" });
               setBusy(false);
-              alert(res ? "Test email sent." : "Failed — check SMTP_PASS and related env vars.");
+              alert(res ? "Test email sent." : "Failed: check SMTP_PASS and related env vars.");
             }}
             disabled={busy || !to.trim()}
             className="px-6 py-3 bg-[#6B21A8] text-white font-bold rounded-xl hover:bg-[#581c87] disabled:opacity-50 whitespace-nowrap"
@@ -156,7 +156,7 @@ function DepartmentsTab() {
     <div className="max-w-lg space-y-4">
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        Read-only — WHMCS's API has no action to create or edit ticket departments remotely. Manage these in WHMCS (Setup → Support Departments).
+        Read-only: WHMCS's API has no action to create or edit ticket departments remotely. Manage these in WHMCS (Setup → Support Departments).
       </div>
       <TableCard>
         <THead cols={["ID", "Department"]} />

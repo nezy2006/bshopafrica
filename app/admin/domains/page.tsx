@@ -65,7 +65,7 @@ function ManageDomainModal({ domain, onClose, onDone }: { domain: AdminDomain; o
   };
 
   return (
-    <Modal title={`Manage — ${domain.domainname}`} onClose={onClose} maxWidth="max-w-xl">
+    <Modal title={`Manage: ${domain.domainname}`} onClose={onClose} maxWidth="max-w-xl">
       <div className="space-y-6">
         <div>
           <p className="text-xs font-bold text-gray-500 uppercase mb-2">Registrar Actions</p>
@@ -80,7 +80,7 @@ function ManageDomainModal({ domain, onClose, onDone }: { domain: AdminDomain; o
           <p className="text-xs font-bold text-gray-500 uppercase mb-2">Domain Lock</p>
           {locked === null ? <p className="text-xs text-gray-400">Loading…</p> : (
             <button onClick={toggleLock} disabled={busy} className={`text-xs px-3 py-1.5 font-semibold rounded-lg disabled:opacity-50 ${locked ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-red-50 text-red-700 hover:bg-red-100"}`}>
-              {locked ? "Locked — Click to Unlock" : "Unlocked — Click to Lock"}
+              {locked ? "Locked - Click to Unlock" : "Unlocked - Click to Lock"}
             </button>
           )}
         </div>
@@ -166,8 +166,8 @@ export default function DomainsPage() {
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{d.domainname}</td>
               <td className="px-5 py-3.5 text-gray-700">{d.firstname} {d.lastname}</td>
               <td className="px-5 py-3.5"><Badge status={d.status} /></td>
-              <td className="px-5 py-3.5 text-gray-500">{d.registrationdate || "—"}</td>
-              <td className="px-5 py-3.5 text-gray-500">{d.nextduedate || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{d.registrationdate || "-"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{d.nextduedate || "-"}</td>
               <td className="px-5 py-3.5">
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${d.autorenew ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />{d.autorenew ? "On" : "Off"}

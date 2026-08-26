@@ -158,7 +158,7 @@ export default function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.1, duration: 0.75, ease: "easeOut" }}
             >
-              Professional web hosting built for African businesses — fast,
+              Professional web hosting built for African businesses: fast,
               reliable, and transparently priced. Your story deserves the
               best foundation.
             </motion.p>
@@ -220,7 +220,7 @@ export default function Hero() {
             >
               <Image
                 src="/The-BShop-Website-images-alone-04.png"
-                alt="The B.Shop — web hosting for Africa"
+                alt="The B.Shop - web hosting for Africa"
                 width={580}
                 height={580}
                 className="w-full max-w-[480px] lg:max-w-[560px] h-auto object-contain drop-shadow-2xl"

@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <LegalPage title="Privacy Policy" updated="July 2026">
       <LegalSection title="1. Information We Collect">
         <p>When you create an account, place an order, or contact support, we collect information such as your name, email address, phone number, billing address, and payment details necessary to process transactions. Payment card details are handled directly by PayPal and are never stored on our servers; mobile money payments are processed through PawaPay.</p>
-        <p>We also automatically collect technical information — IP address, browser type, and usage data — via cookies and similar technologies to operate and improve the Services.</p>
+        <p>We also automatically collect technical information (IP address, browser type, and usage data) via cookies and similar technologies to operate and improve the Services.</p>
       </LegalSection>
 
       <LegalSection title="2. How We Use Your Information">
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
       </LegalSection>
 
       <LegalSection title="7. Security">
-        <p>We apply reasonable technical and organizational measures — including encrypted connections, hashed passwords, and access controls — to protect your data. No system is completely secure, and we cannot guarantee absolute security of information transmitted over the internet.</p>
+        <p>We apply reasonable technical and organizational measures (including encrypted connections, hashed passwords, and access controls) to protect your data. No system is completely secure, and we cannot guarantee absolute security of information transmitted over the internet.</p>
       </LegalSection>
 
       <LegalSection title="8. Children's Privacy">

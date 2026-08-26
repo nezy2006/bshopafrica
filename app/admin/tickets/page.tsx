@@ -103,7 +103,7 @@ export default function TicketsPage() {
                 {t.escalated && <span className="ml-2 text-[10px] font-bold text-red-600 uppercase">Escalated</span>}
               </td>
               <td className="px-5 py-3.5 text-gray-600">{t.firstname} {t.lastname}</td>
-              <td className="px-5 py-3.5 text-gray-500">{t.department || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{t.department || "-"}</td>
               <td className="px-5 py-3.5">{priorityBadge(t.priority)}</td>
               <td className="px-5 py-3.5 text-gray-500 text-xs">{t.assignedAdminName || "Unassigned"}</td>
               <td className="px-5 py-3.5 text-gray-400 text-xs">{t.date}</td>

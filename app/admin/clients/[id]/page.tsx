@@ -96,7 +96,7 @@ export default function ClientProfilePage() {
 
   const combinedLog = [
     ...whmcsLog.map(l => ({ date: l.date, who: l.username || "System", what: l.description })),
-    ...ourLog.map(l => ({ date: l.created_at, who: l.admin_name, what: `${l.action.replace(/_/g, " ")}${l.details ? ` — ${l.details}` : ""}` })),
+    ...ourLog.map(l => ({ date: l.created_at, who: l.admin_name, what: `${l.action.replace(/_/g, " ")}${l.details ? `: ${l.details}` : ""}` })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const TABS = [
@@ -151,10 +151,10 @@ export default function ClientProfilePage() {
             <StatBox label="Open Tickets" value={openTickets} />
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 grid sm:grid-cols-2 gap-4 text-sm">
-            <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Phone</p><p className="text-black font-medium">{details.phonenumber || "—"}</p></div>
-            <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Company</p><p className="text-black font-medium">{details.companyname || "—"}</p></div>
+            <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Phone</p><p className="text-black font-medium">{details.phonenumber || "-"}</p></div>
+            <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Company</p><p className="text-black font-medium">{details.companyname || "-"}</p></div>
             <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Last Login</p><p className="text-black font-medium">{details.lastlogin || "Never"}</p></div>
-            <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Address</p><p className="text-black font-medium">{[details.address1, details.city, details.state, details.postcode, details.country].filter(Boolean).join(", ") || "—"}</p></div>
+            <div><p className="text-gray-400 text-xs font-semibold uppercase mb-1">Address</p><p className="text-black font-medium">{[details.address1, details.city, details.state, details.postcode, details.country].filter(Boolean).join(", ") || "-"}</p></div>
           </div>
         </div>
       )}
@@ -180,7 +180,7 @@ export default function ClientProfilePage() {
             {products.length === 0 ? <EmptyState icon={<Server className="w-5 h-5" />} message="No services" /> : products.map(p => (
               <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{p.name}</td>
-                <td className="px-5 py-3.5 text-gray-600">{p.domain || "—"}</td>
+                <td className="px-5 py-3.5 text-gray-600">{p.domain || "-"}</td>
                 <td className="px-5 py-3.5 text-gray-500 capitalize">{p.billingcycle}</td>
                 <td className="px-5 py-3.5 font-semibold">${p.amount}</td>
                 <td className="px-5 py-3.5 text-gray-500">{p.nextduedate}</td>
@@ -281,7 +281,7 @@ export default function ClientProfilePage() {
       {tab === "notes" && (
         <div className="space-y-4">
           <form onSubmit={async e => { e.preventDefault(); if (!noteText.trim()) return; const ok = await runAction({ action: "addNote", note: noteText }); if (ok) setNoteText(""); }} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3} placeholder="Internal note about this client — not visible to them…" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none" />
+            <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3} placeholder="Internal note about this client, not visible to them…" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none" />
             <div className="flex justify-end mt-2">
               <button type="submit" disabled={busy || !noteText.trim()} className="flex items-center gap-2 px-5 py-2 bg-[#6B21A8] text-white text-sm font-bold rounded-xl hover:bg-[#581c87] disabled:opacity-50"><StickyNote className="w-4 h-4" /> Add Note</button>
             </div>

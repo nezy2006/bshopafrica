@@ -154,7 +154,7 @@ function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.65 }}
         >
-          Our team is available Monday–Friday, 9 AM–5 PM CAT.
+          Our team is available Monday-Friday, 9 AM-5 PM CAT.
           <br className="hidden sm:block" /> We reply within 48 hours.
         </motion.p>
       </div>
@@ -386,7 +386,7 @@ function ContactForm() {
             {fileName ? (
               <span className="text-[#6B21A8] font-semibold truncate">{fileName}</span>
             ) : (
-              <span>Attach a file <span className="text-gray-400 font-normal">(optional — PDF, DOC, image)</span></span>
+              <span>Attach a file <span className="text-gray-400 font-normal">(optional - PDF, DOC, image)</span></span>
             )}
           </button>
         </motion.div>
@@ -465,7 +465,7 @@ function ContactCards() {
         index={1}
         icon={<ClockIcon />}
         title="Support Hours"
-        lines={["Monday – Friday", "9:00 AM – 5:00 PM CAT", "Replies within 48 hours"]}
+        lines={["Monday-Friday", "9:00 AM-5:00 PM CAT", "Replies within 48 hours"]}
       />
 
       <InfoCard

@@ -122,7 +122,7 @@ export default function AdminDashboard() {
                 <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-semibold text-black">{c.firstname} {c.lastname}</td>
                   <td className="px-5 py-3 text-gray-500 text-xs">{c.email}</td>
-                  <td className="px-5 py-3 text-gray-500">{c.country || "—"}</td>
+                  <td className="px-5 py-3 text-gray-500">{c.country || "-"}</td>
                   <td className="px-5 py-3"><Badge status={c.status} /></td>
                 </tr>
               ))}
@@ -146,7 +146,7 @@ export default function AdminDashboard() {
               <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3 font-semibold text-black">{a.admin_name}</td>
                 <td className="px-5 py-3 text-gray-700">{a.action.replace(/_/g, " ")}</td>
-                <td className="px-5 py-3 text-gray-400 text-xs max-w-xs truncate">{a.details || "—"}</td>
+                <td className="px-5 py-3 text-gray-400 text-xs max-w-xs truncate">{a.details || "-"}</td>
                 <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
               </tr>
             ))}

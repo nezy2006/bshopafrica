@@ -278,7 +278,7 @@ function LaunchTab() {
         <div className="flex-1 mx-3 px-3 py-1 bg-[#0d0d0d] rounded text-xs font-mono">
           {phase >= 5 ? (
             <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-green-400">
-              yourdomain.com — LIVE ✓
+              yourdomain.com - LIVE ✓
             </motion.span>
           ) : (
             <span className="text-gray-500">yourdomain.com</span>

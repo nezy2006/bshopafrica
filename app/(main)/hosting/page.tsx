@@ -130,7 +130,7 @@ const WHY_CARDS = [
 const FAQ_ITEMS = [
   {
     q: "What is cPanel and how do I use it?",
-    a: "cPanel is a web-based control panel that lets you manage your hosting account — install apps, create email accounts, manage files, and more. Every B.Shop plan includes full cPanel access, and our support team is happy to walk you through it.",
+    a: "cPanel is a web-based control panel that lets you manage your hosting account: install apps, create email accounts, manage files, and more. Every B.Shop plan includes full cPanel access, and our support team is happy to walk you through it.",
   },
   {
     q: "Can I upgrade my plan later?",
@@ -138,7 +138,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Do you offer email hosting with my plan?",
-    a: "Yes. Every plan includes professional email accounts on your domain (e.g. you@yourbusiness.com). Starter includes 10 accounts, Grower 15, and Plus 30 — each with generous per-mailbox quotas.",
+    a: "Yes. Every plan includes professional email accounts on your domain (e.g. you@yourbusiness.com). Starter includes 10 accounts, Grower 15, and Plus 30 - each with generous per-mailbox quotas.",
   },
   {
     q: "What happens if I exceed my disk quota?",
@@ -146,7 +146,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Is there a money-back guarantee?",
-    a: "Yes — all hosting plans come with a 30-day money-back guarantee. Contact our support team within 30 days of signing up and we'll refund you in full, no questions asked.",
+    a: "Yes, all hosting plans come with a 30-day money-back guarantee. Contact our support team within 30 days of signing up and we'll refund you in full, no questions asked.",
   },
 ];
 

@@ -81,7 +81,7 @@ function LeftPanel() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.65 }}
         >
-          Almost done — set a strong new password to get back into your account
+          Almost done, set a strong new password to get back into your account
         </motion.p>
       </div>
     </motion.div>

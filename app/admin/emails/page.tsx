@@ -22,14 +22,14 @@ function TemplatesTab() {
     setBusyId(t.id);
     const res = await whmcsAdmin("adminSendTestEmail", { to, subject: t.subject });
     setBusyId(null);
-    alert(res ? "Test email sent." : "Failed to send — check SMTP settings.");
+    alert(res ? "Test email sent." : "Failed to send: check SMTP settings.");
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        WHMCS templates are read-only here — the API has no action to edit them remotely. Edit content in WHMCS (Configuration → Email Templates). "Send Test" delivers a subject-line preview via SMTP; merge fields aren't substituted.
+        WHMCS templates are read-only here: the API has no action to edit them remotely. Edit content in WHMCS (Configuration → Email Templates). "Send Test" delivers a subject-line preview via SMTP; merge fields aren't substituted.
       </div>
       <TableCard>
         <THead cols={["ID", "Template Name", "Subject", "Test Send"]} />
@@ -128,7 +128,7 @@ function EmailLogTab() {
     <div className="space-y-4">
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-800">
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        WHMCS's email log API is per-client (GetEmails requires a client id) — there's no bulk system-wide log endpoint. Pick a client to see everything sent to them.
+        WHMCS's email log API is per-client (GetEmails requires a client id) - there's no bulk system-wide log endpoint. Pick a client to see everything sent to them.
       </div>
       <div className="max-w-md"><ClientPicker client={client} onSelect={setClient} /></div>
       {client && (

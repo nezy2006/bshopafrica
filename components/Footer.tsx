@@ -131,7 +131,7 @@ export default function Footer() {
             />
             <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
               Africa&apos;s premier web hosting provider. Fast, reliable, and
-              transparently priced — helping businesses across Africa and beyond
+              transparently priced, helping businesses across Africa and beyond
               establish their digital presence.
             </p>
 

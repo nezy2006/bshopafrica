@@ -205,7 +205,7 @@ export default function LoginPage() {
 
               <motion.div variants={fadeUp} className="mb-8">
                 <h2 className="text-3xl font-black text-black mb-1">Log In to Your Account</h2>
-                <p className="text-gray-500 text-sm">Welcome back — we missed you.</p>
+                <p className="text-gray-500 text-sm">Welcome back, we missed you.</p>
               </motion.div>
 
               <form onSubmit={handleCredentials} className="space-y-5">

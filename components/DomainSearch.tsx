@@ -309,7 +309,7 @@ export default function DomainSearch() {
           {/* Helper text */}
           <p className="mt-5 text-center text-sm text-gray-400">
             {mode === "register"
-              ? <>Type the full domain including its extension — e.g. <span className="font-mono text-gray-500">mybusiness.com</span></>
+              ? <>Type the full domain including its extension, e.g. <span className="font-mono text-gray-500">mybusiness.com</span></>
               : <>Enter a full domain (e.g. <span className="font-mono text-gray-500">yourbrand.com</span>) and we&apos;ll check eligibility and price instantly.</>}
           </p>
 

@@ -249,7 +249,7 @@ export default function TicketDetailPage() {
             {cannedOpen && (
               <div className="absolute right-0 mt-1 w-72 bg-white border border-gray-100 rounded-xl shadow-lg z-10 max-h-64 overflow-y-auto">
                 {cannedResponses.length === 0 ? (
-                  <p className="text-xs text-gray-400 px-4 py-3">No canned responses yet — add some in Settings.</p>
+                  <p className="text-xs text-gray-400 px-4 py-3">No canned responses yet, add some in Settings.</p>
                 ) : cannedResponses.map(c => (
                   <button key={c.id} type="button" onClick={() => { setMessage(m => m ? `${m}\n\n${c.body}` : c.body); setCannedOpen(false); }}
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm border-b border-gray-50 last:border-0">
@@ -262,7 +262,7 @@ export default function TicketDetailPage() {
           </div>
         </div>
         <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
-          placeholder={isNote ? "Internal note — not visible to the client…" : "Write a reply…"}
+          placeholder={isNote ? "Internal note, not visible to the client…" : "Write a reply…"}
           className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#6B21A8] resize-none" />
         <div className="flex justify-end mt-2">
           <button type="submit" disabled={busy || !message.trim()}

@@ -97,7 +97,7 @@ export default function DigitalCampfirePage() {
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2, ease: EASE }}
             className="text-white/60 text-lg max-w-xl mx-auto">
-            For African businesses building their digital presence — practical guides, success stories, and industry insights.
+            For African businesses building their digital presence: practical guides, success stories, and industry insights.
           </motion.p>
         </div>
       </section>
@@ -130,7 +130,7 @@ export default function DigitalCampfirePage() {
             </div>
             <h2 className="text-2xl font-black text-gray-900 mb-3">The Campfire is Warming Up</h2>
             <p className="text-gray-500 max-w-md">
-              Great stories and insights are on their way. Check back soon — the first posts will be live shortly.
+              Great stories and insights are on their way. Check back soon, the first posts will be live shortly.
             </p>
           </motion.div>
         )}

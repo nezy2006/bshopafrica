@@ -27,9 +27,9 @@ function OrderDetailModal({ orderId, onClose }: { orderId: number; onClose: () =
             <div><p className="text-gray-400 text-xs uppercase font-semibold">Client</p><p className="font-medium text-black">{detail.firstname} {detail.lastname}</p></div>
             <div><p className="text-gray-400 text-xs uppercase font-semibold">Status</p><Badge status={detail.status} /></div>
             <div><p className="text-gray-400 text-xs uppercase font-semibold">Amount</p><p className="font-bold text-black">${detail.amount} {detail.currencycode}</p></div>
-            <div><p className="text-gray-400 text-xs uppercase font-semibold">Payment Method</p><p className="text-black">{detail.paymentmethod || "—"}</p></div>
+            <div><p className="text-gray-400 text-xs uppercase font-semibold">Payment Method</p><p className="text-black">{detail.paymentmethod || "-"}</p></div>
             <div><p className="text-gray-400 text-xs uppercase font-semibold">Date</p><p className="text-black">{detail.date}</p></div>
-            <div><p className="text-gray-400 text-xs uppercase font-semibold">Invoice</p><p className="text-black">{detail.invoiceid ? `#${detail.invoiceid}` : "—"}</p></div>
+            <div><p className="text-gray-400 text-xs uppercase font-semibold">Invoice</p><p className="text-black">{detail.invoiceid ? `#${detail.invoiceid}` : "-"}</p></div>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase font-semibold mb-1.5">Line Items</p>
@@ -100,9 +100,9 @@ export default function OrdersPage() {
             <tr key={o.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${o.status === "Pending" ? "bg-yellow-50/40" : ""}`}>
               <td className="px-5 py-3.5 font-bold text-[#6B21A8]">#{o.id}</td>
               <td className="px-5 py-3.5 font-medium text-black">{o.firstname} {o.lastname}</td>
-              <td className="px-5 py-3.5 text-gray-600 max-w-[180px] truncate">{o.product || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-600 max-w-[180px] truncate">{o.product || "-"}</td>
               <td className="px-5 py-3.5 font-semibold">${o.amount} <span className="text-xs text-gray-400">{o.currencycode}</span></td>
-              <td className="px-5 py-3.5 text-gray-500">{o.paymentmethod || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-500">{o.paymentmethod || "-"}</td>
               <td className="px-5 py-3.5 text-gray-500">{o.date}</td>
               <td className="px-5 py-3.5"><Badge status={o.status} /></td>
               <td className="px-5 py-3.5">

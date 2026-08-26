@@ -62,7 +62,7 @@ function RevenueReport({ overview }: { overview: ReportsOverview | null }) {
         <StatCard label="This Year" value={`$${stats?.income_thisyear ?? "0"}`} color="blue" icon={<IconDollar />} />
         <StatCard label="All Time" value={`$${stats?.income_alltime ?? "0"}`} color="orange" icon={<IconDollar />} />
       </div>
-      <BarChart data={overview?.revenueByMonth ?? []} label="Revenue — Last 12 Months (USD)" />
+      <BarChart data={overview?.revenueByMonth ?? []} label="Revenue: Last 12 Months (USD)" />
       <div className="grid lg:grid-cols-2 gap-6">
         <PieChart data={byMethod} label="Revenue by Payment Method (PayPal vs MTN vs Airtel)" />
         <BarChart data={overview?.productPopularity.slice(0, 6) ?? []} label="Top Products by Active Services" />
@@ -84,7 +84,7 @@ function ClientReport({ overview }: { overview: ReportsOverview | null }) {
         <StatCard label="New Clients (12mo)" value={totalNew} color="purple" icon={<IconUsers />} />
         <StatCard label="Avg / Month" value={Math.round(totalNew / 12)} color="blue" icon={<IconUsers />} />
       </div>
-      <BarChart data={overview?.clientsByMonth ?? []} label="New Client Signups — Last 12 Months" />
+      <BarChart data={overview?.clientsByMonth ?? []} label="New Client Signups: Last 12 Months" />
       <ExportButtons
         onCsv={() => downloadCsv("client-signups.csv", "Month,New Clients", (overview?.clientsByMonth ?? []).map(m => [m.key, String(m.value)]))}
         onPdf={() => downloadReportPdf("Client Report", ["Month", "New Clients"], (overview?.clientsByMonth ?? []).map(m => [m.key, String(m.value)]))}
@@ -165,7 +165,7 @@ function DomainReport() {
         <div className="mt-3">
           <ExportButtons
             onCsv={() => downloadCsv("expiring-domains.csv", "Domain,Client,Expiry", expiringSoon.map(d => [d.domainname, `${d.firstname} ${d.lastname}`, d.expirydate]))}
-            onPdf={() => downloadReportPdf("Domain Report — Expiring Soon", ["Domain", "Client", "Expiry"], expiringSoon.map(d => [d.domainname, `${d.firstname} ${d.lastname}`, d.expirydate]))}
+            onPdf={() => downloadReportPdf("Domain Report: Expiring Soon", ["Domain", "Client", "Expiry"], expiringSoon.map(d => [d.domainname, `${d.firstname} ${d.lastname}`, d.expirydate]))}
           />
         </div>
       </div>
@@ -203,7 +203,7 @@ function TicketReport({ overview }: { overview: ReportsOverview | null }) {
         <StatCard label="Open" value={stats?.tickets_open ?? 0} color="red" icon={<IconTicket />} />
         <StatCard label="Answered" value={stats?.tickets_answered ?? 0} color="green" icon={<IconTicket />} />
       </div>
-      <BarChart data={overview?.ticketsByMonth ?? []} label="Ticket Volume — Last 12 Months" />
+      <BarChart data={overview?.ticketsByMonth ?? []} label="Ticket Volume: Last 12 Months" />
       <div className="grid lg:grid-cols-2 gap-6">
         <BarChart data={byStatus} label="Tickets by Status" />
         <BarChart data={byDept} label="Tickets by Department" />

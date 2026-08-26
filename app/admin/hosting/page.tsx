@@ -47,7 +47,7 @@ export default function HostingPage() {
         <tbody>
           {loading ? <SkeletonRows cols={7} /> : filtered.length === 0 ? <EmptyState icon={<Server className="w-5 h-5" />} message="No hosting accounts found" /> : filtered.map(a => (
             <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-              <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{a.domain || "—"}</td>
+              <td className="px-5 py-3.5 font-bold text-[#6B21A8]">{a.domain || "-"}</td>
               <td className="px-5 py-3.5 text-gray-700">{a.firstname} {a.lastname}</td>
               <td className="px-5 py-3.5 text-gray-600">{a.name}</td>
               <td className="px-5 py-3.5 text-gray-500 capitalize">{a.billingcycle}</td>

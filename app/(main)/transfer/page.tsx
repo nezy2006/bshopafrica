@@ -87,7 +87,7 @@ function TransferInner() {
         tld:           "",
         transferPrice: 0,
         currency:      "USD",
-        message:       "Network error — please check your connection and try again.",
+        message:       "Network error, please check your connection and try again.",
       });
     }
     finally { setChecking(false); }
@@ -270,7 +270,7 @@ function TransferInner() {
                   {[
                     "Transfer request sent to Enom automatically",
                     `Nameservers updated to ${NS[0]} and ${NS[1]}`,
-                    "Transfer takes 5–7 days to complete",
+                    "Transfer takes 5-7 days to complete",
                     "Email updates sent at every step",
                     "Domain appears in your dashboard once complete",
                   ].map(item => (
