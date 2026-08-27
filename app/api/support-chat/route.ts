@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
         ...conversationHistory,
         { role: "user", content: message },
       ],
-      model: "llama-3.3-70b-versatile",
+      model: "llama3-70b-8192",
       max_tokens: 500,
       temperature: 0.7,
     });

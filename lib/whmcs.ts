@@ -1354,16 +1354,22 @@ export interface AffiliateDetails {
   datejoined:    string;
 }
 
+// Confirmed against WHMCS's documented GetAffiliates response (developers.whmcs.com/api-reference/getaffiliates):
+// id, date, clientid, visitors, paytype, payamount, onetime, balance, withdrawn, created_at, updated_at.
+// It does not return a signups/campaigns count directly, so those stay best-effort
+// fallbacks (0 unless a customized install happens to add them).
 function parseAffiliateRow(row: WhmcsRaw, clientId: number): AffiliateDetails {
+  const balance   = Number(row.balance ?? 0);
+  const withdrawn = Number(row.withdrawn ?? 0);
   return {
     affiliateId: Number(row.id ?? row.affiliateid ?? 0),
     clientId,
-    balance:     Number(row.balance ?? row.unpaidearnings ?? row.earnings ?? 0),
-    totalEarned: Number(row.totalvalue ?? row.paidearnings ?? row.totalearnings ?? row.balance ?? 0),
+    balance,
+    totalEarned: balance + withdrawn,
     visitors:    Number(row.visitors ?? row.clicks ?? 0),
     signups:     Number(row.signups ?? row.referrals ?? 0),
     campaigns:   Number(row.campaigns ?? 0),
-    datejoined:  String(row.datejoined ?? row.date ?? ""),
+    datejoined:  String(row.date ?? row.datejoined ?? ""),
   };
 }
 
@@ -1384,9 +1390,11 @@ export async function getAffiliateByClientId(clientId: number): Promise<Affiliat
   }
 }
 
-/** Activates affiliate status for a client that doesn't have one yet. */
+/** Activates affiliate status for a client that doesn't have one yet.
+ *  WHMCS's AffiliateActivate action takes `userid`, not `clientid` — sending
+ *  the wrong key is exactly what produces its "Client ID not found" error. */
 export async function activateAffiliate(clientId: number): Promise<AffiliateDetails | null> {
-  await callWhmcs("AffiliateActivate", { clientid: clientId });
+  await callWhmcs("AffiliateActivate", { userid: clientId });
   return getAffiliateByClientId(clientId);
 }
 
