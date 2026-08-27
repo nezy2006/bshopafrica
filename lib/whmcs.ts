@@ -33,7 +33,7 @@ export interface LoginResult        { clientId: number; passwordHash: string; fi
 export interface RegisterResult     { clientId: number; }
 export interface OrderResult        { orderId: number; invoiceId: number; }
 export interface ClientDetails      { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; credit: string; lastlogin: string; address1: string; city: string; state: string; postcode: string; country: string; companyname: string; }
-export interface ClientProduct      { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
+export interface ClientProduct      { id: number; pid: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
 export interface ClientDomain       { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; autorenew: boolean; }
 export interface ClientInvoice      { id: number; date: string; duedate: string; total: string; status: string; }
 
@@ -279,7 +279,7 @@ export async function unsuspendAllClientServices(clientId: number): Promise<void
 export async function getClientProducts(clientId: number): Promise<ClientProduct[]> {
   const data = await callWhmcs("GetClientsProducts", { clientid: clientId });
   const raw = (data.products as { product: WhmcsRaw[] } | undefined)?.product ?? [];
-  return raw.map(p => ({ id: Number(p.id ?? 0), name: String(p.name ?? ""), status: String(p.status ?? ""), nextduedate: String(p.nextduedate ?? ""), billingcycle: String(p.billingcycle ?? ""), amount: String(p.recurringamount ?? p.firstpaymentamount ?? "0.00"), domain: String(p.domain ?? "") }));
+  return raw.map(p => ({ id: Number(p.id ?? 0), pid: Number(p.pid ?? 0), name: String(p.name ?? ""), status: String(p.status ?? ""), nextduedate: String(p.nextduedate ?? ""), billingcycle: String(p.billingcycle ?? ""), amount: String(p.recurringamount ?? p.firstpaymentamount ?? "0.00"), domain: String(p.domain ?? "") }));
 }
 
 export async function getClientDomains(clientId: number): Promise<ClientDomain[]> {
@@ -658,9 +658,13 @@ export async function terminateService(serviceId: number): Promise<void> {
 }
 
 /** calconly stays false — this performs the upgrade/downgrade immediately
- *  (billed via paymentmethod) rather than just previewing the price delta. */
-export async function upgradeService(serviceId: number, newProductId: number, newBillingCycle: string, paymentMethod: string): Promise<void> {
-  await callWhmcs("UpgradeProduct", { serviceid: serviceId, type: "product", newproductid: newProductId, newproductbillingcycle: newBillingCycle, paymentmethod: paymentMethod, calconly: false });
+ *  (billed via paymentmethod) rather than just previewing the price delta.
+ *  Returns the invoice WHMCS generates for the prorated difference, if any
+ *  (0 when the upgrade doesn't produce a chargeable invoice — e.g. a
+ *  downgrade, or a plan change with no price difference). */
+export async function upgradeService(serviceId: number, newProductId: number, newBillingCycle: string, paymentMethod: string): Promise<{ invoiceId: number }> {
+  const data = await callWhmcs("UpgradeProduct", { serviceid: serviceId, type: "product", newproductid: newProductId, newproductbillingcycle: newBillingCycle, paymentmethod: paymentMethod, calconly: false });
+  return { invoiceId: Number(data.invoiceid ?? 0) };
 }
 
 export async function updateServiceDetails(serviceId: number, fields: { nextDueDate?: string; recurringAmount?: number; status?: string }): Promise<void> {

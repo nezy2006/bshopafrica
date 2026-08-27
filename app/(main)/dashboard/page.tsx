@@ -42,7 +42,7 @@ async function whmcs<T>(action: string, params: Record<string, unknown> = {}): P
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 interface ClientDetails { id: number; firstname: string; lastname: string; email: string; phonenumber: string; status: string; datecreated: string; }
-interface ClientProduct { id: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
+interface ClientProduct { id: number; pid: number; name: string; status: string; nextduedate: string; billingcycle: string; amount: string; domain: string; }
 interface ClientDomain  { id: number; domainname: string; status: string; nextduedate: string; expirydate: string; autorenew: boolean; }
 interface DomainNameservers { ns1: string; ns2: string; ns3: string; ns4: string; ns5: string; }
 interface ClientInvoice { id: number; date: string; duedate: string; total: string; status: string; }
@@ -1081,6 +1081,125 @@ function DiskBar({ diskused, disklimit }: { diskused: string; disklimit: string 
   );
 }
 
+/* ─── UPGRADE MODAL ──────────────────────────────────────────────────────── */
+// Ordered low → high — this site's three known hosting tiers. WHMCS's
+// GetProducts has no reliable cross-install "tier rank" field, so upgrade
+// candidates are determined by matching product name against this list and
+// comparing index, not by price (a promo/discounted lower-tier plan could
+// otherwise look "higher" than a plain higher-tier one).
+const HOSTING_TIERS = ["Business Starter Kit", "Business Grower Kit", "Business Plus Kit"];
+
+interface WhmcsProductLite { pid: number; name: string; pricing: Record<string, unknown>; }
+
+function priceForCycle(pricing: Record<string, unknown>, annual: boolean): number | null {
+  const usd = pricing?.USD as Record<string, unknown> | undefined;
+  const raw = usd?.[annual ? "annually" : "monthly"];
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+interface UpgradeOption { pid: number; name: string; price: number; }
+
+function UpgradeModal({ product, onClose, onUpgraded }: {
+  product: ClientProduct; onClose: () => void; onUpgraded: (invoiceId: number) => void;
+}) {
+  const [options,      setOptions]      = useState<UpgradeOption[] | null>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [loadError,    setLoadError]    = useState("");
+  const [upgradeError, setUpgradeError] = useState("");
+  const [upgradingPid, setUpgradingPid] = useState<number | null>(null);
+
+  const annual = product.billingcycle.toLowerCase().includes("annual");
+  const currentAmount = parseFloat(product.amount) || 0;
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true); setLoadError("");
+      try {
+        const products = await whmcs<WhmcsProductLite[]>("getProducts");
+        const currentIndex = HOSTING_TIERS.indexOf(product.name);
+        const higher = products
+          .map(p => ({ pid: p.pid, name: p.name, tierIndex: HOSTING_TIERS.indexOf(p.name), price: priceForCycle(p.pricing, annual) }))
+          .filter(p => p.tierIndex > -1 && p.tierIndex > currentIndex && p.price !== null)
+          .sort((a, b) => a.tierIndex - b.tierIndex)
+          .map(p => ({ pid: p.pid, name: p.name, price: p.price as number }));
+        setOptions(higher);
+      } catch {
+        setLoadError("Could not load upgrade options. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.name]);
+
+  async function handleUpgrade(opt: UpgradeOption) {
+    setUpgradingPid(opt.pid); setUpgradeError("");
+    try {
+      const { invoiceId } = await whmcs<{ invoiceId: number }>("upgradeMyService", {
+        serviceId: product.id, newProductId: opt.pid, newBillingCycle: annual ? "annually" : "monthly",
+      });
+      onUpgraded(invoiceId);
+    } catch (err) {
+      setUpgradeError(err instanceof Error ? err.message : "Could not start the upgrade. Please try again or contact support.");
+      setUpgradingPid(null);
+    }
+  }
+
+  return (
+    <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto"
+        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2, ease: EASE }}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-bold text-gray-900">Upgrade Hosting</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><I.X /></button>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-400 font-semibold uppercase mb-1">Current Plan</p>
+            <p className="font-semibold text-gray-900">{product.name}</p>
+          </div>
+          <p className="text-sm font-semibold text-gray-600">${currentAmount.toFixed(2)}/{annual ? "yr" : "mo"}</p>
+        </div>
+
+        {loading ? (
+          <Skeleton className="h-32" />
+        ) : loadError ? (
+          <p className="text-sm text-red-600">{loadError}</p>
+        ) : !options || options.length === 0 ? (
+          <EmptyState icon={<I.Server />} title="Already on the top plan" desc="There's no higher hosting tier available to upgrade to." />
+        ) : (
+          <div className="space-y-3">
+            {options.map(opt => {
+              const shortName = opt.name.replace("Business ", "").replace(" Kit", "");
+              const diff = opt.price - currentAmount;
+              return (
+                <div key={opt.pid} className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl p-4">
+                  <div>
+                    <p className="font-semibold text-gray-900">{opt.name}</p>
+                    <p className="text-xs text-gray-500">
+                      ${opt.price.toFixed(2)}/{annual ? "yr" : "mo"}
+                      {diff > 0 && <span className="text-green-600 font-medium"> (+${diff.toFixed(2)})</span>}
+                    </p>
+                  </div>
+                  <button onClick={() => handleUpgrade(opt)} disabled={upgradingPid !== null}
+                    className="flex-shrink-0 text-xs px-4 py-2 bg-[#6B21A8] text-white font-semibold rounded-lg hover:bg-[#581c87] disabled:opacity-50 transition-colors whitespace-nowrap">
+                    {upgradingPid === opt.pid ? "Upgrading…" : `Upgrade to ${shortName} - $${opt.price.toFixed(2)}/${annual ? "yr" : "mo"}`}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {upgradeError && <p className="text-sm text-red-600 mt-3">{upgradeError}</p>}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ─── HOSTING ────────────────────────────────────────────────────────────── */
 function HostingSection({ clientId }: { clientId: number }) {
   const [products,    setProducts]    = useState<ClientProduct[]>([]);
@@ -1090,6 +1209,7 @@ function HostingSection({ clientId }: { clientId: number }) {
   const [cpanelLoading, setCpanelLoading] = useState<Record<number, boolean>>({});
   const [renewingId, setRenewingId] = useState<number | null>(null);
   const [payTarget,  setPayTarget]  = useState<{ invoiceId: number; amountUSD: number; description: string; period: string } | null>(null);
+  const [upgradeTarget, setUpgradeTarget] = useState<ClientProduct | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(false);
@@ -1140,6 +1260,33 @@ function HostingSection({ clientId }: { clientId: number }) {
     }
   }
 
+  async function handleUpgraded(invoiceId: number) {
+    const target = upgradeTarget;
+    setUpgradeTarget(null);
+    if (!invoiceId) {
+      // No prorated charge (e.g. mid-cycle downgrade credit) — the upgrade
+      // already applied, nothing left to pay.
+      load();
+      return;
+    }
+    try {
+      const invoices = await whmcs<ClientInvoice[]>("getInvoices", { clientId });
+      const invoice  = invoices.find(i => i.id === invoiceId);
+      setPayTarget({
+        invoiceId,
+        amountUSD:   invoice ? parseFloat(invoice.total) || 0 : 0,
+        description: target ? `Upgrade - ${target.name}` : "Hosting Upgrade",
+        period:      target?.billingcycle ?? "",
+      });
+    } catch {
+      // Upgrade itself already succeeded in WHMCS — just couldn't fetch the
+      // invoice total to open the payment modal. Send them to Invoices instead
+      // of leaving them stuck with no way to pay.
+      alert("Your upgrade was started, but we couldn't load the invoice automatically. Please check the Invoices tab to complete payment.");
+      load();
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -1181,7 +1328,8 @@ function HostingSection({ clientId }: { clientId: number }) {
                     className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#6B21A8] text-white rounded-lg hover:bg-[#581c87] disabled:opacity-60 transition-colors">
                     <I.ExternalLink />{cpanelLoading[p.id] ? "Opening…" : "cPanel Login"}
                   </button>
-                  <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
+                  <button onClick={() => setUpgradeTarget(p)}
+                    className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:border-purple-300 hover:text-[#6B21A8] transition-colors">Upgrade</button>
                   {daysUntil(p.nextduedate) <= 30 && (
                     <button onClick={() => handleRenew(p)} disabled={renewingId === p.id}
                       className="text-xs px-3 py-1.5 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 disabled:opacity-60 transition-colors">
@@ -1194,6 +1342,12 @@ function HostingSection({ clientId }: { clientId: number }) {
           })}
         </div>
       )}
+
+      <AnimatePresence>
+        {upgradeTarget && (
+          <UpgradeModal product={upgradeTarget} onClose={() => setUpgradeTarget(null)} onUpgraded={handleUpgraded} />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {payTarget && (

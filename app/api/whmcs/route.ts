@@ -53,6 +53,11 @@ async function ownsDomain(clientId: number, domainId: number): Promise<boolean> 
   return domains.some(d => d.id === domainId);
 }
 
+async function ownsService(clientId: number, serviceId: number): Promise<boolean> {
+  const products = await getClientProducts(clientId);
+  return products.some(p => p.id === serviceId);
+}
+
 /** Looks for an existing unpaid invoice whose line items mention `matchText`
  *  (e.g. a domain or hosting service name) so renewal clicks don't spawn a
  *  fresh duplicate invoice every time. */
@@ -195,6 +200,19 @@ export async function POST(req: NextRequest) {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;
         data = await getClientProducts(session.clientId);
+        break;
+      }
+      case "upgradeMyService": {
+        // Client-facing upgrade (dashboard "Upgrade" button) — distinct from
+        // adminUpgradeService below, which is admin-gated and trusts a
+        // serviceId with no ownership check since only staff can call it.
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        const serviceId = n("serviceId");
+        if (!(await ownsService(session.clientId, serviceId))) {
+          return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+        }
+        data = await upgradeService(serviceId, n("newProductId"), s("newBillingCycle", "monthly"), s("paymentMethod", WHMCS_PAWAPAY_GATEWAY));
         break;
       }
       case "getClientDomains": {
