@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { getCart, clearCart, type CartItem, type CartDomain, type CartHosting, type CartTransfer, type CartWebsiteBuilder } from "@/lib/cart";
-import { AUTH_KEYS, authHeaders } from "@/lib/auth";
+import { authHeaders, setAuth } from "@/lib/auth";
 // CartTransfer and CartWebsiteBuilder used in type guards within StepPayment
 import { PaymentOptionCard, PayPalWordmark, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
@@ -201,11 +201,9 @@ function StepAccount({ onDone }: { onDone: () => void }) {
         return;
       }
       const { clientId, firstname, lastname, email: clientEmail, sessionToken } = json.data;
-      localStorage.setItem("bshop_client_id",        String(clientId));
-      localStorage.setItem("bshop_client_firstname", firstname ?? "");
-      localStorage.setItem("bshop_client_name",      `${firstname ?? ""} ${lastname ?? ""}`.trim());
-      localStorage.setItem("bshop_client_email",     clientEmail || email);
-      if (sessionToken) localStorage.setItem(AUTH_KEYS.sessionToken, sessionToken);
+      // setAuth() (not raw localStorage writes) so any previous client's
+      // cached notifications get cleared when a different client id logs in.
+      setAuth(clientId, firstname ?? "", lastname ?? "", clientEmail || email, sessionToken);
       window.dispatchEvent(new Event("bshop_cart_update"));
       onDone();
     } catch { setError("Something went wrong. Please try again."); }
@@ -249,11 +247,9 @@ function StepAccount({ onDone }: { onDone: () => void }) {
         setError(json.error ?? "Registration failed. Please try again.");
         return;
       }
-      localStorage.setItem("bshop_client_id",        String(json.data.clientId));
-      localStorage.setItem("bshop_client_firstname", firstName);
-      localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
-      localStorage.setItem("bshop_client_email",     email);
-      if (json.data.sessionToken) localStorage.setItem(AUTH_KEYS.sessionToken, json.data.sessionToken);
+      // setAuth() (not raw localStorage writes) so any previous client's
+      // cached notifications get cleared when a different client id logs in.
+      setAuth(json.data.clientId, firstName, lastName, email, json.data.sessionToken);
       window.dispatchEvent(new Event("bshop_cart_update"));
       setSuccess(true);
       setTimeout(() => onDone(), 1500);

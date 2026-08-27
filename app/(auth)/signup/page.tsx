@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { addToCart } from "@/lib/cart";
+import { setAuth } from "@/lib/auth";
 
 type Ease = [number, number, number, number];
 const EASE: Ease = [0.22, 1, 0.36, 1];
@@ -276,7 +277,7 @@ function SignupPageInner() {
       });
       clearTimeout(timeout);
 
-      const json = (await res.json()) as { success: boolean; data?: { clientId: number }; error?: string };
+      const json = (await res.json()) as { success: boolean; data?: { clientId: number; sessionToken?: string }; error?: string };
       if (!json.success || !json.data?.clientId) {
         const raw = json.error ?? "";
         const msg = raw.includes("403") || raw.includes("whitelist")
@@ -286,11 +287,9 @@ function SignupPageInner() {
         return;
       }
 
-      localStorage.setItem("bshop_client_id",        String(json.data.clientId));
-      localStorage.setItem("bshop_client_firstname", firstName);
-      localStorage.setItem("bshop_client_name",      `${firstName} ${lastName}`.trim());
-      localStorage.setItem("bshop_client_email",     email);
-      localStorage.setItem("bshop_login_time",       Date.now().toString());
+      // setAuth() (not raw localStorage writes) so any previous client's
+      // cached notifications get cleared when a different client id logs in.
+      setAuth(json.data.clientId, firstName, lastName, email, json.data.sessionToken);
 
       // If came from hosting page, add plan to cart
       if (planParam && HOSTING_PLANS[planParam]) {

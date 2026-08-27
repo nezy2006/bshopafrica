@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
         id:        client.id,
         email:     client.email,
         firstname: client.firstname,
+        lastname:  client.lastname,
         fullname:  `${client.firstname} ${client.lastname}`.trim(),
       },
     });

@@ -2,9 +2,9 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AUTH_KEYS } from "@/lib/auth";
+import { setAuth } from "@/lib/auth";
 
-type SsoClient = { id: number; email: string; firstname: string; fullname: string };
+type SsoClient = { id: number; email: string; firstname: string; lastname: string; fullname: string };
 type SsoResponse = { success: boolean; client?: SsoClient; sessionToken?: string; error?: string };
 type Status = "loading" | "unauthorized" | "error";
 
@@ -37,15 +37,14 @@ function ImpersonateInner() {
         const json = await res.json() as SsoResponse;
         if (!json.success || !json.client || !json.sessionToken) { setStatus("error"); return; }
 
-        const { id, email, firstname, fullname } = json.client;
+        const { id, email, firstname, lastname, fullname } = json.client;
         setName(fullname || firstname || "client");
 
-        localStorage.setItem(AUTH_KEYS.clientId,     String(id));
-        localStorage.setItem(AUTH_KEYS.clientEmail,  email);
-        localStorage.setItem(AUTH_KEYS.clientName,   fullname);
-        localStorage.setItem(AUTH_KEYS.clientFirst,  firstname);
-        localStorage.setItem(AUTH_KEYS.loginTime,    Date.now().toString());
-        localStorage.setItem(AUTH_KEYS.sessionToken, json.sessionToken);
+        // setAuth() (not raw localStorage writes) so the previously-impersonated
+        // (or previously logged-in) client's cached notifications get cleared —
+        // an admin switching between impersonated clients on the same browser is
+        // exactly the scenario this guards against.
+        setAuth(id, firstname, lastname, email, json.sessionToken);
 
         setTimeout(() => router.replace("/dashboard"), 1000);
       } catch {

@@ -7,21 +7,33 @@ export interface AppNotification {
   link?:   string;
 }
 
-const KEY      = "bshop_notifications";
-const POLL_KEY = "bshop_last_poll";
+const KEY_PREFIX  = "bshop_notifications";
+const POLL_PREFIX = "bshop_last_poll";
+
+// Keyed per logged-in client id (falling back to a shared "guest" bucket when
+// no one's logged in) so two different clients' cached notifications can
+// never mix on a shared/public browser — even if some future code path ever
+// forgets to call clearNotifications() on login/logout, each client only
+// ever reads and writes its own key.
+function currentSuffix(): string {
+  if (typeof window === "undefined") return "guest";
+  return localStorage.getItem("bshop_client_id") || "guest";
+}
+function storageKey(): string { return `${KEY_PREFIX}_${currentSuffix()}`; }
+function pollKey():    string { return `${POLL_PREFIX}_${currentSuffix()}`; }
 
 export function getNotifications(): AppNotification[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? (JSON.parse(raw) as AppNotification[]) : [];
   } catch { return []; }
 }
 
 function save(notifs: AppNotification[]): void {
-  localStorage.setItem(KEY, JSON.stringify(notifs));
-  if (typeof window !== "undefined")
-    window.dispatchEvent(new Event("bshop_notifications_update"));
+  if (typeof window === "undefined") return;
+  localStorage.setItem(storageKey(), JSON.stringify(notifs));
+  window.dispatchEvent(new Event("bshop_notifications_update"));
 }
 
 export function getUnreadCount(): number {
@@ -47,13 +59,17 @@ export function addNotification(notif: Omit<AppNotification, "id" | "read"> & { 
   save(notifs.slice(0, 50));
 }
 
-/** Wipes the cached notification feed. Must be called on logout/session-switch —
- *  otherwise a second client logging in on the same browser would briefly see
- *  the previous client's cached notifications until enough new ones supersede them. */
+/** Wipes the cached notification feed for whichever client id is currently in
+ *  localStorage. Must be called on logout/session-switch (before the new
+ *  client id is written) — otherwise a second client logging in on the same
+ *  browser would briefly see the previous client's cached notifications until
+ *  enough new ones supersede them. Per-client key prefixing above is the
+ *  primary defense; this is belt-and-suspenders so the old cache doesn't just
+ *  sit there unused taking up storage. */
 export function clearNotifications(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(KEY);
-  localStorage.removeItem(POLL_KEY);
+  localStorage.removeItem(storageKey());
+  localStorage.removeItem(pollKey());
 }
 
 // clientId is intentionally NOT passed here — the server resolves it from the
@@ -67,7 +83,7 @@ async function poll(sessionToken: string | null): Promise<void> {
     if (json.success && Array.isArray(json.data)) {
       for (const n of json.data) addNotification(n);
     }
-    localStorage.setItem(POLL_KEY, Date.now().toString());
+    localStorage.setItem(pollKey(), Date.now().toString());
   } catch { /* silent */ }
 }
 
