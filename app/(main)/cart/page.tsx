@@ -133,7 +133,7 @@ const EMAIL_UPSELL: CartEmail = { id: "email_pro",  type: "email", name: "Profes
 
 const HOSTING_UPSELL_PLANS = [
   { id: "hosting_starter", name: "Business Starter Kit", monthly: 8,  yearly: 96,  disk: "10 GB",  emails: "10", best: false },
-  { id: "hosting_grower",  name: "Business Grower Kit",  monthly: 12, yearly: 144, disk: "25 GB",  emails: "15", best: true  },
+  { id: "hosting_grower",  name: "Business Grower Kit",  monthly: 12, yearly: 144, disk: "25 GB",  emails: "20", best: true  },
   { id: "hosting_plus",    name: "Business Plus Kit",    monthly: 16, yearly: 192, disk: "40 GB",  emails: "30", best: false },
 ] as const;
 

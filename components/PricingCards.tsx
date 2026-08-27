@@ -44,7 +44,7 @@ const PLANS: Plan[] = [
       { label: "Disk",           value: "25 GB" },
       { label: "Bandwidth",      value: "1 TB" },
       { label: "FTP Accounts",   value: "1" },
-      { label: "Email Accounts", value: "15" },
+      { label: "Email Accounts", value: "20" },
       { label: "Quota / Email",  value: "12 GB" },
       { label: "Email Lists",    value: "1" },
       { label: "Databases",      value: "15" },

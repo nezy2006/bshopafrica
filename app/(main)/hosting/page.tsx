@@ -54,7 +54,7 @@ const PLANS: Plan[] = [
       { label: "Disk",           value: "25 GB"    },
       { label: "Bandwidth",      value: "1 TB"     },
       { label: "FTP Accounts",   value: "1"        },
-      { label: "Email Accounts", value: "15"       },
+      { label: "Email Accounts", value: "20"       },
       { label: "Quota / Email",  value: "12 GB"    },
       { label: "Email Lists",    value: "1"        },
       { label: "Databases",      value: "15"       },
@@ -91,7 +91,7 @@ const TABLE_ROWS = [
   { feature: "Disk Space",           starter: "10 GB", grower: "25 GB", plus: "40 GB" },
   { feature: "Bandwidth",            starter: "1 TB",  grower: "1 TB",  plus: "1 TB"  },
   { feature: "FTP Accounts",         starter: "1",     grower: "1",     plus: "10"    },
-  { feature: "Email Accounts",       starter: "10",    grower: "15",    plus: "30"    },
+  { feature: "Email Accounts",       starter: "10",    grower: "20",    plus: "30"    },
   { feature: "Quota / Email",        starter: "5 GB",  grower: "12 GB", plus: "25 GB" },
   { feature: "Email Lists",          starter: "1",     grower: "1",     plus: "10"    },
   { feature: "Databases",            starter: "10",    grower: "15",    plus: "30"    },
@@ -138,7 +138,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Do you offer email hosting with my plan?",
-    a: "Yes. Every plan includes professional email accounts on your domain (e.g. you@yourbusiness.com). Starter includes 10 accounts, Grower 15, and Plus 30 - each with generous per-mailbox quotas.",
+    a: "Yes. Every plan includes professional email accounts on your domain (e.g. you@yourbusiness.com). Starter includes 10 accounts, Grower 20, and Plus 30 - each with generous per-mailbox quotas.",
   },
   {
     q: "What happens if I exceed my disk quota?",
