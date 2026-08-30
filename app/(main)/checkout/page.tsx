@@ -75,9 +75,10 @@ function LockIcon() {
 
 /* ─── Step indicator ─────────────────────────────────────────────────────── */
 const STEPS = [
-  { num: 1, label: "Cart"    },
-  { num: 2, label: "Account" },
-  { num: 3, label: "Payment" },
+  { num: 1, label: "Cart"     },
+  { num: 2, label: "Details"  },
+  { num: 3, label: "Payment"  },
+  { num: 4, label: "Complete" },
 ];
 
 function StepIndicator({ current }: { current: Step }) {
@@ -852,6 +853,16 @@ function StepPayment({ cart }: { cart: Cart }) {
                         ${usdTotal.toFixed(2)} <span className="text-gray-400 font-normal">≈</span> RWF {rwfTotal.toLocaleString()}
                       </span>
                     </div>
+                    {isMmValid && (
+                      <div className="bg-white/70 rounded-xl px-4 py-3 text-xs text-gray-600 space-y-1">
+                        <p className="font-semibold text-gray-700 mb-1.5">How to complete your payment:</p>
+                        <p>1. Enter your {method === "mtn" ? "MTN" : "Airtel"} Mobile Money PIN when prompted</p>
+                        <p>2. A USSD prompt will appear on your phone within 60 seconds</p>
+                        <p>3. Approve the payment on your phone</p>
+                        <p>4. Keep this page open until payment is confirmed</p>
+                        <p>5. Do NOT pay again if you already approved on your phone</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -891,6 +902,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                     {mmCountdown > 0 && mmCountdown <= 90 && (
                       <p className="text-xs text-amber-600 font-medium">
                         No prompt yet? Check your phone for a USSD popup, or try again.
+                        {method === "mtn" ? " Dial *182# to check pending requests." : " Dial *185# to check pending requests."}
                       </p>
                     )}
                     {mmCountdown <= 0 && (

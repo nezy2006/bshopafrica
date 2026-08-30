@@ -66,11 +66,18 @@ async function migrate() {
 
   const existing = await queryOne<{ cnt: number }>("SELECT COUNT(*) as cnt FROM admin_users");
   if (!existing || Number(existing.cnt) === 0) {
-    const hash = await bcrypt.hash(config.adminPassword, 12);
-    await execute(
-      "INSERT INTO admin_users (name, email, password, role, department, is_active) VALUES (?, ?, ?, 'super_admin', 'Management', 1)",
-      ["Super Admin", "admin@bshopafrica.com", hash]
-    );
+    // config.adminPassword has no hardcoded fallback (see lib/config.ts) — if
+    // ADMIN_PASSWORD isn't set, skip seeding rather than create a super_admin
+    // account with a blank password hash that would let anyone in.
+    if (!config.adminPassword) {
+      console.error("[admin-auth] ADMIN_PASSWORD is not set — skipping default super_admin creation. Set ADMIN_PASSWORD and restart to create the initial admin account.");
+    } else {
+      const hash = await bcrypt.hash(config.adminPassword, 12);
+      await execute(
+        "INSERT INTO admin_users (name, email, password, role, department, is_active) VALUES (?, ?, ?, 'super_admin', 'Management', 1)",
+        ["Super Admin", "admin@bshopafrica.com", hash]
+      );
+    }
   }
 }
 

@@ -75,11 +75,18 @@ function AvailableCard({ result, onReset }: { result: DomainCheckResult; onReset
   const router = useRouter();
   const [added, setAdded] = useState(false);
 
+  // result.price comes straight from WHMCS's GetTLDPricing (see lib/whmcs.ts
+  // checkDomain/getTLDPrice) — never invent a fallback number here, since a
+  // wrong guess could add the domain to cart at a price WHMCS won't actually
+  // honor at checkout.
+  const priceKnown = result.price !== null;
+
   const handleAddToCart = () => {
+    if (!priceKnown) return;
     const parsed = splitDomain(result.domain);
     const name = parsed?.name ?? result.domain;
     const tld  = parsed?.tld  ?? "";
-    addToCart({ id: result.domain, type: "domain", name, tld, domain: result.domain, price: result.price ?? 12 });
+    addToCart({ id: result.domain, type: "domain", name, tld, domain: result.domain, price: result.price! });
     setAdded(true);
     setTimeout(() => router.push("/cart"), 600);
   };
@@ -105,13 +112,16 @@ function AvailableCard({ result, onReset }: { result: DomainCheckResult; onReset
           <div>
             <span className="text-xs font-black tracking-widest uppercase text-green-600">Available!</span>
             <p className="font-bold text-black text-base">{result.domain}</p>
+            <p className="text-sm font-semibold text-gray-700 mt-0.5">
+              {priceKnown ? `Register for $${result.price!.toFixed(2)}/year` : "Price unavailable right now"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
             <motion.button
             onClick={handleAddToCart}
-            disabled={added}
-            animate={!added ? { boxShadow: ["0 0 0 0 rgba(22,163,74,0)", "0 0 0 8px rgba(22,163,74,0.2)", "0 0 0 0 rgba(22,163,74,0)"] } : {}}
+            disabled={added || !priceKnown}
+            animate={!added && priceKnown ? { boxShadow: ["0 0 0 0 rgba(22,163,74,0)", "0 0 0 8px rgba(22,163,74,0.2)", "0 0 0 0 rgba(22,163,74,0)"] } : {}}
             transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
             className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-all duration-200 whitespace-nowrap cursor-pointer disabled:opacity-70 active:scale-95"
           >
@@ -120,6 +130,9 @@ function AvailableCard({ result, onReset }: { result: DomainCheckResult; onReset
         </div>
       </div>
       <div className="px-5 pb-3">
+        {!priceKnown && (
+          <p className="text-xs text-orange-600 font-medium mb-1.5">We couldn&apos;t confirm pricing for this domain — please try searching again.</p>
+        )}
         <button onClick={onReset} className="text-xs text-green-600 hover:text-green-800 font-medium transition-colors">
           ← Search again
         </button>

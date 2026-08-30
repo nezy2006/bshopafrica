@@ -39,12 +39,20 @@ function TikTokIcon() {
     </svg>
   );
 }
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M17.6 6.32A8.86 8.86 0 0 0 12.05 4a8.94 8.94 0 0 0-7.75 13.4L3 21l3.7-1.28a8.9 8.9 0 0 0 4.31 1.1h.02a8.94 8.94 0 0 0 8.93-8.9 8.86 8.86 0 0 0-2.36-6.3zM12.05 19.4h-.02a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.97.94-2.73-.18-.28a7.42 7.42 0 0 1 11.6-9.15 7.36 7.36 0 0 1 2.2 5.24 7.43 7.43 0 0 1-7.69 7.15zm4.08-5.56c-.22-.11-1.31-.65-1.51-.72-.2-.07-.35-.11-.5.11-.15.22-.57.72-.7.87-.13.15-.26.16-.48.05a6.06 6.06 0 0 1-1.79-1.1 6.72 6.72 0 0 1-1.24-1.54c-.13-.22 0-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.2-.68-1.65-.18-.43-.36-.37-.5-.38h-.43a.82.82 0 0 0-.6.28 2.5 2.5 0 0 0-.78 1.86c0 1.1.8 2.16.91 2.31.11.15 1.57 2.4 3.81 3.36.53.23.95.37 1.27.47.53.17 1.02.15 1.4.09.43-.06 1.31-.53 1.49-1.05.19-.51.19-.95.13-1.04-.06-.1-.2-.15-.42-.26z" />
+    </svg>
+  );
+}
 
 const SOCIALS = [
   { icon: <InstagramIcon />, href: "https://www.instagram.com/thebshopafrica/",        label: "Instagram" },
   { icon: <TwitterIcon />,   href: "https://x.com/thebshopafrica",                     label: "X / Twitter" },
   { icon: <LinkedinIcon />,  href: "https://rw.linkedin.com/company/the-bshop-africa", label: "LinkedIn" },
   { icon: <TikTokIcon />,    href: "https://www.tiktok.com/@b.shopafrica_",           label: "TikTok" },
+  { icon: <WhatsAppIcon />,  href: "https://wa.me/250724684369",                       label: "WhatsApp" },
 ];
 
 const FOOTER_LINKS = {
@@ -153,6 +161,8 @@ export default function Footer() {
                 <motion.a
                   key={s.label}
                   href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   aria-label={s.label}
                   whileHover={{ rotate: 360, scale: 1.2 }}
                   transition={{ duration: 0.4, ease: "easeInOut" }}

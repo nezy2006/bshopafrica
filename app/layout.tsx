@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SupportChat from "@/components/SupportChat";
 import ReferralCapture from "@/components/ReferralCapture";
+import ToastHost from "@/components/ToastHost";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://bshopafrica.com";
 
@@ -15,9 +16,12 @@ export const metadata: Metadata = {
     "Professional web hosting built for African businesses. Fast, reliable, and transparently priced. Register your domain and get online today.",
   keywords: "web hosting, domain registration, Africa, bshopafrica",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
     apple: "/favicon.png",
+    shortcut: "/favicon.ico",
   },
   openGraph: {
     title: "The B.Shop — Your Digital Story Starts Here",
@@ -33,6 +37,10 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#6B21A8",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -41,6 +49,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col">
         {children}
         <ReferralCapture />
+        <ToastHost />
         <SupportChat />
       </body>
     </html>

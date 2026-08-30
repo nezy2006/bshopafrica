@@ -1,4 +1,5 @@
 import { clearNotifications } from "./notifications";
+import { showToast } from "./toast";
 
 export const AUTH_KEYS = {
   clientId:     "bshop_client_id",
@@ -47,6 +48,25 @@ export function setAuth(clientId: number | string, firstname: string, lastname: 
 export function clearAuth(): void {
   if (typeof window === "undefined") return;
   Object.values(AUTH_KEYS).forEach(k => localStorage.removeItem(k));
+}
+
+let expiryHandled = false;
+
+/** Call when an API response indicates the session is invalid (401, or an
+ *  explicit "Session expired" error). Shows a toast, waits so the user can
+ *  actually read it, then clears auth and redirects to /login — instead of
+ *  yanking them straight to the login page or leaving a broken dashboard
+ *  behind mid-render. Guarded against firing more than once per page load,
+ *  since several in-flight requests can all 401 around the same time. */
+export function handleSessionExpiry(message = "Your session has expired. Please log in again."): void {
+  if (typeof window === "undefined" || expiryHandled) return;
+  expiryHandled = true;
+  showToast(message, { variant: "error", duration: 2000 });
+  setTimeout(() => {
+    clearAuth();
+    clearNotifications();
+    window.location.href = "/login";
+  }, 2000);
 }
 
 export function isLoggedIn(): boolean {

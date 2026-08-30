@@ -10,6 +10,7 @@ import {
   getOrCreateChatSession, appendChatMessages, escalateChatSession,
   newMessage, type ChatMessage, type ChatSession,
 } from "@/lib/chat-store";
+import { getAutoResponse } from "@/lib/chat-rules";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -241,19 +242,28 @@ export async function POST(req: NextRequest) {
       .slice(-HISTORY_LIMIT)
       .map(m => ({ role: toGroqRole(m.role), content: m.content }));
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...conversationHistory,
-        { role: "user", content: message },
-      ],
-      model: "llama3-70b-8192",
-      max_tokens: 500,
-      temperature: 0.7,
-    });
-
-    const reply = completion.choices[0]?.message?.content ||
-      "I'm having trouble responding right now. Please try again or open a support ticket.";
+    // If Groq is down, rate-limited, or the model changes out from under us,
+    // fall back to rule-based responses rather than surfacing an error —
+    // the client should never see "offline". The failure is logged
+    // server-side only.
+    let reply: string;
+    try {
+      const completion = await groq.chat.completions.create({
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...conversationHistory,
+          { role: "user", content: message },
+        ],
+        model: "llama3-70b-8192",
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+      reply = completion.choices[0]?.message?.content ||
+        "I'm having trouble responding right now. Please try again or open a support ticket.";
+    } catch (groqErr) {
+      console.error("[/api/support-chat] Groq call failed, using rule-based fallback:", groqErr instanceof Error ? groqErr.message : groqErr);
+      reply = getAutoResponse(message);
+    }
 
     const shouldEscalate = reply.includes("[ESCALATE:");
     const escalationReason = shouldEscalate

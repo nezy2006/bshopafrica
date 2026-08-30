@@ -181,6 +181,12 @@ export async function POST(req: NextRequest) {
           const reg = await registerClient(params as Record<string, string>);
           const sessionToken = createSession(reg.clientId, s("email"));
           data = { ...reg, sessionToken };
+          // Admin notification — best-effort, never blocks signup.
+          void sendSmtpMail(
+            "admin@bshopafrica.com",
+            `New Client Signup - ${s("firstname")} ${s("lastname")}`,
+            `A new client has signed up on bshopafrica.com\n\nName: ${s("firstname")} ${s("lastname")}\nEmail: ${s("email")}\nDate: ${new Date().toLocaleString()}\nIP: ${getClientIp(req)}\n\nView client profile:\nhttps://bshopafrica.com/admin/clients\n\nThe B.Shop Africa System`
+          ).catch(e => console.error("[registerClient] admin notification email failed", e));
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Registration failed.";
           console.error("[registerClient]", msg);
@@ -278,8 +284,33 @@ export async function POST(req: NextRequest) {
       case "openTicket": {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;
-        data = await openTicket({ clientId: session.clientId, subject: s("subject"), message: s("message"), deptId: n("deptId", 1), priority: s("priority", "Medium"), name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined, attachmentUrls: params.attachmentUrls as string[] | undefined });
-        void pushAdminNotification("new_ticket", `New ticket: ${s("subject")}`, `From ${session.email}`, `/admin/tickets/${(data as { ticketId: number }).ticketId}`);
+        const subject  = s("subject");
+        const priority = s("priority", "Medium");
+        const result = await openTicket({ clientId: session.clientId, subject, message: s("message"), deptId: n("deptId", 1), priority, name: params.name ? s("name") : undefined, email: params.email ? s("email") : undefined, attachmentUrls: params.attachmentUrls as string[] | undefined });
+        data = result;
+        void pushAdminNotification("new_ticket", `New ticket: ${subject}`, `From ${session.email}`, `/admin/tickets/${result.ticketId}`);
+        // Auto-reply confirming receipt — best-effort, never blocks ticket creation.
+        void (async () => {
+          try {
+            const client = await getClientDetails(session.clientId).catch(() => null);
+            const clientName = client?.firstname || "there";
+            const text = `Hi ${clientName},\n\nThank you for contacting B.Shop Africa support.\n\nYour support request has been received successfully.\n\nTicket ID: #${result.ticketId}\nSubject: ${subject}\nPriority: ${priority}\nDepartment: Technical Support\n\nOur team will respond within 24 hours during business hours (Monday to Friday, 8am to 6pm CAT).\n\nYou can view your ticket and our reply at:\nhttps://bshopafrica.com/dashboard\n\nIf your issue is urgent, please reply to this email or contact us on WhatsApp: +250724684369.\n\nThe B.Shop Africa Team\nadmin@bshopafrica.com | bshopafrica.com`;
+            const html = `<p>Hi ${clientName},</p>
+<p>Thank you for contacting B.Shop Africa support.</p>
+<p>Your support request has been received successfully.</p>
+<ul>
+<li><strong>Ticket ID:</strong> #${result.ticketId}</li>
+<li><strong>Subject:</strong> ${subject}</li>
+<li><strong>Priority:</strong> ${priority}</li>
+<li><strong>Department:</strong> Technical Support</li>
+</ul>
+<p>Our team will respond within 24 hours during business hours (Monday to Friday, 8am to 6pm CAT).</p>
+<p>You can view your ticket and our reply at: <a href="https://bshopafrica.com/dashboard">https://bshopafrica.com/dashboard</a></p>
+<p>If your issue is urgent, please reply to this email or contact us on WhatsApp: +250724684369.</p>
+<p>The B.Shop Africa Team<br/>admin@bshopafrica.com | bshopafrica.com</p>`;
+            await sendSmtpMail(session.email, `Support Request Received - Ticket #${result.ticketId}`, text, html);
+          } catch (e) { console.error("[openTicket] auto-reply email failed", e); }
+        })();
         break;
       }
       case "addTicketReply": {

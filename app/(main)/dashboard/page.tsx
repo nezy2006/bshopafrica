@@ -10,7 +10,7 @@ import {
   getNotifications, markAllRead, markRead, startNotificationPolling, stopNotificationPolling,
   getUnreadCount, clearNotifications, type AppNotification,
 } from "@/lib/notifications";
-import { clearAuth, authHeaders, getSessionToken } from "@/lib/auth";
+import { clearAuth, authHeaders, getSessionToken, handleSessionExpiry } from "@/lib/auth";
 import { PaymentOptionCard, PayPalWordmark, MtnLogo, AirtelLogo } from "@/components/PaymentOptions";
 import { PayPalCheckoutButton } from "@/components/PayPalCheckoutButton";
 import { getPawapayFailureMessage } from "@/lib/pawapay-errors";
@@ -28,11 +28,11 @@ async function whmcs<T>(action: string, params: Record<string, unknown> = {}): P
   });
   // Sessions are server-side and short-lived (2h) — a 401 here means the
   // stored session token is missing/expired (including accounts that logged
-  // in before this session system existed), so force a clean re-login.
+  // in before this session system existed). Show the client a toast instead
+  // of yanking them to /login mid-render — handleSessionExpiry() handles the
+  // (deduped) toast + delayed clear + redirect.
   if (res.status === 401) {
-    clearAuth();
-    clearNotifications();
-    window.location.href = "/login";
+    handleSessionExpiry();
     throw new Error("Session expired");
   }
   const json = (await res.json()) as { success: boolean; data?: T; error?: string };
@@ -934,6 +934,16 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
                   )}
                   {!predictLoading && cleanPhone.length >= 9 && !predicted && <p className="text-xs text-red-500 mt-1.5">Operator not supported for this number.</p>}
                 </div>
+                {isMmValid && (
+                  <div className="bg-white/70 rounded-xl px-4 py-3 text-xs text-gray-600 space-y-1">
+                    <p className="font-semibold text-gray-700 mb-1.5">How to complete your payment:</p>
+                    <p>1. Enter your {method === "mtn" ? "MTN" : "Airtel"} Mobile Money PIN when prompted</p>
+                    <p>2. A USSD prompt will appear on your phone within 60 seconds</p>
+                    <p>3. Approve the payment on your phone</p>
+                    <p>4. Keep this page open until payment is confirmed</p>
+                    <p>5. Do NOT pay again if you already approved on your phone</p>
+                  </div>
+                )}
                 {mmError && <p className="text-sm text-red-600">{mmError}</p>}
                 <button onClick={payMobileMoney} disabled={!isMmValid}
                   className="w-full py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-40 hover:bg-[#581c87] transition-colors">
@@ -958,7 +968,10 @@ function PaymentModal({ invoiceId, amountUSD, clientEmail, description, period, 
                     : "Still processing… please wait"}
                 </p>
                 {countdown > 0 && countdown <= 90 && (
-                  <p className="text-xs text-amber-600 font-medium">No prompt yet? Check your phone for a USSD popup, or try again.</p>
+                  <p className="text-xs text-amber-600 font-medium">
+                    No prompt yet? Check your phone for a USSD popup, or try again.
+                    {method === "mtn" ? " Dial *182# to check pending requests." : " Dial *185# to check pending requests."}
+                  </p>
                 )}
                 {countdown <= 0 && (
                   <p className="text-xs text-amber-600 font-medium">

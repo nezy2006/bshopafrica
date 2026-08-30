@@ -15,6 +15,8 @@ export interface UnifiedTransaction {
   status:      string;
   reference:   string;
   invoiceId:   number | null;
+  phone:         string | null;
+  failureReason: string | null;
 }
 
 function providerToMethod(provider: string | null): UnifiedTransaction["method"] {
@@ -39,6 +41,7 @@ export async function GET(req: NextRequest) {
       id: `whmcs-${t.id}`, date: t.date, clientName: `${t.firstname} ${t.lastname}`.trim(),
       clientEmail: "", amountUSD: Number(t.amount) || 0, amountLocal: null, currency: "USD",
       method: "PayPal", status: "Completed", reference: t.transid, invoiceId: t.invoiceid || null,
+      phone: null, failureReason: null,
     }));
 
   const pawapayTxns: UnifiedTransaction[] = pawapay.map(t => ({
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
     clientEmail: t.client_email ?? "", amountUSD: Number(t.amount_usd) || 0,
     amountLocal: Number(t.amount_local) || 0, currency: t.currency,
     method: providerToMethod(t.provider), status: t.status, reference: t.deposit_id,
-    invoiceId: t.invoice_id,
+    invoiceId: t.invoice_id, phone: t.phone, failureReason: t.failure_reason,
   }));
 
   const merged = [...paypalTxns, ...pawapayTxns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

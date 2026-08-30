@@ -1,32 +1,28 @@
 "use client";
-import { Download, CreditCard } from "lucide-react";
+import { Download, CreditCard, AlertTriangle } from "lucide-react";
 
 import { useState, useEffect, useMemo } from "react";
-import { SearchBar, TableCard, THead, SkeletonRows, Badge, EmptyState } from "@/lib/admin-utils";
+import { SearchBar, TableCard, THead, SkeletonRows, Badge, EmptyState, Tabs } from "@/lib/admin-utils";
 import { adminHeaders } from "@/lib/admin-auth-client";
 import type { UnifiedTransaction } from "@/app/api/admin/transactions/route";
 
 const METHODS = ["", "PayPal", "MTN Mobile Money", "Airtel Money"];
+const FAILED_STATUSES = new Set(["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"]);
+const isFailed = (t: UnifiedTransaction) => FAILED_STATUSES.has(t.status.toUpperCase());
 
-export default function TransactionsPage() {
-  const [txns,    setTxns]    = useState<UnifiedTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+function downloadCsv(filename: string, header: string, rows: string[][]) {
+  const csv = [header, ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+  const a = document.createElement("a");
+  a.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+  a.download = filename;
+  a.click();
+}
+
+function AllTransactionsTab({ txns, loading }: { txns: UnifiedTransaction[]; loading: boolean }) {
   const [search,  setSearch]  = useState("");
   const [method,  setMethod]  = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo,   setDateTo]   = useState("");
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const res  = await fetch("/api/admin/transactions", { headers: adminHeaders() });
-        const json = await res.json() as { success: boolean; data?: UnifiedTransaction[] };
-        if (json.success && json.data) setTxns(json.data);
-      } catch { /* offline */ }
-      setLoading(false);
-    })();
-  }, []);
 
   const filtered = useMemo(() => {
     let f = txns;
@@ -37,15 +33,11 @@ export default function TransactionsPage() {
     return f;
   }, [txns, method, search, dateFrom, dateTo]);
 
-  const exportCsv = () => {
-    const header = "Date,Client,Email,Amount USD,Amount Local,Currency,Method,Status,Reference,Invoice ID";
-    const rows = filtered.map(t => [t.date, t.clientName, t.clientEmail, t.amountUSD, t.amountLocal ?? "", t.currency, t.method, t.status, t.reference, t.invoiceId ?? ""].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
-    const csv = [header, ...rows].join("\n");
-    const a = document.createElement("a");
-    a.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
-    a.download = "transactions.csv";
-    a.click();
-  };
+  const exportCsv = () => downloadCsv(
+    "transactions.csv",
+    "Date,Client,Email,Amount USD,Amount Local,Currency,Method,Status,Reference,Invoice ID",
+    filtered.map(t => [t.date, t.clientName, t.clientEmail, String(t.amountUSD), String(t.amountLocal ?? ""), t.currency, t.method, t.status, t.reference, String(t.invoiceId ?? "")]),
+  );
 
   return (
     <>
@@ -78,6 +70,73 @@ export default function TransactionsPage() {
           ))}
         </tbody>
       </TableCard>
+    </>
+  );
+}
+
+function FailedPaymentsTab({ txns, loading }: { txns: UnifiedTransaction[]; loading: boolean }) {
+  const failed = useMemo(() => txns.filter(isFailed), [txns]);
+
+  const exportCsv = () => downloadCsv(
+    "failed-payments.csv",
+    "Date,Client,Phone,Amount,Provider,Reason",
+    failed.map(t => [t.date, t.clientName || t.clientEmail, t.phone ?? "", `${t.currency} ${(t.amountLocal ?? t.amountUSD).toLocaleString()}`, t.method, t.failureReason ?? t.status]),
+  );
+
+  return (
+    <>
+      <div className="flex justify-end mb-4">
+        <button onClick={exportCsv} disabled={failed.length === 0} className="flex items-center gap-1.5 px-4 py-2.5 border-2 border-[#6B21A8] text-[#6B21A8] text-sm font-bold rounded-xl hover:bg-purple-50 transition-colors disabled:opacity-50">
+          <Download className="w-4 h-4" /> Export CSV
+        </button>
+      </div>
+      <TableCard>
+        <THead cols={["Date", "Client", "Phone", "Amount", "Provider", "Reason"]} />
+        <tbody>
+          {loading ? <SkeletonRows cols={6} /> : failed.length === 0 ? <EmptyState icon={<AlertTriangle className="w-5 h-5" />} message="No failed payments — nice." /> : failed.map(t => (
+            <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              <td className="px-5 py-3.5 text-gray-400 text-xs whitespace-nowrap">{new Date(t.date).toLocaleString()}</td>
+              <td className="px-5 py-3.5 font-medium text-black">{t.clientName || t.clientEmail || "—"}</td>
+              <td className="px-5 py-3.5 text-gray-600 whitespace-nowrap">{t.phone ?? "—"}</td>
+              <td className="px-5 py-3.5 font-bold text-black whitespace-nowrap">
+                {t.currency} {(t.amountLocal ?? t.amountUSD).toLocaleString()}
+              </td>
+              <td className="px-5 py-3.5 text-gray-600">{t.method}</td>
+              <td className="px-5 py-3.5 text-red-600 font-medium">{t.failureReason ?? t.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </TableCard>
+    </>
+  );
+}
+
+export default function TransactionsPage() {
+  const [txns,    setTxns]    = useState<UnifiedTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab,     setTab]     = useState("all");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res  = await fetch("/api/admin/transactions", { headers: adminHeaders() });
+        const json = await res.json() as { success: boolean; data?: UnifiedTransaction[] };
+        if (json.success && json.data) setTxns(json.data);
+      } catch { /* offline */ }
+      setLoading(false);
+    })();
+  }, []);
+
+  const failedCount = useMemo(() => txns.filter(isFailed).length, [txns]);
+
+  return (
+    <>
+      <Tabs
+        tabs={[{ id: "all", label: "All Transactions" }, { id: "failed", label: `Failed Payments${failedCount ? ` (${failedCount})` : ""}` }]}
+        active={tab} onChange={setTab}
+      />
+      {tab === "all" ? <AllTransactionsTab txns={txns} loading={loading} /> : <FailedPaymentsTab txns={txns} loading={loading} />}
     </>
   );
 }

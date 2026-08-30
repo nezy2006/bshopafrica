@@ -10,6 +10,7 @@ import {
   type CartWebsiteBuilder,
 } from "@/lib/cart";
 import { PaymentIconsRow } from "@/components/PaymentIcons";
+import { showToast } from "@/lib/toast";
 
 /* ─── Free domain search (shown when hosting in cart, no domain) ─────────── */
 function FreeDomainSearch({ onDomainAdded }: { onDomainAdded: () => void }) {
@@ -458,7 +459,15 @@ export default function CartPage() {
 
   useEffect(() => {
     setMounted(true);
-    setItems(getCart());
+    const restored = getCart();
+    setItems(restored);
+    // Cart is already localStorage-backed (lib/cart.ts) — this just surfaces
+    // that to a returning visitor once per browser session, not on every
+    // cart update within the same visit.
+    if (restored.length > 0 && !sessionStorage.getItem("bshop_cart_notice_shown")) {
+      sessionStorage.setItem("bshop_cart_notice_shown", "1");
+      showToast("You have items in your cart", { variant: "info" });
+    }
     const sync = () => setItems(getCart());
     window.addEventListener("bshop_cart_update", sync);
     return () => window.removeEventListener("bshop_cart_update", sync);
