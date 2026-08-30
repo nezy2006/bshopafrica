@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import SupportChat from "@/components/SupportChat";
+import ReferralCapture from "@/components/ReferralCapture";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://bshopafrica.com";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
     <html lang="en" className="antialiased">
       <body className="min-h-screen flex flex-col">
         {children}
+        <ReferralCapture />
         <SupportChat />
       </body>
     </html>

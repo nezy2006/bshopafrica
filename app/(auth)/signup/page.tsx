@@ -200,6 +200,7 @@ function SignupPageInner() {
   const searchParams = useSearchParams();
   const redirectTo   = searchParams.get("redirect") ?? "/dashboard";
   const planParam    = searchParams.get("plan") ?? "";
+  const refParam      = searchParams.get("ref") ?? searchParams.get("affid") ?? "";
 
   const [firstName,       setFirstName]       = useState("");
   const [lastName,        setLastName]        = useState("");
@@ -254,6 +255,20 @@ function SignupPageInner() {
         return;
       }
 
+      // Resolve a shared referral code (from the URL, or captured earlier by
+      // ReferralCapture if they landed elsewhere first) into the numeric WHMCS
+      // affiliate id AddClient's `affid` expects. A bad/stale code just means
+      // no attribution — it must never block signup.
+      let affid: string | undefined;
+      const ref = refParam || (typeof window !== "undefined" ? localStorage.getItem("bshop_ref_code") ?? "" : "");
+      if (ref) {
+        try {
+          const refRes  = await fetch("/api/whmcs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resolveReferralCode", params: { code: ref } }) });
+          const refJson = await refRes.json() as { success: boolean; data?: { affiliateId: number | null } };
+          if (refJson.data?.affiliateId) affid = String(refJson.data.affiliateId);
+        } catch { /* attribution is best-effort */ }
+      }
+
       // Proceed with registration
       const res = await fetch("/api/whmcs", {
         method:  "POST",
@@ -271,6 +286,7 @@ function SignupPageInner() {
             state:       "N/A",
             postcode:    "00000",
             country:     "RW",
+            ...(affid ? { affid } : {}),
           },
         }),
         signal: controller.signal,
@@ -290,6 +306,7 @@ function SignupPageInner() {
       // setAuth() (not raw localStorage writes) so any previous client's
       // cached notifications get cleared when a different client id logs in.
       setAuth(json.data.clientId, firstName, lastName, email, json.data.sessionToken);
+      try { localStorage.removeItem("bshop_ref_code"); } catch { /* best-effort cleanup */ }
 
       // If came from hosting page, add plan to cart
       if (planParam && HOSTING_PLANS[planParam]) {

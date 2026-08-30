@@ -22,12 +22,14 @@ import {
   registerDomain, transferDomainRecord, renewDomain, getDomainWhoisInfo,
   getEmailTemplates, getClientEmails,
   getAffiliateByClientId, activateAffiliate, getAffiliateTransactions, requestAffiliateWithdrawal,
+  getAdminAffiliates, getAllAffiliateCommissions, getAffiliateWithdrawalRequests, addTicketNote,
 } from "@/lib/whmcs";
 import { sendSmtpMail } from "@/lib/mailer";
 import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
 import { getTicketMetaBulk } from "@/lib/ticket-meta";
 import { pushAdminNotification } from "@/lib/admin-notifications";
+import { getOrCreateReferralCode, resolveReferralCode, getAffiliateOverridesMap, getReferralCodesMap, setAffiliateStatus, setAffiliateCommissionOverride } from "@/lib/affiliate-store";
 
 type Params = Record<string, unknown>;
 
@@ -848,6 +850,17 @@ export async function POST(req: NextRequest) {
         data = affiliate ? await getAffiliateTransactions(affiliate.affiliateId) : [];
         break;
       }
+      case "getAffiliateReferralCode": {
+        // firstname is resolved server-side (not trusted from params) since
+        // it's only used once, the first time a code is minted for this client.
+        const session = requireSession(req);
+        if (isUnauthorized(session)) return session;
+        const affiliate = await getAffiliateByClientId(session.clientId);
+        if (!affiliate) return NextResponse.json({ success: false, error: "Not an affiliate yet." }, { status: 400 });
+        const client = await getClientDetails(session.clientId);
+        data = { code: await getOrCreateReferralCode(session.clientId, affiliate.affiliateId, client.firstname) };
+        break;
+      }
       case "requestAffiliateWithdrawal": {
         const session = requireSession(req);
         if (isUnauthorized(session)) return session;
@@ -855,7 +868,111 @@ export async function POST(req: NextRequest) {
         if (!affiliate || affiliate.balance <= 0) {
           return NextResponse.json({ success: false, error: "No withdrawable balance." }, { status: 400 });
         }
-        data = await requestAffiliateWithdrawal(session.clientId, affiliate.affiliateId, affiliate.balance, s("name") || undefined, session.email);
+        const amount = Number(params.amount ?? affiliate.balance);
+        if (!(amount > 0) || amount > affiliate.balance) {
+          return NextResponse.json({ success: false, error: "Enter a valid amount up to your available balance." }, { status: 400 });
+        }
+        const paymentMethod  = s("paymentMethod", "Unspecified");
+        const paymentDetails = s("paymentDetails");
+        if (!paymentDetails) return NextResponse.json({ success: false, error: "Payment details are required." }, { status: 400 });
+        data = await requestAffiliateWithdrawal(session.clientId, affiliate.affiliateId, amount, paymentMethod, paymentDetails, s("name") || undefined, session.email);
+        break;
+      }
+
+      case "resolveReferralCode": {
+        // Public/unauthenticated — used by the signup page to turn a shared
+        // vanity code (or a raw numeric legacy link) into the WHMCS affiliate
+        // id AddClient's `affid` expects. Returns null rather than erroring
+        // for an unknown code so a bad/stale ref link never blocks signup.
+        data = { affiliateId: await resolveReferralCode(s("code")) };
+        break;
+      }
+
+      case "adminGetAffiliates": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        const [result, overrides, codes] = await Promise.all([
+          getAdminAffiliates(n("limitstart"), n("limitnum", 100)), getAffiliateOverridesMap(), getReferralCodesMap(),
+        ]);
+        data = {
+          total: result.total,
+          affiliates: result.affiliates.map(a => ({
+            ...a,
+            status: overrides.get(a.clientId)?.status ?? "active",
+            commissionRateOverride: overrides.get(a.clientId)?.commissionRateOverride ?? null,
+            tier: overrides.get(a.clientId)?.tier ?? null,
+            referralCode: codes.get(a.clientId) ?? null,
+          })),
+        };
+        break;
+      }
+      case "adminGetAffiliateCommissions": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAllAffiliateCommissions(n("limitnum", 500));
+        break;
+      }
+      case "adminGetAffiliateWithdrawals": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        data = await getAffiliateWithdrawalRequests();
+        break;
+      }
+      case "adminApproveAffiliateWithdrawal": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        const ticketId = n("ticketId");
+        await addTicketNote(ticketId, admin.name, `Withdrawal approved and marked paid by ${admin.name}.${params.note ? ` Note: ${s("note")}` : ""}`);
+        await closeTicket(ticketId);
+        await logAdminActivity(admin.id, "approve_affiliate_withdrawal", `ticketId=${ticketId}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminRejectAffiliateWithdrawal": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        const ticketId = n("ticketId");
+        await addTicketNote(ticketId, admin.name, `Withdrawal rejected by ${admin.name}.${params.reason ? ` Reason: ${s("reason")}` : ""}`);
+        await closeTicket(ticketId);
+        await logAdminActivity(admin.id, "reject_affiliate_withdrawal", `ticketId=${ticketId}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminSetAffiliateStatus": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId"), affiliateId = n("affiliateId");
+        const status = s("status") === "inactive" ? "inactive" : "active";
+        await setAffiliateStatus(clientId, affiliateId, status, admin.id);
+        await logAdminActivity(admin.id, "set_affiliate_status", `clientId=${clientId} status=${status}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminSetAffiliateCommissionOverride": {
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId"), affiliateId = n("affiliateId");
+        const rateRaw = params.rate;
+        const rate = rateRaw === null || rateRaw === undefined || rateRaw === "" ? null : Number(rateRaw);
+        if (rate !== null && !Number.isFinite(rate)) return NextResponse.json({ success: false, error: "Invalid commission rate" }, { status: 400 });
+        await setAffiliateCommissionOverride(clientId, affiliateId, rate, admin.id);
+        await logAdminActivity(admin.id, "set_affiliate_commission_override", `clientId=${clientId} rate=${rate}`, getAdminRequestIp(req));
+        data = { ok: true };
+        break;
+      }
+      case "adminAddAffiliateCommission": {
+        // Manual commission/credit for an offline referral — routed through
+        // WHMCS's real AddCredit action (same one adminAddCredit uses) so it
+        // actually lands in the client's account, not just our own records.
+        const admin = await requireAdmin(req, "affiliates");
+        if (isAdminUnauthorized(admin)) return admin;
+        const clientId = n("clientId");
+        const amount = Number(params.amount ?? 0);
+        if (!clientId || !(amount > 0)) return NextResponse.json({ success: false, error: "clientId and a positive amount are required" }, { status: 400 });
+        const description = s("description", "Manual affiliate commission (offline referral)");
+        await addClientCredit(clientId, amount, description);
+        await logAdminActivity(admin.id, "add_affiliate_commission", `clientId=${clientId} amount=${amount}`, getAdminRequestIp(req));
+        data = { ok: true };
         break;
       }
 

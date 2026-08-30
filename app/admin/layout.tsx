@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
   { id: "tickets",    label: "Support Tickets", href: "/admin/tickets",    icon: TicketIcon  },
   { id: "emails",     label: "Email Management", href: "/admin/emails",   icon: MailIcon    },
   { id: "reports",    label: "Reports & Analytics", href: "/admin/reports", icon: ChartIcon },
+  { id: "affiliates", label: "Affiliates",     href: "/admin/affiliates", icon: PercentIcon },
   { id: "blog",       label: "Blog",           href: "/admin/blog",       icon: EditIcon    },
   { id: "content",    label: "Content Management", href: "/admin/content", icon: LayoutIcon  },
   { id: "newsletter", label: "Newsletter",     href: "/admin/newsletter", icon: MegaphoneIcon },
@@ -81,6 +82,9 @@ function MegaphoneIcon({ cls = "w-4 h-4" }: { cls?: string }) {
 }
 function ActivityIcon({ cls = "w-4 h-4" }: { cls?: string }) {
   return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+}
+function PercentIcon({ cls = "w-4 h-4" }: { cls?: string }) {
+  return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
 }
 function MenuIcon() {
   return <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;

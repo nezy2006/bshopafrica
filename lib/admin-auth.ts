@@ -213,7 +213,7 @@ const ROLE_CATEGORY_ACCESS: Record<AdminRole, "*" | string[]> = {
   super_admin: "*",
   admin:       "*",
   support:     ["tickets", "clients"],
-  billing:     ["invoices", "reports", "stats", "quotes", "emails"],
+  billing:     ["invoices", "reports", "stats", "quotes", "emails", "affiliates"],
   sales:       ["orders", "clients", "domains", "products", "services"],
 };
 

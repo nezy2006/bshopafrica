@@ -1877,7 +1877,80 @@ function SupportSection({ client }: { client: ClientDetails }) {
 }
 
 /* ─── AFFILIATE ──────────────────────────────────────────────────────────── */
-function AffiliateSection({ client }: { client: ClientDetails }) {
+const PAYMENT_METHODS = ["MTN MoMo", "PayPal", "Bank Transfer"] as const;
+type PaymentMethod = typeof PAYMENT_METHODS[number];
+
+function WithdrawModal({ balance, onClose, onSubmitted }: { balance: number; onClose: () => void; onSubmitted: (msg: string) => void }) {
+  const [amount,   setAmount]   = useState(balance.toFixed(2));
+  const [method,   setMethod]   = useState<PaymentMethod>("MTN MoMo");
+  const [details,  setDetails]  = useState("");
+  const [busy,     setBusy]     = useState(false);
+  const [err,      setErr]      = useState("");
+
+  const detailsLabel = method === "PayPal" ? "PayPal Email" : method === "Bank Transfer" ? "Bank Account Details" : "MTN MoMo Phone Number";
+  const detailsPlaceholder = method === "PayPal" ? "you@example.com" : method === "Bank Transfer" ? "Bank name, account number, account name" : "+250 700 000 000";
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const amt = Number(amount);
+    if (!(amt > 0) || amt > balance) { setErr(`Enter an amount up to $${balance.toFixed(2)}.`); return; }
+    if (!details.trim()) { setErr("Payment details are required."); return; }
+    setBusy(true); setErr("");
+    try {
+      await whmcs("requestAffiliateWithdrawal", { amount: amt, paymentMethod: method, paymentDetails: details.trim() });
+      onSubmitted("Withdrawal request submitted! Our team will process it shortly.");
+      onClose();
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Failed to submit withdrawal request. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-900">Request Withdrawal</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><I.X /></button>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Amount to Withdraw (USD)</label>
+          <input type="number" min={0.01} max={balance} step="0.01" value={amount} onChange={e => setAmount(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white transition-all" />
+          <p className="text-xs text-gray-400 mt-1">${balance.toFixed(2)} available</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Payment Method</label>
+          <div className="grid grid-cols-3 gap-2">
+            {PAYMENT_METHODS.map(m => (
+              <button key={m} type="button" onClick={() => setMethod(m)}
+                className={`px-2 py-2.5 rounded-xl text-xs font-bold border-2 transition-colors ${method === m ? "border-[#6B21A8] bg-purple-50 text-[#6B21A8]" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">{detailsLabel}</label>
+          <input value={details} onChange={e => setDetails(e.target.value)} placeholder={detailsPlaceholder}
+            className="w-full px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-gray-50 text-sm text-black outline-none focus:border-[#6B21A8] focus:bg-white transition-all" />
+        </div>
+
+        {err && <p className="text-sm text-red-600">{err}</p>}
+
+        <button type="submit" disabled={busy} className="w-full py-3 bg-[#6B21A8] text-white font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
+          {busy ? "Submitting…" : "Submit Request"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AffiliateSection() {
   const [affiliate,    setAffiliate]    = useState<AffiliateDetails | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(false);
@@ -1885,8 +1958,10 @@ function AffiliateSection({ client }: { client: ClientDetails }) {
   const [activateErr,  setActivateErr]  = useState("");
   const [transactions, setTransactions] = useState<AffiliateTransaction[]>([]);
   const [txLoading,    setTxLoading]    = useState(false);
-  const [copied,       setCopied]       = useState(false);
-  const [withdrawing,  setWithdrawing]  = useState(false);
+  const [code,         setCode]         = useState("");
+  const [copiedCode,   setCopiedCode]   = useState(false);
+  const [copiedLink,   setCopiedLink]   = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawMsg,  setWithdrawMsg]  = useState("");
 
   const load = useCallback(async () => {
@@ -1905,6 +1980,9 @@ function AffiliateSection({ client }: { client: ClientDetails }) {
       .then(setTransactions)
       .catch(() => setTransactions([]))
       .finally(() => setTxLoading(false));
+    whmcs<{ code: string }>("getAffiliateReferralCode")
+      .then(r => setCode(r.code))
+      .catch(() => setCode(""));
   }, [affiliate?.affiliateId]);
 
   async function handleActivate() {
@@ -1918,29 +1996,17 @@ function AffiliateSection({ client }: { client: ClientDetails }) {
     }
   }
 
-  async function handleWithdraw() {
-    if (!affiliate || affiliate.balance <= 0) return;
-    setWithdrawing(true); setWithdrawMsg("");
-    try {
-      await whmcs("requestAffiliateWithdrawal", { name: `${client.firstname} ${client.lastname}`.trim() });
-      setWithdrawMsg("Withdrawal request submitted! Our team will process it shortly.");
-    } catch (err) {
-      setWithdrawMsg(err instanceof Error ? err.message : "Failed to submit withdrawal request. Please try again.");
-    } finally {
-      setWithdrawing(false);
-    }
+  const host = typeof window !== "undefined" ? window.location.host : "bshopafrica.com";
+  const shareUrl = `${host}/?ref=${code}`;
+  const whatsappMessage = `Hey! I'm using B.Shop Africa for web hosting and domains.\nSign up using my code ${code} and get started today!\n${shareUrl}`;
+
+  function copyCode() {
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => { setCopiedCode(true); setTimeout(() => setCopiedCode(false), 2000); }).catch(() => {});
   }
-
-  const referralLink = affiliate && typeof window !== "undefined"
-    ? `${window.location.origin}/signup?ref=${affiliate.affiliateId}`
-    : "";
-
   function copyLink() {
-    if (!referralLink) return;
-    navigator.clipboard.writeText(referralLink).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
+    if (!code) return;
+    navigator.clipboard.writeText(shareUrl).then(() => { setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000); }).catch(() => {});
   }
 
   if (error) return <ErrorState onRetry={load} />;
@@ -1965,18 +2031,33 @@ function AffiliateSection({ client }: { client: ClientDetails }) {
         </div>
       ) : (
         <>
-          {/* Referral link */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <h3 className="font-semibold text-gray-900 mb-3">Your Referral Link</h3>
-            <div className="flex items-center gap-2">
-              <input readOnly value={referralLink}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 outline-none" />
-              <button onClick={copyLink}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl hover:bg-[#581c87] transition-colors flex-shrink-0">
-                <I.Copy />{copied ? "Copied!" : "Copy"}
+          {/* Referral code + link */}
+          <div className="bg-gradient-to-br from-[#6B21A8] to-[#4c1d95] rounded-2xl p-6 text-white">
+            <p className="text-purple-200 text-xs font-bold uppercase tracking-wide mb-2">Your Referral Code</p>
+            <div className="flex items-center gap-3 flex-wrap mb-4">
+              <span className="text-3xl font-black tracking-wider">{code || "…"}</span>
+              <button onClick={copyCode} disabled={!code}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-xs font-bold transition-colors disabled:opacity-50">
+                {copiedCode ? <I.Check /> : <I.Copy />}{copiedCode ? "Copied!" : "Copy Code"}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Share this link — when someone signs up through it, they&apos;re credited to your account.</p>
+            <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2.5">
+              <span className="flex-1 text-sm text-purple-100 truncate">Share link: {shareUrl}</span>
+              <button onClick={copyLink} disabled={!code}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#6B21A8] rounded-lg text-xs font-bold hover:bg-purple-50 transition-colors disabled:opacity-50 flex-shrink-0">
+                {copiedLink ? <I.Check /> : <I.Copy />}{copiedLink ? "Copied!" : "Copy Link"}
+              </button>
+            </div>
+            <a
+              href={code ? `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}` : undefined}
+              target="_blank" rel="noopener noreferrer"
+              aria-disabled={!code}
+              className={`mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-[#25D366] text-white text-sm font-bold rounded-xl transition-opacity ${code ? "hover:opacity-90" : "opacity-50 pointer-events-none"}`}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17.6 6.32A8.86 8.86 0 0 0 12.05 4a8.94 8.94 0 0 0-7.75 13.4L3 21l3.7-1.28a8.9 8.9 0 0 0 4.31 1.1h.02a8.94 8.94 0 0 0 8.93-8.9 8.86 8.86 0 0 0-2.36-6.3zM12.05 19.4h-.02a7.4 7.4 0 0 1-3.78-1.04l-.27-.16-2.8.97.94-2.73-.18-.28a7.42 7.42 0 0 1 11.6-9.15 7.36 7.36 0 0 1 2.2 5.24 7.43 7.43 0 0 1-7.69 7.15zm4.08-5.56c-.22-.11-1.31-.65-1.51-.72-.2-.07-.35-.11-.5.11-.15.22-.57.72-.7.87-.13.15-.26.16-.48.05a6.06 6.06 0 0 1-1.79-1.1 6.72 6.72 0 0 1-1.24-1.54c-.13-.22 0-.34.1-.45.1-.1.22-.26.33-.39.11-.13.15-.22.22-.37.07-.15.04-.28-.02-.39-.06-.11-.5-1.2-.68-1.65-.18-.43-.36-.37-.5-.38h-.43a.82.82 0 0 0-.6.28 2.5 2.5 0 0 0-.78 1.86c0 1.1.8 2.16.91 2.31.11.15 1.57 2.4 3.81 3.36.53.23.95.37 1.27.47.53.17 1.02.15 1.4.09.43-.06 1.31-.53 1.49-1.05.19-.51.19-.95.13-1.04-.06-.1-.2-.15-.42-.26z"/></svg>
+              Share via WhatsApp
+            </a>
+            <p className="text-xs text-purple-200 mt-3">When someone signs up with your code, they&apos;re credited to your account.</p>
           </div>
 
           {/* Stats */}
@@ -1987,7 +2068,7 @@ function AffiliateSection({ client }: { client: ClientDetails }) {
               { label: "Total Earned", value: `$${affiliate.totalEarned.toFixed(2)}`, icon: <I.Wallet />,       color: "text-green-600",  bg: "bg-green-50" },
               { label: "Balance",      value: `$${affiliate.balance.toFixed(2)}`,     icon: <I.Wallet />,       color: "text-orange-600", bg: "bg-orange-50" },
             ].map(stat => (
-              <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-5">
+              <div key={stat.label} className="bg-white rounded-2xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
                 <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-3`}>{stat.icon}</div>
                 <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                 <p className="text-sm text-gray-500 mt-0.5">{stat.label}</p>
@@ -2002,13 +2083,17 @@ function AffiliateSection({ client }: { client: ClientDetails }) {
                 <h3 className="font-semibold text-gray-900">Commission Balance</h3>
                 <p className="text-sm text-gray-500 mt-0.5">${affiliate.balance.toFixed(2)} available to withdraw</p>
               </div>
-              <button onClick={handleWithdraw} disabled={withdrawing || affiliate.balance <= 0}
+              <button onClick={() => setShowWithdraw(true)} disabled={affiliate.balance <= 0}
                 className="px-5 py-2.5 bg-[#6B21A8] text-white text-sm font-semibold rounded-xl disabled:opacity-50 hover:bg-[#581c87] transition-colors">
-                {withdrawing ? "Submitting…" : "Request Withdrawal"}
+                Request Withdrawal
               </button>
             </div>
             {withdrawMsg && <p className="text-sm text-gray-600 mt-3">{withdrawMsg}</p>}
           </div>
+
+          {showWithdraw && (
+            <WithdrawModal balance={affiliate.balance} onClose={() => setShowWithdraw(false)} onSubmitted={setWithdrawMsg} />
+          )}
 
           {/* Transaction / withdrawal history */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -2629,7 +2714,7 @@ function DashboardInner() {
               {section === "orders"        && <OrdersSection clientId={client.id} />}
               {section === "invoices"      && <InvoicesSection clientId={client.id} />}
               {section === "support"       && <SupportSection client={client} />}
-              {section === "affiliate"     && <AffiliateSection client={client} />}
+              {section === "affiliate"     && <AffiliateSection />}
               {section === "notifications" && <NotificationsSection onNavigate={setSection} />}
               {section === "settings"      && <AccountSettingsSection client={client} />}
             </motion.div>

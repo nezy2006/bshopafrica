@@ -1347,11 +1347,14 @@ export interface AffiliateDetails {
   affiliateId:   number;
   clientId:      number;
   balance:       number; // unpaid commission available to withdraw
+  withdrawn:     number; // lifetime commission already paid out
   totalEarned:   number; // lifetime commission earned (paid + unpaid)
   visitors:      number;
   signups:       number;
   campaigns:     number;
   datejoined:    string;
+  payType:       string; // WHMCS's per-affiliate commission type, e.g. "Percentage" / "Fixed Amount"
+  payAmount:     number; // the rate/amount for payType, as configured in WHMCS
 }
 
 // Confirmed against WHMCS's documented GetAffiliates response (developers.whmcs.com/api-reference/getaffiliates):
@@ -1365,11 +1368,14 @@ function parseAffiliateRow(row: WhmcsRaw, clientId: number): AffiliateDetails {
     affiliateId: Number(row.id ?? row.affiliateid ?? 0),
     clientId,
     balance,
+    withdrawn,
     totalEarned: balance + withdrawn,
     visitors:    Number(row.visitors ?? row.clicks ?? 0),
     signups:     Number(row.signups ?? row.referrals ?? 0),
     campaigns:   Number(row.campaigns ?? 0),
     datejoined:  String(row.date ?? row.datejoined ?? ""),
+    payType:     String(row.paytype ?? ""),
+    payAmount:   Number(row.payamount ?? 0),
   };
 }
 
@@ -1435,15 +1441,127 @@ export async function getAffiliateTransactions(affiliateId: number): Promise<Aff
 /** Submits a withdrawal request as an admin ticket in the Billing department
  *  — WHMCS's stock API has no dedicated affiliate-payout-request action, so
  *  this routes the request to a human the same way any other billing request
- *  would go, tagging the affiliate ID for easy lookup. */
-export async function requestAffiliateWithdrawal(clientId: number, affiliateId: number, balance: number, name?: string, email?: string): Promise<{ ticketId: number; tid: string }> {
+ *  would go, tagging the affiliate ID and payout details for easy lookup.
+ *  The admin Affiliates page parses these fields back out of the message. */
+export async function requestAffiliateWithdrawal(
+  clientId: number, affiliateId: number, amount: number,
+  paymentMethod: string, paymentDetails: string, name?: string, email?: string
+): Promise<{ ticketId: number; tid: string }> {
   return openTicket({
     clientId,
     subject: "Affiliate Withdrawal Request",
-    message: `Requesting withdrawal of affiliate commission balance.\n\nAffiliate ID: ${affiliateId}\nRequested amount: $${balance.toFixed(2)}`,
+    message: `Requesting withdrawal of affiliate commission balance.\n\nAffiliate ID: ${affiliateId}\nRequested amount: $${amount.toFixed(2)}\nPayment Method: ${paymentMethod}\nPayment Details: ${paymentDetails}`,
     deptId:  2,
     priority: "Medium",
     name,
     email,
   });
+}
+
+/* ─── Admin: affiliate management ─────────────────────────────────────────
+ * These read across ALL affiliates (not just one client), for the admin
+ * Affiliates page. GetAffiliates has no clientid filter, so this pages through
+ * the full list and enriches each row with the referring client's name/email
+ * (one GetClientsDetails call per affiliate — fine at admin-panel scale). */
+export interface AdminAffiliate extends AffiliateDetails {
+  firstname: string;
+  lastname:  string;
+  email:     string;
+}
+
+export async function getAdminAffiliates(limitstart = 0, limitnum = 100): Promise<{ affiliates: AdminAffiliate[]; total: number }> {
+  try {
+    const data = await callWhmcs("GetAffiliates", { limitstart, limitnum });
+    const raw  = (data.affiliates as { affiliate: WhmcsRaw | WhmcsRaw[] } | undefined)?.affiliate ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    const affiliates = await Promise.all(list.map(async row => {
+      const clientId = Number(row.clientid ?? row.userid ?? 0);
+      const base = parseAffiliateRow(row, clientId);
+      const client = await getClientDetails(clientId).catch(() => null);
+      return { ...base, firstname: client?.firstname ?? "", lastname: client?.lastname ?? "", email: client?.email ?? "" };
+    }));
+    return { affiliates, total: Number(data.totalresults ?? affiliates.length) };
+  } catch (e) {
+    console.error("[whmcs.getAdminAffiliates]", e);
+    return { affiliates: [], total: 0 };
+  }
+}
+
+export interface AffiliateCommissionRow {
+  id:          number;
+  date:        string;
+  affiliateId: number; // 0 when the transaction description didn't name an affiliate # explicitly
+  description: string;
+  amount:      number;
+}
+
+/** All affiliate-tagged rows from WHMCS's general transactions ledger (same
+ *  GetTransactions source as getAffiliateTransactions, but unfiltered by
+ *  affiliate so the admin Commissions tab can show every affiliate at once). */
+export async function getAllAffiliateCommissions(limitnum = 500): Promise<AffiliateCommissionRow[]> {
+  try {
+    const data = await callWhmcs("GetTransactions", { limitnum });
+    const raw  = (data.transactions as { transaction: WhmcsRaw | WhmcsRaw[] } | undefined)?.transaction ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list
+      .filter(t => /affiliate/i.test(String(t.description ?? "")))
+      .map(t => {
+        const description = String(t.description ?? "");
+        const match = description.match(/affiliate\s*#\s*(\d+)/i);
+        return {
+          id:          Number(t.id ?? 0),
+          date:        String(t.date ?? ""),
+          affiliateId: match ? Number(match[1]) : 0,
+          description,
+          amount:      Number(t.amountin ?? t.amount ?? 0) - Number(t.amountout ?? 0),
+        };
+      });
+  } catch (e) {
+    console.error("[whmcs.getAllAffiliateCommissions]", e);
+    return [];
+  }
+}
+
+export interface AffiliateWithdrawalRequest {
+  ticketId:      number;
+  tid:           string;
+  clientId:      number;
+  firstname:     string;
+  lastname:      string;
+  affiliateId:   number;
+  amount:        number;
+  paymentMethod: string;
+  paymentDetails: string;
+  date:          string;
+  status:        string;
+}
+
+/** Reads pending affiliate payout requests back out of the Billing-department
+ *  tickets requestAffiliateWithdrawal() files — see that function's comment
+ *  for why a ticket (not a dedicated API) is the source of truth here. */
+export async function getAffiliateWithdrawalRequests(): Promise<AffiliateWithdrawalRequest[]> {
+  try {
+    const { tickets } = await getAdminTickets("", 0, 200, 2);
+    const matches = tickets.filter(t => t.title.toLowerCase().includes("affiliate withdrawal"));
+    return await Promise.all(matches.map(async t => {
+      const full = await getTicket(t.id).catch(() => null);
+      const body = full?.replies?.[0]?.message ?? "";
+      const affId    = body.match(/Affiliate ID:\s*(\d+)/i);
+      const amount   = body.match(/Requested amount:\s*\$?([\d.]+)/i);
+      const method   = body.match(/Payment Method:\s*([^\n]+)/i);
+      const details  = body.match(/Payment Details:\s*([^\n]+)/i);
+      return {
+        ticketId: t.id, tid: t.tid, clientId: full?.userid ?? 0,
+        firstname: t.firstname, lastname: t.lastname,
+        affiliateId: affId ? Number(affId[1]) : 0,
+        amount: amount ? Number(amount[1]) : 0,
+        paymentMethod: method ? method[1].trim() : "Unspecified",
+        paymentDetails: details ? details[1].trim() : "",
+        date: t.date, status: t.status,
+      };
+    }));
+  } catch (e) {
+    console.error("[whmcs.getAffiliateWithdrawalRequests]", e);
+    return [];
+  }
 }
