@@ -445,16 +445,25 @@ function StepPayment({ cart }: { cart: Cart }) {
   const [refStatus,     setRefStatus]     = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const [refName,       setRefName]       = useState("");
   const [refAffid,      setRefAffid]      = useState<number | null>(null);
+  const [refError,      setRefError]      = useState("");
 
   const checkReferralCode = useCallback(async (code: string) => {
     const trimmed = code.trim();
-    if (!trimmed) { setRefStatus("idle"); setRefAffid(null); return; }
-    setRefStatus("checking");
+    if (!trimmed) { setRefStatus("idle"); setRefAffid(null); setRefError(""); return; }
+    setRefStatus("checking"); setRefError("");
     try {
-      const res  = await fetch(`/api/affiliate/validate?code=${encodeURIComponent(trimmed)}`);
-      const json = await res.json() as { valid: boolean; affiliateName?: string; affid?: number };
-      if (json.valid && json.affid) { setRefStatus("valid"); setRefName(json.affiliateName ?? ""); setRefAffid(json.affid); }
-      else { setRefStatus("invalid"); setRefAffid(null); }
+      const clientId = typeof window !== "undefined" ? localStorage.getItem("bshop_client_id") : null;
+      const url = `/api/affiliate/validate?code=${encodeURIComponent(trimmed)}${clientId ? `&clientId=${clientId}` : ""}`;
+      const res  = await fetch(url);
+      const json = await res.json() as { valid: boolean; affiliateName?: string; affid?: number; error?: string };
+      if (json.valid && json.affid) {
+        setRefStatus("valid"); setRefName(json.affiliateName ?? ""); setRefAffid(json.affid);
+      } else if (json.error) {
+        // Self-referral — reject and clear the field rather than just marking it invalid.
+        setRefStatus("invalid"); setRefAffid(null); setRefError(json.error); setRefCode("");
+      } else {
+        setRefStatus("invalid"); setRefAffid(null);
+      }
     } catch { setRefStatus("invalid"); setRefAffid(null); }
   }, []);
 
@@ -1015,7 +1024,7 @@ function StepPayment({ cart }: { cart: Cart }) {
               </div>
               <input
                 type="text" value={refCode}
-                onChange={e => { setRefCode(e.target.value.toUpperCase()); setRefStatus("idle"); setRefPrefilled(false); }}
+                onChange={e => { setRefCode(e.target.value.toUpperCase()); setRefStatus("idle"); setRefError(""); setRefPrefilled(false); }}
                 onBlur={e => checkReferralCode(e.target.value)}
                 className={`${INPUT} text-sm uppercase tracking-widest`}
               />
@@ -1025,7 +1034,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                   ✓ Referral code {refCode.trim()} applied{refName ? ` — you are being referred by ${refName}` : ""}
                 </p>
               )}
-              {refStatus === "invalid" && <p className="mt-1.5 text-xs text-red-500 font-medium">Invalid referral code</p>}
+              {refStatus === "invalid" && <p className="mt-1.5 text-xs text-red-500 font-medium">{refError || "Invalid referral code"}</p>}
             </div>
           )}
 

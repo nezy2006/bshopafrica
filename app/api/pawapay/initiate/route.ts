@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { depositStore, cleanupDeposits } from "@/lib/pawapay-store";
 import { config } from "@/lib/config";
+import { getAffiliateById } from "@/lib/whmcs";
 
 const BASE_URL =
   config.pawapayEnvironment === "production"
@@ -74,11 +75,23 @@ export async function POST(req: NextRequest) {
     invoiceAmount,
     discountAmount,
     promoCode,
-    affid,
   } = body;
   const currency  = body.currency ?? "RWF";
   const depositId = randomUUID();
   const orderId   = randomUUID();
+
+  // Same server-side re-check as /api/checkout/create-order: the checkout
+  // page's client-side validation is only a UX nicety, since affid arrives
+  // here as a raw number. Silently drop a self-referral instead of failing
+  // the deposit — no commission, not a blocked payment.
+  let affid = body.affid || undefined;
+  if (affid && clientId) {
+    const affiliate = await getAffiliateById(affid).catch(() => null);
+    if (affiliate && affiliate.clientId === Number(clientId)) {
+      console.warn("[pawapay/initiate] dropped self-referral affid", { clientId, affid });
+      affid = undefined;
+    }
+  }
 
   // Validate phone and get canonical provider via predict-provider
   const intlPhone = toInternational(phone);
