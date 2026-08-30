@@ -1106,9 +1106,11 @@ export async function createOrderWithGateway(
   cartItems: CartItemLike[],
   gateway:   string,
   promoCode?: string,
+  affid?:     number,
 ): Promise<PawapayOrderResult> {
   const baseParams: Record<string, string | number> = { clientid: clientId, paymentmethod: gateway };
   if (promoCode) baseParams.promocode = promoCode;
+  if (affid) baseParams.affid = affid;
 
   const domain   = cartItems.find(i => i.type === "domain");
   const hosting  = cartItems.find(i => i.type === "hosting");
@@ -1193,12 +1195,12 @@ export async function createOrderWithGateway(
   return { orderId, invoiceId, allOrderIds };
 }
 
-export async function createPawapayOrder(clientId: number, cartItems: CartItemLike[]): Promise<PawapayOrderResult> {
-  return createOrderWithGateway(clientId, cartItems, WHMCS_PAWAPAY_GATEWAY);
+export async function createPawapayOrder(clientId: number, cartItems: CartItemLike[], affid?: number): Promise<PawapayOrderResult> {
+  return createOrderWithGateway(clientId, cartItems, WHMCS_PAWAPAY_GATEWAY, undefined, affid);
 }
 
-export async function createPaypalOrder(clientId: number, cartItems: CartItemLike[], promoCode?: string): Promise<PawapayOrderResult> {
-  return createOrderWithGateway(clientId, cartItems, WHMCS_PAYPAL_GATEWAY, promoCode);
+export async function createPaypalOrder(clientId: number, cartItems: CartItemLike[], promoCode?: string, affid?: number): Promise<PawapayOrderResult> {
+  return createOrderWithGateway(clientId, cartItems, WHMCS_PAYPAL_GATEWAY, promoCode, affid);
 }
 
 /* ─── Invoice lookup ─────────────────────────────────────────────────────── */
@@ -1456,6 +1458,28 @@ export async function requestAffiliateWithdrawal(
     name,
     email,
   });
+}
+
+export interface AffiliateLookup { affiliateId: number; clientId: number; firstname: string; lastname: string; }
+
+/** Looks up a single affiliate by their numeric WHMCS id, for the public
+ *  referral-code validation endpoint (checkout/signup show the referrer's
+ *  first name). GetAffiliates has no id filter, so this pages through the
+ *  full list and matches client-side — same tradeoff as getAffiliateByClientId. */
+export async function getAffiliateById(affiliateId: number): Promise<AffiliateLookup | null> {
+  try {
+    const data = await callWhmcs("GetAffiliates", { limitnum: 1000 });
+    const raw  = (data.affiliates as { affiliate: WhmcsRaw | WhmcsRaw[] } | undefined)?.affiliate ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    const match = list.find(a => Number(a.id ?? a.affiliateid ?? 0) === affiliateId);
+    if (!match) return null;
+    const clientId = Number(match.clientid ?? match.userid ?? 0);
+    const client = await getClientDetails(clientId).catch(() => null);
+    return { affiliateId, clientId, firstname: client?.firstname ?? "", lastname: client?.lastname ?? "" };
+  } catch (e) {
+    console.error("[whmcs.getAffiliateById]", e);
+    return null;
+  }
 }
 
 /* ─── Admin: affiliate management ─────────────────────────────────────────

@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
       const { orderId, invoiceId, allOrderIds } = await createPawapayOrder(
         clientId,
         stored.cartItems as { type: string; [k: string]: unknown }[],
+        stored.affid,
       );
       console.log("[pawapay/callback] order created", { orderId, invoiceId, allOrderIds });
       void pushAdminNotification("new_order", `New order #${orderId}`, `Invoice #${invoiceId} — paid via mobile money`, "/admin/orders");

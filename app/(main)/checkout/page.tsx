@@ -438,6 +438,36 @@ function StepPayment({ cart }: { cart: Cart }) {
     type: "percentage", value: 0, discount: 0, message: "", error: "",
   });
 
+  // Referral code
+  const [refCode,       setRefCode]       = useState("");
+  const [refPrefilled,  setRefPrefilled]  = useState(false);
+  const [refStatus,     setRefStatus]     = useState<"idle" | "checking" | "valid" | "invalid">("idle");
+  const [refName,       setRefName]       = useState("");
+  const [refAffid,      setRefAffid]      = useState<number | null>(null);
+
+  const checkReferralCode = useCallback(async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) { setRefStatus("idle"); setRefAffid(null); return; }
+    setRefStatus("checking");
+    try {
+      const res  = await fetch(`/api/affiliate/validate?code=${encodeURIComponent(trimmed)}`);
+      const json = await res.json() as { valid: boolean; affiliateName?: string; affid?: number };
+      if (json.valid && json.affid) { setRefStatus("valid"); setRefName(json.affiliateName ?? ""); setRefAffid(json.affid); }
+      else { setRefStatus("invalid"); setRefAffid(null); }
+    } catch { setRefStatus("invalid"); setRefAffid(null); }
+  }, []);
+
+  // A referral code captured earlier (from a shared ?ref= link, or typed at
+  // signup) is handed off via localStorage — pick it up and pre-fill so it
+  // carries through to this order too, same as the coupon handoff below.
+  useEffect(() => {
+    const captured = localStorage.getItem("bshop_ref_code");
+    if (!captured) return;
+    setRefCode(captured);
+    setRefPrefilled(true);
+    checkReferralCode(captured);
+  }, [checkReferralCode]);
+
   // Totals
   const hasBundle  = !!(cart.domain && cart.hosting);
   const bundleDisc = hasBundle ? (cart.domain?.price ?? 0) : 0;
@@ -511,6 +541,7 @@ function StepPayment({ cart }: { cart: Cart }) {
           setMmStep("success");
           setTimeout(() => {
             clearCart();
+            localStorage.removeItem("bshop_ref_code");
             router.push("/checkout/complete?method=pawapay");
           }, 1500);
         } else if (["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"].includes(json.status)) {
@@ -601,7 +632,7 @@ function StepPayment({ cart }: { cart: Cart }) {
       if (json.success && json.status === "COMPLETED") {
         setMmError("");
         setMmStep("success");
-        setTimeout(() => { clearCart(); router.push("/checkout/complete?method=pawapay"); }, 1500);
+        setTimeout(() => { clearCart(); localStorage.removeItem("bshop_ref_code"); router.push("/checkout/complete?method=pawapay"); }, 1500);
         return;
       }
     } catch { /* couldn't confirm — fall through and let the user retry */ }
@@ -654,6 +685,7 @@ function StepPayment({ cart }: { cart: Cart }) {
           cartItems,
           totalUSD:    usdTotal,
           totalRWF:    rwfTotal,
+          affid:       refAffid ?? undefined,
         }),
       });
       const json = (await res.json()) as { success: boolean; depositId?: string; error?: string };
@@ -681,7 +713,7 @@ function StepPayment({ cart }: { cart: Cart }) {
       const res  = await fetch("/api/checkout/create-order", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body:    JSON.stringify({ clientId: Number(clientId), cartItems, promoCode: coupon.applied ? coupon.code : undefined }),
+        body:    JSON.stringify({ clientId: Number(clientId), cartItems, promoCode: coupon.applied ? coupon.code : undefined, affid: refAffid ?? undefined }),
       });
       const json = await res.json() as { success: boolean; invoiceId?: number; orderId?: number; allOrderIds?: number[]; error?: string };
       console.log("[Checkout][PayPal/Card] create-order response:", json);
@@ -954,6 +986,30 @@ function StepPayment({ cart }: { cart: Cart }) {
             </div>
           )}
 
+          {/* ── Referral code ── */}
+          {!inMmFlow && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-sm font-semibold text-gray-700">Referral Code (optional)</p>
+                {refPrefilled && <span className="text-[10px] font-bold uppercase tracking-wide text-[#6B21A8] bg-purple-50 px-2 py-0.5 rounded-full">From your link</span>}
+              </div>
+              <input
+                type="text" value={refCode}
+                onChange={e => { setRefCode(e.target.value.toUpperCase()); setRefStatus("idle"); setRefPrefilled(false); }}
+                onBlur={e => checkReferralCode(e.target.value)}
+                placeholder="e.g. NELSON10"
+                className={`${INPUT} text-sm uppercase tracking-widest`}
+              />
+              {refStatus === "checking" && <p className="mt-1.5 text-xs text-gray-400">Checking code…</p>}
+              {refStatus === "valid" && (
+                <p className="mt-1.5 text-xs text-green-600 font-semibold flex items-center gap-1">
+                  ✓ Referral code {refCode.trim()} applied{refName ? ` — you are being referred by ${refName}` : ""}
+                </p>
+              )}
+              {refStatus === "invalid" && <p className="mt-1.5 text-xs text-red-500 font-medium">Invalid referral code</p>}
+            </div>
+          )}
+
           {/* ── Terms ── */}
           {!inMmFlow && (
             <label className="flex items-start gap-3 cursor-pointer group">
@@ -1006,6 +1062,7 @@ function StepPayment({ cart }: { cart: Cart }) {
                   onSuccess={() => {
                     setPaypalPaid(true);
                     clearCart();
+                    localStorage.removeItem("bshop_ref_code");
                     setTimeout(() => router.push(`/checkout/complete?method=paypal&invoiceId=${paypalOrder.invoiceId}`), 1200);
                   }}
                   onError={(msg) => setError(msg)}

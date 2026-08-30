@@ -16,6 +16,7 @@ export interface DepositRecord {
                              // fully paid and the service actually renews instead of sitting partially paid
   discountAmount?: number;  // promo discount applied at checkout, informational + gates the invoiceAmount override
   promoCode?:    string;    // promo code applied, for audit/transaction records
+  affid?:        number;    // referring affiliate's numeric WHMCS id, passed to AddOrder on order creation
   createdAt:     number;    // Date.now()
   status?:       string;    // set by the callback route on terminal failure, for debugging/audit
   failureReason?: string;   // PawaPay failureCode (e.g. NOT_ENOUGH_FUNDS) — status/route.ts reads this live from PawaPay instead, this is a secondary record

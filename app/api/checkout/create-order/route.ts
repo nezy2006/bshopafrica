@@ -4,19 +4,20 @@ import { pushAdminNotification } from "@/lib/admin-notifications";
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientId, cartItems, promoCode } = await req.json() as {
+    const { clientId, cartItems, promoCode, affid } = await req.json() as {
       clientId:  number;
       cartItems: { type: string; [k: string]: unknown }[];
       promoCode?: string;
+      affid?:    number;
     };
 
-    console.log("[checkout/create-order] request:", { clientId, cartItems, promoCode });
+    console.log("[checkout/create-order] request:", { clientId, cartItems, promoCode, affid });
 
     if (!clientId || !Array.isArray(cartItems) || cartItems.length === 0) {
       return NextResponse.json({ success: false, error: "Invalid request" }, { status: 400 });
     }
 
-    const { orderId, invoiceId, allOrderIds } = await createPaypalOrder(clientId, cartItems, promoCode || undefined);
+    const { orderId, invoiceId, allOrderIds } = await createPaypalOrder(clientId, cartItems, promoCode || undefined, affid || undefined);
     console.log("[checkout/create-order] WHMCS order created:", { orderId, invoiceId, allOrderIds });
 
     if (!invoiceId) {
