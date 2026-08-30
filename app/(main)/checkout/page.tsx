@@ -1017,7 +1017,6 @@ function StepPayment({ cart }: { cart: Cart }) {
                 type="text" value={refCode}
                 onChange={e => { setRefCode(e.target.value.toUpperCase()); setRefStatus("idle"); setRefPrefilled(false); }}
                 onBlur={e => checkReferralCode(e.target.value)}
-                placeholder="e.g. NELSON10"
                 className={`${INPUT} text-sm uppercase tracking-widest`}
               />
               {refStatus === "checking" && <p className="mt-1.5 text-xs text-gray-400">Checking code…</p>}
