@@ -29,7 +29,7 @@ import { createSession, getSession } from "@/lib/session-store";
 import { requireAdmin, isAdminUnauthorized, logAdminActivity, getRequestIp as getAdminRequestIp } from "@/lib/admin-auth";
 import { getTicketMetaBulk } from "@/lib/ticket-meta";
 import { pushAdminNotification } from "@/lib/admin-notifications";
-import { getOrCreateReferralCode, resolveReferralCode, getAffiliateOverridesMap, getReferralCodesMap, setAffiliateStatus, setAffiliateCommissionOverride } from "@/lib/affiliate-store";
+import { getOrCreateReferralCode, getAffiliateOverridesMap, getReferralCodesMap, setAffiliateStatus, setAffiliateCommissionOverride } from "@/lib/affiliate-store";
 
 type Params = Record<string, unknown>;
 
@@ -907,15 +907,6 @@ export async function POST(req: NextRequest) {
         const paymentDetails = s("paymentDetails");
         if (!paymentDetails) return NextResponse.json({ success: false, error: "Payment details are required." }, { status: 400 });
         data = await requestAffiliateWithdrawal(session.clientId, affiliate.affiliateId, amount, paymentMethod, paymentDetails, s("name") || undefined, session.email);
-        break;
-      }
-
-      case "resolveReferralCode": {
-        // Public/unauthenticated — used by the signup page to turn a shared
-        // vanity code (or a raw numeric legacy link) into the WHMCS affiliate
-        // id AddClient's `affid` expects. Returns null rather than erroring
-        // for an unknown code so a bad/stale ref link never blocks signup.
-        data = { affiliateId: await resolveReferralCode(s("code")) };
         break;
       }
 

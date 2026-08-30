@@ -5,8 +5,10 @@ import { useEffect } from "react";
 const STORAGE_KEY = "bshop_ref_code";
 
 /** Captures a shared affiliate code/link from any landing page (?ref=CODE, or
- *  the legacy numeric ?affid=) and remembers it until signup, since visitors
- *  usually land on the homepage or a product page — not directly on /signup. */
+ *  the legacy numeric ?affid=) and remembers it until checkout, since visitors
+ *  usually land on the homepage or a product page — not directly on /checkout.
+ *  Deliberately unrelated to signup: affiliates are only credited once a
+ *  payment actually completes, never for an account being created. */
 export default function ReferralCapture() {
   useEffect(() => {
     try {

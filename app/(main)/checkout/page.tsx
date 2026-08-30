@@ -458,9 +458,11 @@ function StepPayment({ cart }: { cart: Cart }) {
     } catch { setRefStatus("invalid"); setRefAffid(null); }
   }, []);
 
-  // A referral code captured earlier (from a shared ?ref= link, or typed at
-  // signup) is handed off via localStorage — pick it up and pre-fill so it
-  // carries through to this order too, same as the coupon handoff below.
+  // A referral code captured from a shared ?ref= link (see ReferralCapture)
+  // is handed off via localStorage — pick it up and pre-fill so it carries
+  // through to this order, same as the coupon handoff below. This is the
+  // only place a referral is ever applied — signup never sees it, since
+  // affiliates are only credited once a payment actually completes.
   useEffect(() => {
     const captured = localStorage.getItem("bshop_ref_code");
     if (!captured) return;
@@ -542,8 +544,9 @@ function StepPayment({ cart }: { cart: Cart }) {
           setMmStep("success");
           setTimeout(() => {
             clearCart();
+            const referred = refAffid !== null;
             localStorage.removeItem("bshop_ref_code");
-            router.push("/checkout/complete?method=pawapay");
+            router.push(`/checkout/complete?method=pawapay${referred ? "&ref=1" : ""}`);
           }, 1500);
         } else if (["FAILED", "REJECTED", "TIMED_OUT", "DUPLICATE_IGNORED"].includes(json.status)) {
           setMmStep("failed");
@@ -633,7 +636,12 @@ function StepPayment({ cart }: { cart: Cart }) {
       if (json.success && json.status === "COMPLETED") {
         setMmError("");
         setMmStep("success");
-        setTimeout(() => { clearCart(); localStorage.removeItem("bshop_ref_code"); router.push("/checkout/complete?method=pawapay"); }, 1500);
+        setTimeout(() => {
+          clearCart();
+          const referred = refAffid !== null;
+          localStorage.removeItem("bshop_ref_code");
+          router.push(`/checkout/complete?method=pawapay${referred ? "&ref=1" : ""}`);
+        }, 1500);
         return;
       }
     } catch { /* couldn't confirm — fall through and let the user retry */ }
@@ -1074,8 +1082,9 @@ function StepPayment({ cart }: { cart: Cart }) {
                   onSuccess={() => {
                     setPaypalPaid(true);
                     clearCart();
+                    const referred = refAffid !== null;
                     localStorage.removeItem("bshop_ref_code");
-                    setTimeout(() => router.push(`/checkout/complete?method=paypal&invoiceId=${paypalOrder.invoiceId}`), 1200);
+                    setTimeout(() => router.push(`/checkout/complete?method=paypal&invoiceId=${paypalOrder.invoiceId}${referred ? "&ref=1" : ""}`), 1200);
                   }}
                   onError={(msg) => setError(msg)}
                 />

@@ -113,7 +113,12 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // 1. Create WHMCS order(s) from cart items
+      // 1. Create WHMCS order(s) from cart items. `stored.affid` (captured at
+      //    /api/pawapay/initiate from the checkout referral field) is attached
+      //    to the order here, but WHMCS only actually credits the affiliate's
+      //    commission once the invoice is marked Paid — step 2 below, which
+      //    only runs after PawaPay has confirmed COMPLETED. A signup alone,
+      //    or a deposit that never completes, never earns a commission.
       const { orderId, invoiceId, allOrderIds } = await createPawapayOrder(
         clientId,
         stored.cartItems as { type: string; [k: string]: unknown }[],

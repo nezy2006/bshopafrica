@@ -15,8 +15,17 @@ function Spinner() {
   );
 }
 
+/* ─── Referral confirmation ──────────────────────────────────────────────── */
+function ReferralConfirmation() {
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-3 mb-6 text-sm text-[#6B21A8] font-semibold text-center">
+      Thank you! Your referral has been recorded.
+    </div>
+  );
+}
+
 /* ─── Paid state ─────────────────────────────────────────────────────────── */
-function InvoicePaid({ invoice }: { invoice: InvoiceDetails }) {
+function InvoicePaid({ invoice, referred }: { invoice: InvoiceDetails; referred: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
@@ -49,6 +58,8 @@ function InvoicePaid({ invoice }: { invoice: InvoiceDetails }) {
         <p className="text-gray-500 text-sm mb-6">
           Invoice #{invoice.id} · Check your email for next steps.
         </p>
+
+        {referred && <ReferralConfirmation />}
 
         {/* Order details */}
         <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5 mb-6 text-left">
@@ -147,7 +158,7 @@ function InvoicePending({ invoice, onRefresh }: { invoice: InvoiceDetails | null
 }
 
 /* ─── PawaPay success ────────────────────────────────────────────────────── */
-function PawapaySuccess() {
+function PawapaySuccess({ referred }: { referred: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
@@ -171,6 +182,8 @@ function PawapaySuccess() {
         <p className="text-gray-500 text-sm mb-6">
           Your payment was received. Your order is being provisioned now.
         </p>
+
+        {referred && <ReferralConfirmation />}
 
         <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-6 text-sm text-green-800 text-left space-y-1">
           <p className="font-semibold">What happens next?</p>
@@ -203,6 +216,7 @@ function CheckoutCompleteInner() {
   const searchParams = useSearchParams();
   const method       = searchParams.get("method");
   const invoiceId    = searchParams.get("invoiceId");
+  const referred     = searchParams.get("ref") === "1";
 
   const [invoice,  setInvoice]  = useState<InvoiceDetails | null>(null);
   const [loading,  setLoading]  = useState(true);
@@ -249,7 +263,7 @@ function CheckoutCompleteInner() {
       <div className="max-w-xl mx-auto">
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
           {method === "pawapay" ? (
-            <PawapaySuccess />
+            <PawapaySuccess referred={referred} />
           ) : loading ? (
             <div className="text-center py-16 space-y-4">
               <Spinner />
@@ -261,7 +275,7 @@ function CheckoutCompleteInner() {
               <Link href="/" className="text-[#6B21A8] font-bold text-sm hover:underline">Return to Home</Link>
             </div>
           ) : isPaid && invoice ? (
-            <InvoicePaid invoice={invoice} />
+            <InvoicePaid invoice={invoice} referred={referred} />
           ) : (
             <InvoicePending invoice={invoice} onRefresh={fetchInvoice} />
           )}

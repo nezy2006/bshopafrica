@@ -29,6 +29,14 @@ export async function POST(req: NextRequest) {
 
     // Money has already moved at this point — always report success to the user from here on,
     // even if the WHMCS-side bookkeeping below has a partial failure. Log for manual follow-up.
+    //
+    // Affiliate commission: nothing to do here explicitly. The order behind this
+    // invoice was created with `affid` already attached (see createOrderWithGateway
+    // in lib/whmcs.ts, called from /api/checkout/create-order) — WHMCS's affiliate
+    // module only actually credits that commission once the invoice is marked
+    // Paid, which is exactly what addPaymentToInvoice below does. So a signup
+    // alone, or an order that never gets captured, never earns a commission;
+    // only a real, captured payment does.
     try {
       // If a promo discount was applied, the client only paid the discounted amount via
       // PayPal but the WHMCS invoice is for the full price. Recording only the discounted

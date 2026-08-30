@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -200,7 +200,6 @@ function SignupPageInner() {
   const searchParams = useSearchParams();
   const redirectTo   = searchParams.get("redirect") ?? "/dashboard";
   const planParam    = searchParams.get("plan") ?? "";
-  const refParam      = searchParams.get("ref") ?? searchParams.get("affid") ?? "";
 
   const [firstName,       setFirstName]       = useState("");
   const [lastName,        setLastName]        = useState("");
@@ -213,36 +212,6 @@ function SignupPageInner() {
   const [agreed,          setAgreed]          = useState(false);
   const [loading,         setLoading]         = useState(false);
   const [errors,          setErrors]          = useState<Record<string, string>>({});
-
-  const [refCode,     setRefCode]     = useState("");
-  const [refStatus,   setRefStatus]   = useState<"idle" | "checking" | "valid" | "invalid">("idle");
-  const [refName,     setRefName]     = useState("");
-  const [refAffid,    setRefAffid]    = useState<number | null>(null);
-
-  // Pre-fill and validate a code captured from ?ref=/?affid= or a shared link
-  // (via ReferralCapture), so the field isn't blank when someone arrives that way.
-  useEffect(() => {
-    const captured = refParam || (typeof window !== "undefined" ? localStorage.getItem("bshop_ref_code") ?? "" : "");
-    if (captured) { setRefCode(captured); checkReferralCode(captured); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function checkReferralCode(code: string) {
-    const trimmed = code.trim();
-    if (!trimmed) { setRefStatus("idle"); setRefAffid(null); return; }
-    setRefStatus("checking");
-    try {
-      const res  = await fetch(`/api/affiliate/validate?code=${encodeURIComponent(trimmed)}`);
-      const json = await res.json() as { valid: boolean; affiliateName?: string; affid?: number };
-      if (json.valid && json.affid) {
-        setRefStatus("valid"); setRefName(json.affiliateName ?? ""); setRefAffid(json.affid);
-      } else {
-        setRefStatus("invalid"); setRefAffid(null);
-      }
-    } catch {
-      setRefStatus("invalid"); setRefAffid(null);
-    }
-  }
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -285,36 +254,11 @@ function SignupPageInner() {
         return;
       }
 
-      // Resolve a referral code into the numeric WHMCS affiliate id AddClient's
-      // `affid` expects. The manually-typed field takes priority (re-validated
-      // now in case it was never blurred); otherwise fall back to one captured
-      // from the URL or an earlier ReferralCapture landing. A bad/stale code
-      // just means no attribution — it must never block signup.
-      let affid: string | undefined;
-      if (refCode.trim()) {
-        if (refStatus === "valid" && refAffid) {
-          affid = String(refAffid);
-        } else {
-          try {
-            const valRes  = await fetch(`/api/affiliate/validate?code=${encodeURIComponent(refCode.trim())}`);
-            const valJson = await valRes.json() as { valid: boolean; affid?: number };
-            if (valJson.valid && valJson.affid) { affid = String(valJson.affid); setRefStatus("valid"); }
-            else setRefStatus("invalid");
-          } catch { /* attribution is best-effort */ }
-        }
-      } else {
-        const ref = refParam || (typeof window !== "undefined" ? localStorage.getItem("bshop_ref_code") ?? "" : "");
-        if (ref) {
-          try {
-            const refRes  = await fetch("/api/whmcs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resolveReferralCode", params: { code: ref } }) });
-            const refJson = await refRes.json() as { success: boolean; data?: { affiliateId: number | null } };
-            if (refJson.data?.affiliateId) affid = String(refJson.data.affiliateId);
-          } catch { /* attribution is best-effort */ }
-        }
-      }
-      if (affid) { try { localStorage.setItem("bshop_ref_code", affid); } catch { /* best-effort */ } }
-
       // Proceed with registration
+      // No affid here — affiliates are only credited on a completed payment
+      // at checkout, never for a signup alone. Any referral code captured
+      // earlier (ReferralCapture / a shared link) is left untouched in
+      // localStorage so it still applies once the client actually checks out.
       const res = await fetch("/api/whmcs", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -331,7 +275,6 @@ function SignupPageInner() {
             state:       "N/A",
             postcode:    "00000",
             country:     "RW",
-            ...(affid ? { affid } : {}),
           },
         }),
         signal: controller.signal,
@@ -351,7 +294,6 @@ function SignupPageInner() {
       // setAuth() (not raw localStorage writes) so any previous client's
       // cached notifications get cleared when a different client id logs in.
       setAuth(json.data.clientId, firstName, lastName, email, json.data.sessionToken);
-      try { localStorage.removeItem("bshop_ref_code"); } catch { /* best-effort cleanup */ }
 
       // If came from hosting page, add plan to cart
       if (planParam && HOSTING_PLANS[planParam]) {
@@ -500,25 +442,6 @@ function SignupPageInner() {
                   <EyeIcon open={showCpw} />
                 </button>
               </div>
-            </Field>
-
-            {/* Referral code (optional) */}
-            <Field label="Referral Code (optional)">
-              <input
-                type="text"
-                value={refCode}
-                onChange={(e) => { setRefCode(e.target.value); setRefStatus("idle"); }}
-                onBlur={(e) => checkReferralCode(e.target.value)}
-                placeholder="e.g. NELSON10"
-                className={`${INPUT} uppercase`}
-              />
-              {refStatus === "checking" && <p className="mt-1.5 text-xs text-gray-400">Checking code…</p>}
-              {refStatus === "valid" && (
-                <p className="mt-1.5 text-xs text-green-600 font-semibold">
-                  ✓ Referral code {refCode.trim().toUpperCase()} applied{refName ? ` — you are being referred by ${refName}` : ""}
-                </p>
-              )}
-              {refStatus === "invalid" && <p className="mt-1.5 text-xs text-red-500 font-medium">Invalid referral code</p>}
             </Field>
 
             {/* Terms checkbox */}
